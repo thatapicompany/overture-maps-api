@@ -1,31 +1,36 @@
 // src/gcs/gcs.service.ts
-import { Injectable } from '@nestjs/common';
-import { Storage } from '@google-cloud/storage';
+import { Injectable, Logger } from '@nestjs/common';
+import { Storage, Bucket } from '@google-cloud/storage';
 import { createHash } from 'crypto';
 import * as path from 'path';
 
 @Injectable()
 export class GcsService {
   private storage: Storage;
-  private bucketName: string;
+  private bucket: Bucket;
+
+  logger = new Logger('GcsService');
 
   constructor() {
     this.storage = new Storage({
       projectId: process.env.BIGQUERY_PROJECT_ID,
       keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     });
-    this.bucketName = process.env.GCS_BUCKET_NAME; // Make sure to create a bucket in GCS and set its name here
+
+    this.bucket = this.storage.bucket(process.env.GCS_BUCKET_NAME);
+
+    // Apply lifecycle rule to auto-delete objects after 90 days
+    this.setLifecyclePolicy();
   }
 
-  // Generate a unique filename based on the lat, lng, and radius
-  private generateCacheFileName(lat: number, lng: number, radius: number): string {
-    const hash = createHash('md5').update(`${lat}-${lng}-${radius}`).digest('hex');
+  // Method to generate unique cache file names
+  private generateCacheFileName(filename): string {
+    const hash = createHash('md5').update(filename).digest('hex');
     return `${hash}.json`;
   }
 
-  async getCachedPlaces(lat: number, lng: number, radius: number): Promise<any | null> {
-    const fileName = this.generateCacheFileName(lat, lng, radius);
-    const file = this.storage.bucket(this.bucketName).file(fileName);
+  async getJSON(fileName: string): Promise<any | null> {
+    const file = this.bucket.file(this.generateCacheFileName(fileName));
 
     try {
       const exists = await file.exists();
@@ -34,24 +39,41 @@ export class GcsService {
         return JSON.parse(content.toString());
       }
     } catch (error) {
-      console.error('Error fetching cached places:', error);
+      this.logger.error('Error fetching cached places:', error);
       return null;
     }
     return null;
   }
 
-  async cachePlaces(lat: number, lng: number, radius: number, data: any): Promise<void> {
-    const fileName = this.generateCacheFileName(lat, lng, radius);
-    const file = this.storage.bucket(this.bucketName).file(fileName);
-    
+  async storeJSON(data: any, fileName: string): Promise<void> {
+    const file = this.bucket.file(this.generateCacheFileName(fileName));
+
     try {
       await file.save(JSON.stringify(data), {
         contentType: 'application/json',
         resumable: false,
       });
-      console.log('Cached places saved to GCS.');
+      this.logger.log('Cached places saved to GCS.');
     } catch (error) {
-      console.error('Error saving cached places:', error);
+        this.logger.error('Error saving cached places:', error);
+    }
+  }
+  // Method to set lifecycle policy on the bucket
+  private async setLifecyclePolicy(): Promise<void> {
+    try {
+      await this.bucket.setMetadata({
+        lifecycle: {
+          rule: [
+            {
+              action: { type: 'Delete' },
+              condition: { age: 90 } // Automatically delete objects older than 90 days
+            }
+          ]
+        }
+      });
+      this.logger.log('Lifecycle policy set to auto-delete objects after 90 days.');
+    } catch (error) {
+        this.logger.error('Error setting lifecycle policy:', error);
     }
   }
 }

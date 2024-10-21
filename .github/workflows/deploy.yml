@@ -1,0 +1,29 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Google Cloud SDK
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }} # Set this secret in your GitHub repo
+          service_account_key: ${{ secrets.GCP_SA_KEY }} # Set this secret in your GitHub repo
+          export_default_credentials: true
+
+      # Step 3: Trigger Cloud Build
+      - name: Trigger Cloud Build
+        run: |
+          gcloud builds submit --config cloudbuild.yaml --substitutions=_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
