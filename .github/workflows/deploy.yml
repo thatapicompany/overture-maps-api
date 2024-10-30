@@ -1,29 +1,36 @@
-name: Deploy to Cloud Run
-
+name: Default test
 on:
   push:
-    branches:
-      - main
+    branches-ignore:
+      - 'master'
+      - 'staging'
 
 jobs:
-  deploy:
-    name: Deploy to Cloud Run
+  test-build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        node-version: [22.x]
+    
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # Step 2: Set up Google Cloud SDK
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }} # Set this secret in your GitHub repo
-          service_account_key: ${{ secrets.GCP_SA_KEY }} # Set this secret in your GitHub repo
-          export_default_credentials: true
-
-      # Step 3: Trigger Cloud Build
-      - name: Trigger Cloud Build
-        run: |
-          gcloud builds submit --config cloudbuild.yaml --substitutions=_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+    - uses: actions/checkout@v1
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: npm install
+      run: |
+        npm install
+    - name: npm test
+      run: |
+        npm test 
+        
+    - name: npm test:e2e
+      run: |
+        npm run test:e2e 
+      
+    - name: npm build
+      run: |
+        npm run build --if-present

@@ -3,6 +3,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BigQuery } from '@google-cloud/bigquery';
 import { Place } from '../places/interfaces/place.interface';
 
+interface IQueryStatistics {
+  totalBytesProcessed: number;
+  totalBytesBilled: number;
+  billedAmountInGB: number;
+  bytesProcessedInGB: number;
+  durationMs: number;
+}
+
 @Injectable()
 export class BigQueryService {
   private bigQueryClient: BigQuery;
@@ -92,11 +100,12 @@ export class BigQueryService {
     latitude?: number,
     longitude?: number,
     radius: number = 1000,
+    categories?: string[],
     minimum_places: number = 10,
     require_wikidata: boolean = false
 
-  ): Promise<{ brand: string; wikidata: string }[]> {
-    let query = `
+  ): Promise<{ brand: string; wikidata: string; counts:{ places:number}  }[]> {
+    let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand.names.primary AS brand, brand.wikidata AS wikidata, count(id) as count_places
       FROM \`bigquery-public-data.overture_maps.place\`
     `;
@@ -110,6 +119,9 @@ export class BigQueryService {
       ) <= ${radius}`;
     }
     query += ` AND brand IS NOT NULL`;
+    if(categories && categories.length > 0){
+      query += ` AND category.primary IN UNNEST(["${categories.join('","')}"])`;
+    }
     if (require_wikidata) {
       query += ` AND brand.wikidata IS NOT NULL`;
     }
@@ -129,64 +141,149 @@ export class BigQueryService {
     return rows.map((row: any) => ({
       brand: row.brand,
       wikidata: row.wikidata,
-      count_places: row.count_places,
+      counts:{
+        places: row.count_places
+      }
     }));
   }
 
-  async getPlaceCountsByCountry(): Promise<{ country: string; count_places: number }[]> {
-    const query = `
-      SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places
+  async getPlaceCountsByCountry(): Promise<{ country: string; counts:{ places:number, brands:number} }[]> {
+    const query = `-- Overture Maps API: Get place counts by country
+      SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
       FROM \`bigquery-public-data.overture_maps.place\`
       GROUP BY country
       ORDER BY count_places DESC;
     `;
 
-    const options = {
-      query: query,
-      location: 'US', // Adjust the location if necessary
-    };
-
-    const [rows] = await this.bigQueryClient.query(options);
+    const {rows} = await this.runQuery(query);
 
     return rows.map((row: any) => ({
       country: row.country,
-      count_places: row.count_places,
+      counts:{
+        places: row.count_places,
+        brands: row.count_brands
+      }
     }));
   }
-
   async getPlacesNearby(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    wikidata?: string,
-    country?: string
+    brand_wikidata?: string,
+    brand_name?: string,
+    country?: string,
+    categories?: string[],
+    min_confidence?: number,
+    limit?: number
   ): Promise<Place[]> {
-    // Build the query with optional filters for wikidata and country
-    let query = `
-      SELECT *, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS distance_m FROM \`bigquery-public-data.overture_maps.place\`
-      WHERE ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})
-
-    `;
-
   
-    if (wikidata) {
-        query += ` AND brand.wikidata = "${wikidata}"`;
-      }
+    let queryParts: string[] = [];
   
-      if (country) {
-        query += ` AND addresses.list[OFFSET(0)].element.country = "${country}"`;
-      }
-    query += ` ORDER BY distance_m LIMIT 100;`;
+    // Base query and distance calculation if latitude and longitude are provided
+    queryParts.push(`-- Overture Maps API: Get places nearby \n`);
+    queryParts.push(`SELECT *`);
     
+    if (latitude && longitude) {
+      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${latitude}, ${longitude})) AS distance_m`);
+    }
+  
+    queryParts.push(`FROM \`bigquery-public-data.overture_maps.place\``);
+  
+    // Conditional filters
+    let whereClauses: string[] = [];
+    
+    if (latitude && longitude && radius) {
+      whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+    } 
+  
+    if (brand_wikidata) {
+      whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
+    }
+    if (brand_name) {
+      whereClauses.push(`brand.names.primary = "${brand_name}"`);
+    }
+  
+    if (country) {
+      whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
+    }
+
+    if(categories && categories.length > 0){
+      console.log(categories);
+      whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
+    }
+  
+    if (min_confidence) {
+      whereClauses.push(`confidence >= ${min_confidence}`);
+    }
+  
+    // Combine where clauses
+    if (whereClauses.length > 0) {
+      queryParts.push(`WHERE ${whereClauses.join(' AND ')}`);
+    }
+  
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY distance_m`);
+    }
+  
+    // Limit results if no filters are provided
+    if (!latitude && !longitude && !brand_wikidata && !brand_name) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+  
+    // Finalize the query stbilledAmountInnGBring
+    const query = queryParts.join(' ') + ';';
     this.logger.debug(`Running query: ${query}`);
+  
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => this.parseRow(row));
+  }  
 
-    const options = {
-      query: query,
-      location: 'US', // Adjust the location if necessary
-    };
-
-    const [rows] = await this.bigQueryClient.query(options);
-
-    return rows.map((row: any) => (this.parseRow(row)));
+  applyMaxLimit(limit: number): number {
+    return Math.min(limit, 1000);
   }
+
+  getDefaultLabels() : any
+  {
+
+      const  labels =  {
+          "product":  "overture-maps-api",
+          "env": process.env.ENV
+      }
+      return labels;
+  }
+
+  async runQuery(query:string, labels:any={}):Promise<{rows:any[], statistics:IQueryStatistics}>
+  {
+      
+      let start = Date.now()
+      const options = {
+          query: query,
+          // Location must match that of the dataset(s) referenced in the query.
+          location: 'US',
+          labels: {...labels, ...this.getDefaultLabels()},
+      };
+      // Run the query as a job
+      const [job] = await this.bigQueryClient.createQueryJob(options);
+
+      // Wait for the query to finish
+      const [rows] = await job.getQueryResults();
+      const [result] = await job.getMetadata();
+      
+      const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
+      const totalBytesBilled = parseInt(result.statistics.query.totalBytesBilled);
+      
+      const statistics:IQueryStatistics = {
+          totalBytesProcessed,
+          totalBytesBilled,
+          billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
+          bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
+          durationMs: Date.now() - start
+      }
+
+      const QueryFirstLine = query.split('\n')[0];
+      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. Processed ${statistics.bytesProcessedInGB} GB. Query ${QueryFirstLine}`);
+      
+      return {rows,statistics};
+    }
 }

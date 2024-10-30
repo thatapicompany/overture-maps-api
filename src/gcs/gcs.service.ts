@@ -20,7 +20,7 @@ export class GcsService {
     this.bucket = this.storage.bucket(process.env.GCS_BUCKET_NAME);
 
     // Apply lifecycle rule to auto-delete objects after 90 days
-    this.setLifecyclePolicy();
+    //this.setLifecyclePolicy();
   }
 
   // Method to generate unique cache file names

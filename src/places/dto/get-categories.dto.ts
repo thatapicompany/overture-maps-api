@@ -2,7 +2,7 @@
 import { Transform } from 'class-transformer';
 import { IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
-export class GetBrandsDto {
+export class GetCategoriesDto {
   @IsOptional()
   @IsString()
   @MaxLength(2)
@@ -23,9 +23,4 @@ export class GetBrandsDto {
   @Min(1)
   radius?: number = 1000; // Default radius is 1000 meters if not provided
 
-  //transform into an array of strings
-  @IsOptional()
-  @Transform(({ value }) => value.split(','))
-  @IsString({ each: true })
-  categories?: string[]; // Array of category names
 }
