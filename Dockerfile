@@ -1,32 +1,34 @@
-# Stage 1: Build the app
-FROM node:22 AS build
+FROM node:17-stretch
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the package.json and package-lock.json to the working directory
 COPY package*.json ./
 
-# Install the dependencies
-RUN npm install --only=production
+RUN npm install
+RUN git --version
 
-# Copy the rest of the application code
-COPY . .
+COPY src ./src
+RUN ls ./
 
-# Build the app
-RUN npm run build
+#ARG NODE_ENV=prod
+#ENV NODE_ENV=${NODE_ENV}
 
-# Stage 2: Create a smaller image for running the app
-FROM node:22-slim
+#COPY tools ./tools
 
-# Set the working directory
-WORKDIR /app
+# placeholders for validation
+RUN [ "touch",".env"]
+RUN [ "touch",".env.staging"]
+RUN [ "touch",".env.dev"]
+RUN [ "touch",".env.production"]
 
-# Copy the built app from the build stage
-COPY --from=build /app .
+COPY tsconfig.json .
+COPY tsconfig.build.json .
 
-# Expose the application port (adjust if necessary)
+RUN [ "npm", "run", "build"]
+
+
 EXPOSE 8080
 
-# Start the app
-CMD ["npm", "run", "start:prod"]
+CMD [ "npm", "run", "start" ]
+# COPY entrypoint.sh .
+ # ENTRYPOINT [ "/app/entrypoint.sh" ]
