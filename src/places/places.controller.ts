@@ -6,6 +6,7 @@ import { GetPlacesDto } from './dto/get-places.dto';
 import { PlaceResponseDto } from './dto/place-response.dto';
 import { GetBrandsDto } from './dto/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
+import { GetCategoriesDto } from './dto/get-categories.dto';
 
 @Controller('places')
 @UseGuards(IsAuthenticatedGuard)
@@ -48,11 +49,11 @@ export class PlacesController {
   
       const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
 
-    // Check if cached results exist in GCS
-    const cachedResult = await this.gcsService.getJSON(cacheKey);
-    if (cachedResult) {
-      return cachedResult;
-    }
+      // Check if cached results exist in GCS
+      const cachedResult = await this.gcsService.getJSON(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
+      }
     
       const brands = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
       
@@ -67,6 +68,20 @@ export class PlacesController {
         }
 
         const brands = await this.bigQueryService.getPlaceCountsByCountry();
+        
+        return brands;
+    }
+
+    @Get('categories')
+    async getCategories(@Query() query: GetCategoriesDto) {
+
+        const cacheKey = `get-places-categories`;
+        const cachedResult = await this.gcsService.getJSON(cacheKey);
+        if (cachedResult) {
+          return cachedResult;
+        }
+        
+        const brands = await this.bigQueryService.getCategories(query.country);
       
         return brands;
     }

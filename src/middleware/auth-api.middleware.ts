@@ -15,7 +15,7 @@ export class AuthAPIMiddleware implements NestMiddleware {
   private theAuthAPI: TheAuthAPI;
 
   constructor() { 
-    if(process.env.AUTH_API_ACCESS_KEY)this.theAuthAPI = new TheAuthAPI(process.env.AUTH_API_ACCESS_KEY);
+    if(process.env.AUTH_API_ACCESS_KEY && process.env.AUTH_API_ACCESS_KEY!="create-one-from-theauthapi.com")this.theAuthAPI = new TheAuthAPI(process.env.AUTH_API_ACCESS_KEY);
   }
 
   async use(req: Request, res: Response, next: () => void) {

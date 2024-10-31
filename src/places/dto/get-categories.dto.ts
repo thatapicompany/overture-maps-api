@@ -9,18 +9,4 @@ export class GetCategoriesDto {
   @MinLength(2)
   country?: string; // ISO 3166 country code
 
-  @ValidateIf(o => !o.country)
-  @IsNumber()
-  lat?: number;
-
-  @ValidateIf(o => !o.country)
-  @IsNumber()
-  lng?: number;
-
-  @ValidateIf(o => !o.country)
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  radius?: number = 1000; // Default radius is 1000 meters if not provided
-
 }

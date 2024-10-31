@@ -23,7 +23,7 @@ export class BigQueryService {
     });
   }
 
-  private parseRow(row: any): Place {
+  private parsePlaceRow(row: any): Place {
     return {
         id: row.id,
         geometry: {
@@ -101,12 +101,13 @@ export class BigQueryService {
     longitude?: number,
     radius: number = 1000,
     categories?: string[],
-    minimum_places: number = 10,
+    minimum_places?: number,
     require_wikidata: boolean = false
 
-  ): Promise<{ brand: string; wikidata: string; counts:{ places:number}  }[]> {
+  ): Promise<{ names: {primary:string,common:string,rules:string}; wikidata: string; counts:{ places:number}  }[]> {
+
     let query = `-- Overture Maps API: Get brands nearby
-      SELECT DISTINCT brand.names.primary AS brand, brand.wikidata AS wikidata, count(id) as count_places
+      SELECT DISTINCT brand , count(id) as count_places
       FROM \`bigquery-public-data.overture_maps.place\`
     `;
 
@@ -125,22 +126,17 @@ export class BigQueryService {
     if (require_wikidata) {
       query += ` AND brand.wikidata IS NOT NULL`;
     }
-    query += ` GROUP BY brand, wikidata`;
+    query += ` GROUP BY ALL`;
     if (minimum_places) {
       query += ` HAVING count_places >= ${minimum_places}`;
     }
     query += ` ORDER BY count_places DESC;`;
 
-    const options = {
-      query: query,
-      location: 'US', // Adjust the location if necessary
-    };
-
-    const [rows] = await this.bigQueryClient.query(options);
+    const {rows} = await this.runQuery(query);
 
     return rows.map((row: any) => ({
-      brand: row.brand,
-      wikidata: row.wikidata,
+      names: row.brand.names,
+      wikidata: row.brand.wikidata,
       counts:{
         places: row.count_places
       }
@@ -165,6 +161,34 @@ export class BigQueryService {
       }
     }));
   }
+
+  async getCategories(country?:string): Promise<{ primary: string; counts:{ places:number } }[]> {
+    let query = `-- Overture Maps API: Get categories
+      SELECT DISTINCT categories.primary AS category_primary,
+      count(1) as count_places,
+      count(distinct brand.names.primary) as count_brands
+      FROM \`bigquery-public-data.overture_maps.place\`
+      WHERE categories.primary IS NOT NULL
+    `;
+    if (country) {
+      query += ` AND addresses.list[OFFSET(0)].element.country = "${country}"`
+    }
+
+    query += ` GROUP BY category_primary
+      ORDER BY count_places DESC;
+    `;
+
+    const {rows} = await this.runQuery(query);
+
+    return rows.map((row: any) => ({
+      primary: row.category_primary,
+      counts:{
+        places: row.count_places,
+        brands: row.count_brands
+      }
+    }));
+  }
+
   async getPlacesNearby(
     latitude: number,
     longitude: number,
@@ -231,12 +255,12 @@ export class BigQueryService {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
   
-    // Finalize the query stbilledAmountInnGBring
+    // Finalize the query
     const query = queryParts.join(' ') + ';';
     this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
-    return rows.map((row: any) => this.parseRow(row));
+    return rows.map((row: any) => this.parsePlaceRow(row));
   }  
 
   applyMaxLimit(limit: number): number {

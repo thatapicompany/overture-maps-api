@@ -5,32 +5,46 @@
 ## Endpoints
 
 - [./Places](https://docs.overturemaps.org/guides/places/) - The Overture places theme has one feature type, called place, and contains more than 53 million point representations of real-world entities: schools, businesses, hospitals, religious organizations, landmarks, mountain peaks, and much more.
-- [./Addressess](https://docs.overturemaps.org/guides/addresses/) - An address is a feature type that represents a physical place through a series of attributes: street number, street name, unit, address_levels, postalcode and/or country. They also have a Point geometry, which provides an approximate location of the position most commonly associated with the feature. 
-- [./Wikidata](https://www.wikidata.org/wiki/Wikidata:Main_Page) - Wikidata is a free and open knowledge base that can be read and edited by both humans and machines. It is used to match the brand.wikidata with the wikidata_id of the place.
+- [./Places/Brands]
+- [./Places/Categories]
+- [./Places/Countries]
 
+### Schemas & Design
 
-### Schemas
+- [API Design](./docs/api-design.md)
 - [Place](https://docs.overturemaps.org/schema/reference/places/place/)
 - [Address](https://docs.overturemaps.org/schema/reference/addresses/address/)
 
-
-### BigQuery
-- [Place](https://console.cloud.google.com/bigquery?project=bigquery-public-data&p=bigquery-public-data&d=overture_maps&t=place&page=table)
-
-Example Query
-```SQL
-SELECT *
-FROM `bigquery-public-data.overture_maps.place`
-WHERE ST_DWithin(geometry, ST_GeogPoint(16.3738, 48.2082), 500)
-```
-
 ### Extras
+
 - [Overture Maps](https://overturemaps.org/)
 - [Overture Maps API](https://docs.overturemaps.org/)
 
-
 ### Data patching
+
 - Wikidata ID - is not always availble in the Overture Maps data. We can use the Wikidata API to get the wikidata_id for the place with a name and country match for best quess. This can be disabled in the request parameters via `patch_wikidata=false`.
 
-### Deployment
+### Deployment & Datasets
+
 - [Google Cloud Platform](./docs/google-cloud-platform.md)
+
+
+### API Key management
+
+You can either use the hardcoded API key in the code, or use the Auth API by going to theAuthAPI.com and creating an account. You can then create an Access Key for the App and add it as an Env var, and then create any number of API Keys for secure access to the API, and rate-limit them for cost control.
+
+
+### Running Locally
+
+GCP: Download the Service Account .json file, and set the name in the .env variable `GOOGLE_APPLICATION_CREDENTIALS` to the path of the file.
+
+```bash
+ npm install
+ npm run start
+```
+
+Test the API by curl on `http://localhost:8080/places/countries` with the DEMO-API-KEY
+
+```bash
+curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands' -d 'country=AU'
+```
