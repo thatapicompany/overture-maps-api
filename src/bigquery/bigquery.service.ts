@@ -11,6 +11,8 @@ interface IQueryStatistics {
   durationMs: number;
 }
 
+const MAX_LIMIT = 100000;
+
 @Injectable()
 export class BigQueryService {
   private bigQueryClient: BigQuery;
@@ -251,7 +253,7 @@ export class BigQueryService {
     }
   
     // Limit results if no filters are provided
-    if (!latitude && !longitude && !brand_wikidata && !brand_name) {
+    if (limit) {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
   
@@ -264,7 +266,7 @@ export class BigQueryService {
   }  
 
   applyMaxLimit(limit: number): number {
-    return Math.min(limit, 1000);
+    return Math.min(limit, MAX_LIMIT);
   }
 
   getDefaultLabels() : any

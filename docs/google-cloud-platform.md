@@ -51,3 +51,36 @@ Google Cloud Storage (GCS) Permissions:
 
 - Storage Object Viewer (roles/storage.objectViewer): Grants read access to objects in the bucket.
 - Storage Object Creator (roles/storage.objectCreator): Grants permission to write files to the bucket, including creating new objects.
+
+
+## Billing Alerts
+
+To set a maximum amount of BigQuery billed usage for a service account in Google Cloud Platform (GCP), you can use **BigQuery custom quotas** with **Budget Alerts** and **Cost Management** policies. While GCP does not directly offer a "hard limit" on the gigabytes processed by a specific service account in BigQuery, you can combine these methods to closely monitor and restrict usage:
+
+### 1. Set a Budget with Alerts
+Setting a budget for BigQuery can help you track and get alerts when usage approaches your desired monthly limit. Here’s how to set this up:
+
+1. **Go to the GCP Console** and navigate to **Billing** > **Budgets & alerts**.
+2. Click **Create Budget** and select the billing account.
+3. Define your budget, naming it appropriately (e.g., "BigQuery Service Account Budget").
+4. Set the **amount** for your budget to align with the estimated monthly cost for your maximum GB usage.
+5. Configure **alerts** at specific percentages of the budget (e.g., 50%, 80%, 100%) to receive notifications when the limit is nearing.
+6. Assign specific recipients or roles to get notified via email.
+
+> **Note**: Although this will alert you to high usage, it won’t automatically stop queries when usage exceeds this amount.
+
+### 2. Use Cost Controls with Organization Policies
+To enforce restrictions on usage, you can use **GCP organization policies** to prevent BigQuery from running queries beyond a certain threshold:
+
+1. Go to **IAM & Admin** > **Organization Policies**.
+2. Use policies like `constraints/bigquery.restrictQueries` to restrict which projects, datasets, or tables can be accessed by a service account. 
+3. By applying restrictions on certain datasets or tables, you can indirectly limit how much data the service account can process, thus affecting the billed usage.
+
+### 3. Monitoring Usage with Cloud Monitoring and Alerts
+For more granular control and monitoring, set up **Cloud Monitoring** to track BigQuery usage specifically by the service account:
+
+1. In **Cloud Monitoring**, go to **Metrics Explorer**.
+2. Use the `BigQuery > Bytes Billed` metric, and filter by **service account**.
+3. Set up **alert policies** based on this metric to notify you when the usage approaches your set threshold.
+
+By combining these approaches, you can closely monitor and manage the BigQuery usage of a service account to stay within the specified limits.

@@ -54,3 +54,29 @@ export class PlaceResponseDto {
     
   }
 }
+
+export const toPlaceResponseDto = (place: Place) => {
+  return new PlaceResponseDto(place);
+}
+
+export const toPlacesGeoJSONResponseDto = (places: Place[]) => {
+ const toplevel = 
+  {
+    "type":"FeatureCollection",
+    "features":[
+    ]
+ }
+  places.forEach(place => {
+    toplevel.features.push({
+      "type":"Feature",
+      "geometry":place.geometry,
+      "properties":{
+        confidence: place.confidence,
+        ...place.names,
+        ...place.brand,
+        ...place.categories
+      }
+    })
+  })
+  return toplevel;
+}

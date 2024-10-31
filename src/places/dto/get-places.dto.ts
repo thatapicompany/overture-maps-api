@@ -1,6 +1,6 @@
 // src/places/dto/get-places.dto.ts
 import { Transform } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
 
 export class GetPlacesDto {
   //convert string to number
@@ -50,4 +50,10 @@ export class GetPlacesDto {
   @Transform(({ value }) => String(value).split(','))
   @IsString({ each: true })
   categories?: string[]; // Array of category names
+
+  //json by default csv or geojson
+  @IsOptional()
+  @IsString()
+  @IsIn(['json', 'csv', 'geojson'])
+  format?: string = 'json';
 }

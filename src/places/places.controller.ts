@@ -3,7 +3,7 @@ import { Controller, Get, Logger, Query, UseGuards } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/get-places.dto';
-import { PlaceResponseDto } from './dto/place-response.dto';
+import { PlaceResponseDto, toPlacesGeoJSONResponseDto } from './dto/place-response.dto';
 import { GetBrandsDto } from './dto/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { GetCategoriesDto } from './dto/get-categories.dto';
@@ -30,6 +30,10 @@ export class PlacesController {
     const cachedResult = await this.gcsService.getJSON(cacheKey);
     if (cachedResult) {
       this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
+
+      if(query.format === 'geojson') {
+        return toPlacesGeoJSONResponseDto(cachedResult);
+      }
       return cachedResult.map((place: any) => new PlaceResponseDto(place));
     }
 
@@ -41,6 +45,9 @@ export class PlacesController {
     // Cache the results in GCS
     await this.gcsService.storeJSON (places,cacheKey);
 
+    if(query.format === 'geojson') {
+      return toPlacesGeoJSONResponseDto(places);
+    }
     return places.map((place: any) => new PlaceResponseDto(place));
   }
     

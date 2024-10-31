@@ -12,6 +12,7 @@
 ### Schemas & Design
 
 - [API Design](./docs/api-design.md)
+- [Response Formats GeoJSON & JSON](./docs/response-formats.md)
 - [Place](https://docs.overturemaps.org/schema/reference/places/place/)
 - [Address](https://docs.overturemaps.org/schema/reference/addresses/address/)
 
@@ -47,4 +48,8 @@ Test the API by curl on `http://localhost:8080/places/countries` with the DEMO-A
 
 ```bash
 curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands' -d 'country=AU'
+```
+
+```bash
+curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places' -d 'country=AU'  -d 'brand_name=TAB' -d 'limit=2' -d 'format=geojson'
 ```
