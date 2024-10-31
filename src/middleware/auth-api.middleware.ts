@@ -12,22 +12,48 @@ const DEMO_API_KEY = 'demo-api-key';
 
 @Injectable()
 export class AuthAPIMiddleware implements NestMiddleware {
+
+  private logger = new Logger('AuthAPIMiddleware');
   private theAuthAPI: TheAuthAPI;
 
   constructor() { 
     if(process.env.AUTH_API_ACCESS_KEY && process.env.AUTH_API_ACCESS_KEY!="create-one-from-theauthapi.com")this.theAuthAPI = new TheAuthAPI(process.env.AUTH_API_ACCESS_KEY);
   }
 
+  getAPIKeyFromHeaderOrQuery(req: Request): string|undefined {
+
+    // as this is an educational API we want to be a little flexible with the API key header names
+    const apiKeys = ['X-Api-Key','api_key', 'api-key', 'apiKey', 'apikey'];
+
+    //check if any in the headers
+    const header: string | undefined = apiKeys
+      .map((key) => req.get(key))
+      .find((value) => value !== undefined);
+
+    if (header) {
+      return header;
+    }
+
+
+    const queryParam: string | undefined = apiKeys
+      .map((key) => req.query[key] as string | undefined)
+      .find((value) => value !== undefined);
+
+      return queryParam;    
+    
+  }
+
   async use(req: Request, res: Response, next: () => void) {
 
-
-    if (!req.get('X-Api-Key') && !req.get('api_key') && !req.get('api-key') || req.res.locals['user']?.id ) {
+    const apiKeyString = this.getAPIKeyFromHeaderOrQuery(req);
+    
+    this.logger.log(`API Key: ${apiKeyString}`);
+    //if no api key, or user is already set, skip
+    if (!apiKeyString || req.res.locals['user']?.id ) {
       next();
     } else {
-      const key: string = req.get('X-Api-Key') || req.get('api_key') || req.get('api-key');
-
-
-      if (key.toLowerCase() === DEMO_API_KEY) {
+      //if demo key, set user to demo user
+      if (apiKeyString.toLowerCase() === DEMO_API_KEY) {
         req['user'] = req.res.locals['user'] = {
           metadata: {
             isDemoAccount:true
@@ -45,7 +71,7 @@ export class AuthAPIMiddleware implements NestMiddleware {
           next();
           return;
         }
-        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(key); 
+        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString); 
         if (apiKey) {
           const userObj = {
             metadata: apiKey.customMetaData,
@@ -59,7 +85,7 @@ export class AuthAPIMiddleware implements NestMiddleware {
         next();
         return;
       } catch (error) {
-        Logger.error('APIKeyMiddleware Error:', error, ` key: ${key}`);
+        Logger.error('APIKeyMiddleware Error:', error, ` key: ${apiKeyString}`);
       }
       next()
       return;
