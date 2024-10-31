@@ -29,6 +29,7 @@ export class PlacesController {
     // Check if cached results exist in GCS
     const cachedResult = await this.gcsService.getJSON(cacheKey);
     if (cachedResult) {
+      this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
       return cachedResult.map((place: any) => new PlaceResponseDto(place));
     }
 
@@ -38,7 +39,7 @@ export class PlacesController {
     const places = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
 
     // Cache the results in GCS
-    //await this.gcsService.storeJSON (places,cacheKey);
+    await this.gcsService.storeJSON (places,cacheKey);
 
     return places.map((place: any) => new PlaceResponseDto(place));
   }
@@ -52,37 +53,41 @@ export class PlacesController {
       // Check if cached results exist in GCS
       const cachedResult = await this.gcsService.getJSON(cacheKey);
       if (cachedResult) {
+        this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
         return cachedResult;
       }
     
-      const brands = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
-      
-      return brands;
+      const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
+      await this.gcsService.storeJSON (results,cacheKey);
+      return results;
     }
     @Get('countries')
     async getCountries() {
         const cacheKey = `get-places-countries`;
         const cachedResult = await this.gcsService.getJSON(cacheKey);
         if (cachedResult) {
+          this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
           return cachedResult;
         }
 
-        const brands = await this.bigQueryService.getPlaceCountsByCountry();
-        
-        return brands;
+        const results = await this.bigQueryService.getPlaceCountsByCountry();
+        await this.gcsService.storeJSON (results,cacheKey);
+        return results;
     }
 
     @Get('categories')
     async getCategories(@Query() query: GetCategoriesDto) {
 
-        const cacheKey = `get-places-categories`;
+        const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
         const cachedResult = await this.gcsService.getJSON(cacheKey);
         if (cachedResult) {
+          this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
           return cachedResult;
         }
         
-        const brands = await this.bigQueryService.getCategories(query.country);
-      
-        return brands;
+        const results = await this.bigQueryService.getCategories(query.country);
+        
+        await this.gcsService.storeJSON (results,cacheKey);
+        return results;
     }
 }
