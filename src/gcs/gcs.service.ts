@@ -12,6 +12,11 @@ export class GcsService {
   logger = new Logger('GcsService');
 
   constructor() {
+
+    if(!process.env.BIGQUERY_PROJECT_ID || process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GCS_BUCKET_NAME){
+      this.logger.error('GCS environment variables not set');
+      return;
+    }
     this.storage = new Storage({
       projectId: process.env.BIGQUERY_PROJECT_ID,
       keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
