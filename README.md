@@ -51,5 +51,14 @@ curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands
 ```
 
 ```bash
+curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands' -d 'country=AU' -d 'category=adult_store'
+```
+
+```bash
 curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places' -d 'country=AU'  -d 'brand_name=TAB' -d 'limit=2' -d 'format=geojson'
+```
+
+```bash
+curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/categories' -d 'country=AU'
+curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands' -d 'country=AU' -d 'categories=adult_store,airlines,airline'
 ```

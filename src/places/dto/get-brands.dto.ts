@@ -25,7 +25,7 @@ export class GetBrandsDto {
 
   //transform into an array of strings
   @IsOptional()
-  @Transform(({ value }) => value.split(','))
+  @Transform(({ value }) => String(value).split(','))
   @IsString({ each: true })
   categories?: string[]; // Array of category names
 }

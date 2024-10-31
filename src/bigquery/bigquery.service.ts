@@ -123,7 +123,7 @@ export class BigQueryService {
     }
     query += ` AND brand IS NOT NULL`;
     if(categories && categories.length > 0){
-      query += ` AND category.primary IN UNNEST(["${categories.join('","')}"])`;
+      query += ` AND categories.primary IN UNNEST(["${categories.join('","')}"])`;
     }
     if (require_wikidata) {
       query += ` AND brand.wikidata IS NOT NULL`;
