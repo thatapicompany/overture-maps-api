@@ -66,24 +66,22 @@ export class AuthAPIMiddleware implements NestMiddleware {
       }
 
       try {
-        if(!this.theAuthAPI) {
-          Logger.error('APIKeyMiddleware Error: Auth API not initialized');
+        if(this.theAuthAPI) {
+          
+          const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString); 
+          if (apiKey) {
+            const userObj = {
+              metadata: apiKey.customMetaData,
+              accountId: apiKey.customAccountId,
+              userId: apiKey.customUserId,
+            };
+
+            //set to both req and locals for backwards compatibility
+            req['user'] = req.res.locals['user'] = userObj;
+          }
           next();
           return;
         }
-        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString); 
-        if (apiKey) {
-          const userObj = {
-            metadata: apiKey.customMetaData,
-            accountId: apiKey.customAccountId,
-            userId: apiKey.customUserId,
-          };
-
-          //set to both req and locals for backwards compatibility
-          req['user'] = req.res.locals['user'] = userObj;
-        }
-        next();
-        return;
       } catch (error) {
         Logger.error('APIKeyMiddleware Error:', error, ` key: ${apiKeyString}`);
       }
