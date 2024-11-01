@@ -16,7 +16,8 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return hello', () => {
-      expect(appController.getHello()).toBe('API by ThatAPICompany.com, Data by OvertureMaps.org');
+      const result = appController.getHello();
+      expect(result.message).toBe('API by ThatAPICompany.com, Data by OvertureMaps.org');
     });
   });
 });

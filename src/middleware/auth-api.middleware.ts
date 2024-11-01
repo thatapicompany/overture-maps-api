@@ -87,6 +87,10 @@ export class AuthAPIMiddleware implements NestMiddleware {
       } catch (error) {
         Logger.error('APIKeyMiddleware Error:', error, ` key: ${apiKeyString}`);
       }
+
+      //if we got this far and they passed a key we should tell the user their key doesn't work and to check for a spelling mistake
+      res.status(401).send('Unauthorized - check the spelling of your API Key');
+
       next()
       return;
     }

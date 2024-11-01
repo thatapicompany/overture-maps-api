@@ -13,7 +13,7 @@ export class GcsService {
 
   constructor() {
 
-    if(!process.env.BIGQUERY_PROJECT_ID || process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GCS_BUCKET_NAME){
+    if(!process.env.BIGQUERY_PROJECT_ID || !process.env.GOOGLE_APPLICATION_CREDENTIALS || !process.env.GCS_BUCKET_NAME){
       this.logger.error('GCS environment variables not set');
       return;
     }

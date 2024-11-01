@@ -27,40 +27,32 @@ export class PlacesController {
     const cacheKey = `get-places-${JSON.stringify(query)}`;
 
     // Check if cached results exist in GCS
-    const cachedResult = await this.gcsService.getJSON(cacheKey);
-    if (cachedResult) {
-      this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
-
-      if(query.format === 'geojson') {
-        return toPlacesGeoJSONResponseDto(cachedResult);
-      }
-      return cachedResult.map((place: any) => new PlaceResponseDto(place));
+      let results = await this.getFromCache(cacheKey);
+    if (!results) {
+      // if only country is provided, then potentially just use the lat / lng of it's capital city
+  
+      // If no cache, query BigQuery with wikidata and country support
+      results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
+  
+      // Cache the results in GCS
+      await this.gcsService.storeJSON (results,cacheKey);
     }
 
-    // if only country is provided, then potentially just use the lat / lng of it's capital city
-
-    // If no cache, query BigQuery with wikidata and country support
-    const places = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
-
-    // Cache the results in GCS
-    await this.gcsService.storeJSON (places,cacheKey);
 
     if(query.format === 'geojson') {
-      return toPlacesGeoJSONResponseDto(places);
+      return toPlacesGeoJSONResponseDto(results);
     }
-    return places.map((place: any) => new PlaceResponseDto(place));
+    return results.map((place: any) => new PlaceResponseDto(place));
   }
     
   @Get('brands')
     async getBrands(@Query() query: GetBrandsDto) {
       const { country, lat, lng, radius, categories } = query;
-  
-      const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
 
       // Check if cached results exist in GCS
-      const cachedResult = await this.gcsService.getJSON(cacheKey);
+      const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
+      const cachedResult = await this.getFromCache(cacheKey);
       if (cachedResult) {
-        this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
         return cachedResult;
       }
     
@@ -71,9 +63,8 @@ export class PlacesController {
     @Get('countries')
     async getCountries() {
         const cacheKey = `get-places-countries`;
-        const cachedResult = await this.gcsService.getJSON(cacheKey);
+        const cachedResult = await this.getFromCache(cacheKey);
         if (cachedResult) {
-          this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
           return cachedResult;
         }
 
@@ -85,16 +76,35 @@ export class PlacesController {
     @Get('categories')
     async getCategories(@Query() query: GetCategoriesDto) {
 
-        const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
-        const cachedResult = await this.gcsService.getJSON(cacheKey);
+      const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
+        const cachedResult = await this.getFromCache(cacheKey );
         if (cachedResult) {
-          this.logger.log(`Cache hit for ${cacheKey} - cachedResult length: ${cachedResult.length}`);
           return cachedResult;
         }
         
         const results = await this.bigQueryService.getCategories(query.country);
         
-        await this.gcsService.storeJSON (results,cacheKey);
+        await this.storeToCache (results, cacheKey);
         return results;
+    }
+
+    async getFromCache(cacheKey:string): Promise<any[]|null> {
+        try{;
+          const cachedResult = await this.gcsService.getJSON(cacheKey);
+          this.logger.log(`Cache hit for get-places-categories-${JSON.stringify(cacheKey)} - cachedResult length: ${cachedResult.length}`);
+          return cachedResult;
+        }catch(error){
+          this.logger.error('Error fetching cached places:', error);
+          return null;
+        }
+    }
+
+    async storeToCache( data,cacheKey:string): Promise<void> {
+      try{
+
+        await this.gcsService.storeJSON (data,cacheKey);
+      }catch(error){
+        this.logger.error('Error saving cached places:', error);
+      }
     }
 }
