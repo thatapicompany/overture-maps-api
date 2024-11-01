@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);  
@@ -26,6 +27,29 @@ async function bootstrap() {
   }
   app.enableCors(corsOptions);
   app.useGlobalPipes(new ValidationPipe({transform: true}));
+
+
+  // Configure Swagger
+  const config = new DocumentBuilder()
+    .setTitle('Overture Maps API Documentation')
+    .setDescription('Auto-generated OpenAPI spec for the Overture Maps API')
+    .setVersion('1.0')
+    .addServer('http://localhost:8080/', 'Local environment')
+    .addServer('https://overture-maps-api.thatapicompany.com','Cloud API Service')
+    .setContact("Aden Forshaw", "https://thatapicompany.com/overure-maps-api", "aden@thatapicompany.com")
+    .addApiKey(
+      { type: 'apiKey', name: 'x-api-key', in: 'header' },
+      'API_KEY', // Reference name for the security scheme
+    )
+    .addTag('places', 'Operations related to Places')
+    .build();
+
+  // Create the Swagger document
+  const document = SwaggerModule.createDocument(app, config);
+  // Serve the Swagger document at /api-docs
+  SwaggerModule.setup('api-docs', app, document,{jsonDocumentUrl: '/api-docs-json', swaggerUrl: '/api-docs-ui'});
+
+
   await app.listen(8080);
 }
 bootstrap();

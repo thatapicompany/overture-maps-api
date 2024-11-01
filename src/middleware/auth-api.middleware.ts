@@ -47,7 +47,6 @@ export class AuthAPIMiddleware implements NestMiddleware {
 
     const apiKeyString = this.getAPIKeyFromHeaderOrQuery(req);
     
-    this.logger.log(`API Key: ${apiKeyString}`);
     //if no api key, or user is already set, skip
     if (!apiKeyString || req.res.locals['user']?.id ) {
       next();
