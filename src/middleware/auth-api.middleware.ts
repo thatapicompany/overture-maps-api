@@ -8,7 +8,7 @@ import { Request, Response } from 'express';
 //import CacheService from '../cache/CacheService';
 import TheAuthAPI from 'theauthapi';
 
-const DEMO_API_KEY = 'demo-api-key';
+const DEMO_API_KEY = process.env.DEMO_API_KEY || 'DEMO-API-KEY';
 
 @Injectable()
 export class AuthAPIMiddleware implements NestMiddleware {
@@ -51,20 +51,10 @@ export class AuthAPIMiddleware implements NestMiddleware {
     if (!apiKeyString || req.res.locals['user']?.id ) {
       next();
     } else {
-      //if demo key, set user to demo user
-      if (apiKeyString.toLowerCase() === DEMO_API_KEY) {
-        req['user'] = req.res.locals['user'] = {
-          metadata: {
-            isDemoAccount:true
-          },
-          accountId: 'demo-account-id',
-          userId: 'demo-user-id',
-        };
-        next();
-        return;
-      }
 
       try {
+        
+        // if theAuthAPI.com is integrated, check the key
         if(this.theAuthAPI) {
           
           const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString); 
@@ -83,6 +73,19 @@ export class AuthAPIMiddleware implements NestMiddleware {
         }
       } catch (error) {
         Logger.error('APIKeyMiddleware Error:', error, ` key: ${apiKeyString}`);
+      }
+
+      //if demo key, set user to demo user
+      if (apiKeyString === DEMO_API_KEY) {
+        req['user'] = req.res.locals['user'] = {
+          metadata: {
+            isDemoAccount:true
+          },
+          accountId: 'demo-account-id',
+          userId: 'demo-user-id',
+        };
+        next();
+        return;
       }
 
       //if we got this far and they passed a key we should tell the user their key doesn't work and to check for a spelling mistake

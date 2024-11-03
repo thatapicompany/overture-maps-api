@@ -37,6 +37,12 @@ FROM `bigquery-public-data.overture_maps.place`
 WHERE ST_DWithin(geometry, ST_GeogPoint(16.3738, 48.2082), 500)
 ```
 
+### Recommended Strategy to reduce costs
+
+As there is one large table for each theme of data, a simple strategy to reduce costs is to create a new dataset in BigQuery, and copy the tables you need filtering down to just the country you are interested in. Another option would be the shard the tables by country, and then only query the tables you need.
+
+Using a metadata store such as Firebase in Datastore mode - this would allow storing of building geomtries and other data matched to place that is too expensive to query in BigQuery.
+
 ### Service Account roles
 
 For a service account in GCP that a Cloud Run instance will use to access BigQuery and Google Cloud Storage (GCS), you’ll need to grant it specific roles to ensure it has permissions to create and run BigQuery jobs, as well as read and write files in a GCS bucket. Here are the recommended roles:

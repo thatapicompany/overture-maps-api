@@ -25,7 +25,7 @@
 - [x] Places/Brands endpoint
 - [x] Places/Categories endpoint
 - [x] Places/Countries endpoint
-- [ ] Places/Buildings endpoint
+- [ ] Places/Buildings endpoint - very expensive dataset in BigQuery so will require sharding by country and optimizing
 - [ ] Addresses endpoint for Overture Maps 'Address' Theme
 - [ ] Base endpoint for Overture Maps 'Base' Theme
 - [ ] Buildings endpoint for Overture Maps 'Building' Theme

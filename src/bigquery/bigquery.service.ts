@@ -9,9 +9,13 @@ interface IQueryStatistics {
   billedAmountInGB: number;
   bytesProcessedInGB: number;
   durationMs: number;
+  costInUSD: number;
 }
 
 const MAX_LIMIT = 100000;
+
+// replace this with your own dataset if you have optimised ot to only include the country you are interested in
+const SOURCE_DATASET="bigquery-public-data.overture_maps" 
 
 @Injectable()
 export class BigQueryService {
@@ -110,7 +114,7 @@ export class BigQueryService {
 
     let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand , count(id) as count_places
-      FROM \`bigquery-public-data.overture_maps.place\`
+      FROM \`${SOURCE_DATASET}.place\`
     `;
 
     if (country_code) {
@@ -148,7 +152,7 @@ export class BigQueryService {
   async getPlaceCountsByCountry(): Promise<{ country: string; counts:{ places:number, brands:number} }[]> {
     const query = `-- Overture Maps API: Get place counts by country
       SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
-      FROM \`bigquery-public-data.overture_maps.place\`
+      FROM \`${SOURCE_DATASET}.place\`
       GROUP BY country
       ORDER BY count_places DESC;
     `;
@@ -169,7 +173,7 @@ export class BigQueryService {
       SELECT DISTINCT categories.primary AS category_primary,
       count(1) as count_places,
       count(distinct brand.names.primary) as count_brands
-      FROM \`bigquery-public-data.overture_maps.place\`
+      FROM \`${SOURCE_DATASET}.place\`
       WHERE categories.primary IS NOT NULL
     `;
     if (country) {
@@ -190,6 +194,63 @@ export class BigQueryService {
       }
     }));
   }
+
+  async getBuildingsNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    min_confidence?: number,
+    limit?: number
+  ): Promise<Place[]> {
+  
+    let queryParts: string[] = [];
+  
+    // Base query and distance calculation if latitude and longitude are provided
+    queryParts.push(`-- Overture Maps API: Get buildings nearby \n`);
+    queryParts.push(`SELECT *`);
+    
+    if (latitude && longitude) {
+      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${latitude}, ${longitude})) AS distance_m`);
+    }
+  
+    queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
+  
+    // Conditional filters
+    let whereClauses: string[] = [];
+    
+    if (latitude && longitude && radius) {
+      whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+    } 
+  
+    whereClauses.push(`categories.primary = "building"`);
+  
+    if (min_confidence) {
+      whereClauses.push(`confidence >= ${min_confidence}`);
+    }
+  
+    // Combine where clauses
+    if (whereClauses.length > 0) {
+      queryParts.push(`WHERE ${whereClauses.join(' AND ')}`);
+    }
+  
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY distance_m`);
+    }
+  
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+  
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+    this.logger.debug(`Running query: ${query}`);
+  
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => this.parsePlaceRow(row));
+  }
+  
 
   async getPlacesNearby(
     latitude: number,
@@ -213,7 +274,7 @@ export class BigQueryService {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${latitude}, ${longitude})) AS distance_m`);
     }
   
-    queryParts.push(`FROM \`bigquery-public-data.overture_maps.place\``);
+    queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
   
     // Conditional filters
     let whereClauses: string[] = [];
@@ -304,11 +365,12 @@ export class BigQueryService {
           totalBytesBilled,
           billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
           bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
-          durationMs: Date.now() - start
+          durationMs: Date.now() - start,
+          costInUSD: Math.round(totalBytesBilled / 1000000000) * 5
       }
 
       const QueryFirstLine = query.split('\n')[0];
-      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. Processed ${statistics.bytesProcessedInGB} GB. Query ${QueryFirstLine}`);
+      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $${statistics.costInUSD}. Query Line 1: ${QueryFirstLine}`);
       
       return {rows,statistics};
     }

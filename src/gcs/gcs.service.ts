@@ -41,6 +41,9 @@ export class GcsService {
       const exists = await file.exists();
       if (exists[0]) {
         const [content] = await file.download();
+        //get size of file
+        const fileSize = content.length;
+        const fileSizeInKB = fileSize / 1024;
         return JSON.parse(content.toString());
       }
     } catch (error) {
