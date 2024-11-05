@@ -1,6 +1,6 @@
 # Overture Maps API
 
-- Built using [NestJS](https://github.com/nestjs/nest) TypeScript Framework
+- Built using [NestJS](https://github.com/nestjs/nest) TypeScript Framework by [ThatAPICompany](https://thatapicompany.com) - specialists in all things APIs
 
 ## Endpoints
 
@@ -77,3 +77,8 @@ curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/catego
 curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands' \
 -d 'country=AU' -d 'categories=airlines,airline'
 ```
+
+
+#### Credits
+
+Another fine API from ThatAPICompany - specialists in all things APIs
