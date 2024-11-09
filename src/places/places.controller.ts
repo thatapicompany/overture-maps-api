@@ -1,4 +1,4 @@
-// src/places/places.controller.ts
+
 import { Controller, Get, Logger, Query, UseGuards } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';

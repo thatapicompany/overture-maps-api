@@ -1,7 +1,9 @@
-// src/bigquery/bigquery.service.ts
+
 import { Injectable, Logger } from '@nestjs/common';
 import { BigQuery } from '@google-cloud/bigquery';
 import { Place } from '../places/interfaces/place.interface';
+import { Building } from '../buildings/interfaces/building.interface';
+import { parsePointToGeoJSON, parsePolygonToGeoJSON } from '../utils/geojson';
 
 interface IQueryStatistics {
   totalBytesProcessed: number;
@@ -28,14 +30,21 @@ export class BigQueryService {
       keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     });
   }
+  
+  private parseBuildingRow(row: any): Building {
+
+    this.logger.log(row);
+    return {
+
+      id: row.id,
+      geometry: parsePolygonToGeoJSON(row.geometry),
+    }
+  }
 
   private parsePlaceRow(row: any): Place {
     return {
         id: row.id,
-        geometry: {
-          type: 'Point',
-          coordinates: this.parseGeometry(row.geometry),
-        },
+        geometry:  parsePointToGeoJSON(row.geometry),
         bbox: {
           xmin: parseFloat(row.bbox.xmin),
           xmax: parseFloat(row.bbox.xmax),
@@ -82,23 +91,6 @@ export class BigQueryService {
         distance_m: parseFloat(row.distance_m),
       }
     }
-
-  // Function to parse the "POINT" geometry string into coordinates array
-  private parseGeometry(geometry: string): number[] {
-    try{
-        //@ts-ignore
-        const match = geometry.value.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-        if (match) {
-            const longitude = parseFloat(match[1]);
-            const latitude = parseFloat(match[2]);
-            return [longitude, latitude];
-        }
-    }catch(err){
-        this.logger.error(err);
-        this.logger.error(`Error parsing geometry: ${JSON.stringify(geometry)}`);
-    }
-    return [];
-  }
 
   // New method to get brands based on country or lat/lng/radius
   async getBrandsNearby(
@@ -199,40 +191,37 @@ export class BigQueryService {
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    min_confidence?: number,
     limit?: number
   ): Promise<Place[]> {
   
     let queryParts: string[] = [];
   
-    // Base query and distance calculation if latitude and longitude are provided
-    queryParts.push(`-- Overture Maps API: Get buildings nearby \n`);
-    queryParts.push(`SELECT *`);
-    
-    if (latitude && longitude) {
-      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${latitude}, ${longitude})) AS distance_m`);
-    }
-  
-    queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
-  
-    // Conditional filters
-    let whereClauses: string[] = [];
-    
-    if (latitude && longitude && radius) {
-      whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
-    } 
-  
-    whereClauses.push(`categories.primary = "building"`);
-  
-    if (min_confidence) {
-      whereClauses.push(`confidence >= ${min_confidence}`);
-    }
-  
-    // Combine where clauses
-    if (whereClauses.length > 0) {
-      queryParts.push(`WHERE ${whereClauses.join(' AND ')}`);
-    }
-  
+    queryParts.push(
+    `-- Overture Maps API: Get Buildings Nearby
+    -- Step 1: define the search area as the largest neighborhood that contains the point
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = (
+  SELECT
+    geometry
+  FROM
+    \`bigquery-public-data.overture_maps.division_area\`
+  WHERE
+    country = 'AU'
+    AND subtype = "neighborhood"
+    AND ST_INTERSECTS(geometry, ST_GeogPoint(${longitude}, ${latitude}))
+  ORDER BY
+    ST_AREA(geometry) DESC
+  LIMIT 1
+);
+
+-- Step 2: Select buildings within the search area
+SELECT
+  *
+FROM
+  \`bigquery-public-data.overture_maps.building\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), 1000)
+
+`)
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
       queryParts.push(`ORDER BY distance_m`);
@@ -271,7 +260,7 @@ export class BigQueryService {
     queryParts.push(`SELECT *`);
     
     if (latitude && longitude) {
-      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${latitude}, ${longitude})) AS distance_m`);
+      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS distance_m`);
     }
   
     queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);

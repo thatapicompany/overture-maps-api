@@ -8,9 +8,10 @@ import { PlacesController } from './places.controller';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { ConfigModule } from '@nestjs/config';
+import { CloudstorageCacheModule } from '../cloudstorage-cache/cloudstorage-cache.module';
 
 @Module({
-    imports: [ConfigModule],
+    imports: [ConfigModule, CloudstorageCacheModule],
     controllers: [PlacesController],
     providers: [PlacesService, BigQueryService, GcsService],
     exports: [PlacesService]

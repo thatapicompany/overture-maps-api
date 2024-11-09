@@ -1,4 +1,4 @@
-// src/places/interfaces/place.interface.ts
+
 export interface Place {
     id: string;
     geometry: Geometry;

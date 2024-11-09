@@ -1,6 +1,8 @@
+import { CloudstorageCacheModule } from './cloudstorage-cache/cloudstorage-cache.module';
+import { BuildingsModule } from './buildings/buildings.module';
 import { PlacesModule } from './places/places.module';
 import { PlacesService } from './places/places.service';
-// src/app.module.ts
+
 import { Module, NestMiddleware, MiddlewareConsumer, Logger, RequestMethod } from '@nestjs/common';
 import { PlacesController } from './places/places.controller';
 import { BigQueryService } from './bigquery/bigquery.service';
@@ -13,9 +15,11 @@ import { AppService } from './app.service';
 
 @Module({
   imports: [
+    CloudstorageCacheModule,
+    BuildingsModule,
     PlacesModule, ConfigModule.forRoot()],
   controllers: [AppController],
-  providers: [ BigQueryService, GcsService, AppService],
+  providers: [BigQueryService, GcsService, AppService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {

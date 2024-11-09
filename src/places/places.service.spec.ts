@@ -6,11 +6,12 @@ import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
 import { PlaceResponseDto, toPlaceDto } from './dto/place-response.dto';
 import { ConfigService } from '@nestjs/config';
+import { CloudStorageCacheService } from '../cloudstorage-cache/cloudstorage-cache.service';
 
 describe('PlacesService', () => {
   let service: PlacesService;
   let bigQueryService: BigQueryService;
-  let gcsService: GcsService;
+  let cacheService: CloudStorageCacheService;
 
   const mockBigQueryGetPlacesNearbyResponse = [
     {
@@ -138,7 +139,7 @@ describe('PlacesService', () => {
           useValue: { getPlacesNearby: mockBigQueryGetPlacesNearby },
         },
         {
-          provide: GcsService,
+          provide: CloudStorageCacheService,
           useValue: { getJSON: mockGcsGetJSON, storeJSON: mockGcsStoreJSON },
         },
         {
@@ -150,7 +151,7 @@ describe('PlacesService', () => {
 
     service = module.get<PlacesService>(PlacesService);
     bigQueryService = module.get<BigQueryService>(BigQueryService);
-    gcsService = module.get<GcsService>(GcsService);
+    cacheService = module.get<CloudStorageCacheService>(CloudStorageCacheService);
   });
 
   afterEach(() => {
@@ -215,13 +216,4 @@ describe('PlacesService', () => {
     expect(result).toEqual(mockPlaceResponseDto);
   });
 
-  it('should handle errors gracefully in getFromCache', async () => {
-    const cacheKey = 'get-places-categories-sample-key';
-    mockGcsGetJSON.mockRejectedValueOnce(new Error('Cache fetch error'));
-
-    const result = await service.getFromCache(cacheKey);
-
-    expect(result).toBeNull();
-    expect(mockGcsGetJSON).toHaveBeenCalledWith(cacheKey);
-  });
 });

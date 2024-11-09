@@ -18,6 +18,7 @@ import { AuthedUser, User } from '../decorators/authed-user.decorator';
 import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
 import { Place } from './interfaces/place.interface';
 import { ConfigService } from '@nestjs/config';
+import { CloudStorageCacheService } from '../cloudstorage-cache/cloudstorage-cache.service';
 
 @Injectable()
 export class PlacesService {
@@ -26,7 +27,7 @@ export class PlacesService {
     constructor(
         private readonly configService: ConfigService,
       private readonly bigQueryService: BigQueryService,
-      private readonly gcsService: GcsService,
+      private readonly cloudStorageCache: CloudStorageCacheService,
     ) {}
     async getPlaces(query: GetPlacesDto):Promise<Place[]> {
 
@@ -35,12 +36,12 @@ export class PlacesService {
         const cacheKey = `get-places-${JSON.stringify(query)}`;
     
         // Check if cached results exist in GCS
-        let results:Place[] = await this.getFromCache(cacheKey);
+        let results:Place[] = await this.cloudStorageCache.getJSON(cacheKey);
         if (!results) {
           // If no cache, query BigQuery with wikidata and country support
           results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
           // Cache the results in GCS
-          await this.gcsService.storeJSON (results,cacheKey);
+          await this.cloudStorageCache.storeJSON (results,cacheKey);
     
         }
           return results
@@ -52,59 +53,40 @@ export class PlacesService {
   
         // Check if cached results exist in GCS
         const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
-        const cachedResult = await this.getFromCache(cacheKey);
+        const cachedResult = await this.cloudStorageCache.getJSON(cacheKey);
         if (cachedResult) {
           return cachedResult;
         }
       
         const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
-        await this.gcsService.storeJSON (results,cacheKey);
+        await this.cloudStorageCache.storeJSON (results,cacheKey);
         return results.map((brand: any) => new BrandDto(brand));
       }
 
     async getCountries():Promise<CountryResponseDto[]> {
         const cacheKey = `get-places-countries`;
-        const cachedResult = await this.getFromCache(cacheKey);
+        const cachedResult = await this.cloudStorageCache.getJSON(cacheKey);
         if (cachedResult) {
           return cachedResult;
         }
 
         const results = await this.bigQueryService.getPlaceCountsByCountry();
-        await this.gcsService.storeJSON (results,cacheKey);
+        await this.cloudStorageCache.storeJSON (results,cacheKey);
         return results.map((country: any) => toCountryResponseDto(country));
     }
 
     async getCategories(query: GetCategoriesDto): Promise<CategoryResponseDto[]> {
 
         const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
-          const cachedResult = await this.getFromCache(cacheKey );
+          const cachedResult = await this.cloudStorageCache.getJSON(cacheKey );
           if (cachedResult) {
             return cachedResult;
           }
           
           const results = await this.bigQueryService.getCategories(query.country);
           
-          await this.storeToCache (results, cacheKey);
+          await this.cloudStorageCache.storeJSON (results, cacheKey);
             return results.map((category: any) => toCategoryResponseDto(category));
       }
 
-    async getFromCache(cacheKey:string): Promise<any[]|null> {
-        try{;
-          const cachedResult = await this.gcsService.getJSON(cacheKey);
-          this.logger.log(`Cache hit for get-places-categories-${JSON.stringify(cacheKey)} - cachedResult length: ${cachedResult.length}`);
-          return cachedResult;
-        }catch(error){
-          this.logger.error('Error fetching cached places:', error);
-          return null;
-        }
-    }
-
-    async storeToCache( data,cacheKey:string): Promise<void> {
-      try{
-
-        await this.gcsService.storeJSON (data,cacheKey);
-      }catch(error){
-        this.logger.error('Error saving cached places:', error);
-      }
-    }
 }
