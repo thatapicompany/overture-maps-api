@@ -1,0 +1,125 @@
+[{
+  "id": "08f184d6d16d5c5303f2f0fb615c6051",
+  "geometry": "POINT(-1.1516016 43.8711004)",
+  "bbox": {
+    "xmin": "-1.1516017913818359",
+    "xmax": "-1.1516015529632568",
+    "ymin": "43.87109375",
+    "ymax": "43.871101379394531"
+  },
+  "version": "0",
+  "sources": {
+    "list": [{
+      "element": {
+        "property": "",
+        "dataset": "meta",
+        "record_id": "680834765441518",
+        "update_time": "2024-08-02T00:00:00.000Z",
+        "confidence": null
+      }
+    }]
+  },
+  "names": {
+    "primary": "Intermarché",
+    "common": null,
+    "rules": null
+  },
+  "categories": {
+    "primary": "supermarket",
+    "alternate": {
+      "list": [{
+        "element": "grocery_store"
+      }, {
+        "element": "health_food_store"
+      }]
+    }
+  },
+  "confidence": "0.54162042175360714",
+  "websites": {
+    "list": [{
+      "element": "http://www.intermarche.fr/"
+    }]
+  },
+  "socials": {
+    "list": [{
+      "element": "https://www.facebook.com/680834765441518"
+    }]
+  },
+  "emails": null,
+  "phones": {
+    "list": [{
+      "element": "+33558550353"
+    }]
+  },
+  "brand": null,
+  "addresses": {
+    "list": [{
+      "element": {
+        "freeform": "rue Jean de Nasse ",
+        "locality": "Castets",
+        "postcode": "40260",
+        "region": null,
+        "country": "FR"
+      }
+    }]
+  }
+}, {
+  "id": "08f186b6d36e57a3037a18c4044bf6d9",
+  "geometry": "POINT(-0.6791638 44.8745056)",
+  "bbox": {
+    "xmin": "-0.67916381359100342",
+    "xmax": "-0.67916369438171387",
+    "ymin": "44.874504089355469",
+    "ymax": "44.87451171875"
+  },
+  "version": "0",
+  "sources": {
+    "list": [{
+      "element": {
+        "property": "",
+        "dataset": "meta",
+        "record_id": "101121412833434",
+        "update_time": "2024-08-02T00:00:00.000Z",
+        "confidence": null
+      }
+    }]
+  },
+  "names": {
+    "primary": "CocciMarket Le Haillan",
+    "common": null,
+    "rules": null
+  },
+  "categories": {
+    "primary": "supermarket",
+    "alternate": {
+      "list": [{
+        "element": "construction_services"
+      }]
+    }
+  },
+  "confidence": "0.54162042175360714",
+  "websites": null,
+  "socials": {
+    "list": [{
+      "element": "https://www.facebook.com/101121412833434"
+    }]
+  },
+  "emails": null,
+  "phones": {
+    "list": [{
+      "element": "+33556025819"
+    }]
+  },
+  "brand": null,
+  "addresses": {
+    "list": [{
+      "element": {
+        "freeform": "194 Avenue Pasteur",
+        "locality": "Le Haillan",
+        "postcode": "33185",
+        "region": null,
+        "country": "FR"
+      }
+    }]
+  }
+}]

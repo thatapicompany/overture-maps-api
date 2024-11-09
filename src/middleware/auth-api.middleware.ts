@@ -5,10 +5,12 @@ import {
 } from '@nestjs/common';
 
 import { Request, Response } from 'express';
+import { User } from '../decorators/authed-user.decorator';
 //import CacheService from '../cache/CacheService';
 import TheAuthAPI from 'theauthapi';
 
 const DEMO_API_KEY = process.env.DEMO_API_KEY || 'DEMO-API-KEY';
+
 
 @Injectable()
 export class AuthAPIMiddleware implements NestMiddleware {
@@ -59,8 +61,9 @@ export class AuthAPIMiddleware implements NestMiddleware {
           
           const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString); 
           if (apiKey) {
-            const userObj = {
-              metadata: apiKey.customMetaData,
+            const metaData = apiKey.customMetaData as any;
+            const userObj:User = {
+              isDemoAccount: metaData.isDemoAccount || false,
               accountId: apiKey.customAccountId,
               userId: apiKey.customUserId,
             };
@@ -77,13 +80,12 @@ export class AuthAPIMiddleware implements NestMiddleware {
 
       //if demo key, set user to demo user
       if (apiKeyString === DEMO_API_KEY) {
-        req['user'] = req.res.locals['user'] = {
-          metadata: {
-            isDemoAccount:true
-          },
+        const demoUser:User = {
+          isDemoAccount:true,
           accountId: 'demo-account-id',
-          userId: 'demo-user-id',
+          userId: 'demo-user-id'
         };
+        req['user'] = req.res.locals['user'] = demoUser;
         next();
         return;
       }

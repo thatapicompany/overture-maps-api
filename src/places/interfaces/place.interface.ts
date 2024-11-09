@@ -15,6 +15,8 @@ export interface Place {
     brand?: Brand;
     addresses: Address[];
     distance_m?: number;
+    theme?: string;
+    type?: string;
   }
   
   export interface Geometry {
@@ -39,7 +41,7 @@ export interface Place {
   
   export interface Names {
     primary: string;
-    common?: string;
+    common?: Record<string, string>;
     rules?: any; // No clear type provided, so keeping it as `any`
   }
   
@@ -55,7 +57,7 @@ export interface Place {
   
   export interface BrandNames {
     primary: string;
-    common?: string;
+    common?: Record<string, string>;
     rules?: any; // No clear type provided, so keeping it as `any`
   }
   

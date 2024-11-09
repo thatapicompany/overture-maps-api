@@ -3,7 +3,7 @@ import { Controller, Get, Logger, Query, UseGuards } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
-import { PlaceResponseDto, toPlacesGeoJSONResponseDto } from './dto/place-response.dto';
+import { PlaceResponseDto, toPlaceDto } from './dto/place-response.dto';
 import { GetBrandsDto } from './dto/requests/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { GetCategoriesDto } from './dto/requests/get-categories.dto';
@@ -11,6 +11,9 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody , ApiQuery, ApiSecurity} fr
 import { BrandDto } from './dto/models/brand.dto';
 import { CountryResponseDto, toCountryResponseDto } from './dto/responses/country-response.dto';
 import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/category-response.dto';
+import { AuthedUser, User } from '../decorators/authed-user.decorator';
+import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
+import { PlacesService } from './places.service';
 
 @ApiTags('places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -21,109 +24,61 @@ export class PlacesController {
   logger = new Logger('PlacesController');
   
   constructor(
-    private readonly bigQueryService: BigQueryService,
-    private readonly gcsService: GcsService,
+    private placesService: PlacesService
+
   ) {}
 
   @Get()
+  @ValidateLatLngUser()
   @ApiOperation({ summary: 'Get all Places using Query params as filters' })
-  @ApiResponse({ status: 200, description: 'Return all Places.' , type: PlaceResponseDto, isArray: true})
   @ApiQuery({type:GetPlacesDto})
-  async getPlaces(@Query() query: GetPlacesDto) {
+  @ApiResponse({ status: 200, description: 'Return all Places.' , type: PlaceResponseDto, isArray: true})
+  async getPlaces(@Query() query: GetPlacesDto, @AuthedUser() user: User) {
 
-    const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit } = query;
-
-    const cacheKey = `get-places-${JSON.stringify(query)}`;
-
-    // Check if cached results exist in GCS
-      let results = await this.getFromCache(cacheKey);
-    if (!results) {
-      // if only country is provided, then potentially just use the lat / lng of it's capital city
-  
+    
       // If no cache, query BigQuery with wikidata and country support
-      results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
-  
-      // Cache the results in GCS
-      await this.gcsService.storeJSON (results,cacheKey);
-
-      return results.map((place: any) => new PlaceResponseDto(place));
-    }
-
+    const  results = await this.placesService.getPlaces(query);
+    const dtoResults = results.map((place: any) =>toPlaceDto(place));
 
     if(query.format === 'geojson') {
-      return toPlacesGeoJSONResponseDto(results);
+      return {
+        "type":"FeatureCollection",
+        "features":   dtoResults   
+      };
     }
-    return results.map((place: any) => new PlaceResponseDto(place));
+    return dtoResults
   }
     
   @Get('brands')
+  @ValidateLatLngUser()
   @ApiOperation({ summary: 'Get all Brands from Places using Query params as filters' })
   @ApiResponse({ status: 200, description: 'Return all Brands, along with a count of all Places for each.' , type: BrandDto, isArray: true})
   @ApiQuery({type:GetBrandsDto})
-    async getBrands(@Query() query: GetBrandsDto) {
-      const { country, lat, lng, radius, categories } = query;
+    async getBrands(@Query() query: GetBrandsDto, @AuthedUser() user: User) {
 
-      // Check if cached results exist in GCS
-      const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
-      const cachedResult = await this.getFromCache(cacheKey);
-      if (cachedResult) {
-        return cachedResult;
-      }
-    
-      const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
-      await this.gcsService.storeJSON (results,cacheKey);
-      return results.map((brand: any) => new BrandDto(brand));
+      return await this.placesService.getBrands(query);
+
     }
+
     @Get('countries')
+    @ValidateLatLngUser()
     @ApiOperation({ summary: 'Get all Countries from Places using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return all Countries, as well as a count of all the Places and Brands in each.', type:CountryResponseDto, isArray: true})
     async getCountries() {
-        const cacheKey = `get-places-countries`;
-        const cachedResult = await this.getFromCache(cacheKey);
-        if (cachedResult) {
-          return cachedResult;
-        }
 
-        const results = await this.bigQueryService.getPlaceCountsByCountry();
-        await this.gcsService.storeJSON (results,cacheKey);
-        return results.map((country: any) => toCountryResponseDto(country));
+        return await this.placesService.getCountries();
+        
     }
 
     @Get('categories')
+    @ValidateLatLngUser()
     @ApiOperation({ summary: 'Get all Categories from Places using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return all Categories, along with a count of all Brands and Places for each' , type: CategoryResponseDto, isArray: true})
     @ApiQuery({type:GetCategoriesDto})
-    async getCategories(@Query() query: GetCategoriesDto) {
+    async getCategories(@Query() query: GetCategoriesDto):Promise<CategoryResponseDto[]> {
 
-      const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
-        const cachedResult = await this.getFromCache(cacheKey );
-        if (cachedResult) {
-          return cachedResult;
-        }
+        return await this.placesService.getCategories(query);
         
-        const results = await this.bigQueryService.getCategories(query.country);
-        
-        await this.storeToCache (results, cacheKey);
-        return results.map((category: any) => toCategoryResponseDto(category));
     }
 
-    async getFromCache(cacheKey:string): Promise<any[]|null> {
-        try{;
-          const cachedResult = await this.gcsService.getJSON(cacheKey);
-          this.logger.log(`Cache hit for get-places-categories-${JSON.stringify(cacheKey)} - cachedResult length: ${cachedResult.length}`);
-          return cachedResult;
-        }catch(error){
-          this.logger.error('Error fetching cached places:', error);
-          return null;
-        }
-    }
-
-    async storeToCache( data,cacheKey:string): Promise<void> {
-      try{
-
-        await this.gcsService.storeJSON (data,cacheKey);
-      }catch(error){
-        this.logger.error('Error saving cached places:', error);
-      }
-    }
 }

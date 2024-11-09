@@ -92,13 +92,13 @@ export class PropertiesDto {
   addresses?: AddressDto[];
 
   @ApiProperty({ description: 'Theme associated with the place.', example: 'Restaurant' })
-  theme: string;
+  theme?: string;
 
   @ApiProperty({ description: 'Type of feature or place.', example: 'Commercial' })
-  type: string;
+  type?: string;
 
-  @ApiProperty({ description: 'Version number of the place data.', example: 1 })
-  version: number;
+  @ApiProperty({ description: 'Version number of the place data.', example: "1" })
+  version: string;
 
   @ApiProperty({
     description: 'Source information for the place data.',
@@ -111,6 +111,10 @@ export class PropertiesDto {
     type: () => PlaceNamesDto,
   })
   names: PlaceNamesDto;
+
+  constructor(data={}) {
+    Object.assign(this, data);
+  }
 }
 
 export class PlaceResponseDto {
@@ -134,29 +138,22 @@ export class PlaceResponseDto {
 
   constructor(place: Place) {
     this.id = place.id;
-    Object.assign(this, place);
+    this.geometry = place.geometry;
+    //if(!this.properties) this.properties = new PropertiesDto();
+    //Object.assign(this.properties, place);
   }
 }
 
+export const toPlaceDto = (place: Place):PlaceResponseDto => {
 
-export const toPlacesGeoJSONResponseDto = (places: Place[]) => {
-  const toplevel = 
-   {
-     "type":"FeatureCollection",
-     "features":[
-     ]
-  }
-   places.forEach(place => {
-     toplevel.features.push({
-       "type":"Feature",
-       "geometry":place.geometry,
-       "properties":{
-         confidence: place.confidence,
-         ...place.names,
-         ...place.brand,
-         ...place.categories
-       }
-     })
-   })
-   return toplevel;
- }
+  const excludeFieldsFromProperties = ['properties','geometry','distance_m','bbox'];
+  const properties = {...place};
+  excludeFieldsFromProperties.forEach(field => delete properties[field]);
+
+  const rPlace =  new PlaceResponseDto(place)
+  rPlace.properties = properties;
+  rPlace.geometry = place.geometry;
+
+  return rPlace;
+}
+
