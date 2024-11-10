@@ -33,18 +33,57 @@ export class BigQueryService {
   
   private parseBuildingRow(row: any): Building {
 
-    this.logger.log(row);
     return {
 
       id: row.id,
-      geometry: parsePolygonToGeoJSON(row.geometry),
+      geometry: parsePolygonToGeoJSON(row.geometry.value),
+      bbox: {
+        xmin: parseFloat(row.bbox.xmin),
+        xmax: parseFloat(row.bbox.xmax),
+        ymin: parseFloat(row.bbox.ymin),
+        ymax: parseFloat(row.bbox.ymax),
+      },
+      version: row.version,
+      sources: row.sources.list.map((source: any) => ({
+        property: source.element.property,
+        dataset: source.element.dataset,
+        record_id: source.element.record_id,
+        update_time: source.element.update_time,
+        confidence: source.element.confidence ? parseFloat(source.element.confidence) : null,
+      })),
+
+      subtype: row.subtype,
+      class: row.class,
+      names: row.names,
+      level: row.level,
+      has_parts: row.has_parts,
+      height: row.height,
+      is_underground: row.is_underground,
+      num_floors: row.num_floors,
+      num_floors_underground: row.num_floors_underground,
+      min_height: row.min_height,
+      min_floor: row.min_floor,
+      facade_color: row.facade_color,
+      facade_material: row.facade_material,
+      roof_material: row.roof_material,
+      roof_shape: row.roof_shape,
+      roof_direction: row.roof_direction,
+      roof_orientation: row.roof_orientation,
+      roof_color: row.roof_color,
+      roof_height: row.roof_height,
+      ext_distance: parseFloat(row.ext_distance),
+      theme: row.theme,
+      type: row.type,
+
+
     }
   }
 
   private parsePlaceRow(row: any): Place {
+
     return {
         id: row.id,
-        geometry:  parsePointToGeoJSON(row.geometry),
+        geometry:  parsePointToGeoJSON(row.geometry.value),
         bbox: {
           xmin: parseFloat(row.bbox.xmin),
           xmax: parseFloat(row.bbox.xmax),
@@ -88,7 +127,7 @@ export class BigQueryService {
           region: address.element?.region,
           country: address.element?.country,
         })) : [],
-        distance_m: parseFloat(row.distance_m),
+        ext_distance: parseFloat(row.ext_distance),
       }
     }
 
@@ -192,7 +231,7 @@ export class BigQueryService {
     longitude: number,
     radius: number = 1000,
     limit?: number
-  ): Promise<Place[]> {
+  ): Promise<Building[]> {
   
     let queryParts: string[] = [];
   
@@ -217,14 +256,14 @@ SET search_area_geometry = (
 -- Step 2: Select buildings within the search area
 SELECT
   *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.building\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), 1000)
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
 
-`)
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY distance_m`);
+      queryParts.push(`ORDER BY ext_distance`);
     }
   
     // Limit results if no filters are provided
@@ -237,7 +276,7 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
-    return rows.map((row: any) => this.parsePlaceRow(row));
+    return rows.map((row: any) => this.parseBuildingRow(row));
   }
   
 
@@ -260,7 +299,7 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     queryParts.push(`SELECT *`);
     
     if (latitude && longitude) {
-      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS distance_m`);
+      queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance`);
     }
   
     queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
@@ -284,7 +323,6 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     }
 
     if(categories && categories.length > 0){
-      console.log(categories);
       whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
     }
   
@@ -299,7 +337,7 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY distance_m`);
+      queryParts.push(`ORDER BY ext_distance`);
     }
   
     // Limit results if no filters are provided
@@ -355,7 +393,7 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
           billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
           bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
           durationMs: Date.now() - start,
-          costInUSD: Math.round(totalBytesBilled / 1000000000) * 5
+          costInUSD: (Math.round(totalBytesBilled / 1000000000) * 5)/100
       }
 
       const QueryFirstLine = query.split('\n')[0];

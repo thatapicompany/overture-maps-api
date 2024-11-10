@@ -1,9 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
 
-export class GetPlacesDto extends GetByLocationDto {
+//format string enums
+export enum Format {
+  JSON = 'json',
+  CSV = 'csv',
+  GEOJSON = 'geojson',
+}
+
+
+export class GetByLocationDto {
   @ApiProperty({
     description: 'Latitude coordinate. Required if country code is not provided.',
     example: 40.7128,
@@ -36,48 +43,17 @@ export class GetPlacesDto extends GetByLocationDto {
   radius?: number = 1000;
 
   @ApiPropertyOptional({
-    description: 'ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided.',
-    example: 'US',
+    description: 'Limit on the number of results returned, defaulting to 100 if not provided.',
+    example: 10,
+    minimum: 1,
+    default: 100,
   })
   @IsOptional()
-  @IsString()
-  country?: string;
+  @Transform(({ value }) => parseInt(value))
+  @IsNumber()
+  @Min(1)
+  limit?: number = 100;
 
-
-
-  @ApiPropertyOptional({
-    description: 'Wikidata brand ID associated with the place.',
-    example: 'Q12345',
-  })
-  @IsOptional()
-  @IsString()
-  brand_wikidata?: string;
-
-  @ApiPropertyOptional({
-    description: 'Brand name associated with the place.',
-    example: 'Starbucks',
-  })
-  @IsOptional()
-  @IsString()
-  brand_name?: string;
-
-  @ApiPropertyOptional({
-    description: 'Minimum confidence score for the places to be returned, defaulting to 0.5 if not provided.',
-    example: 0.5,
-    default: 0.5,
-  })
-  @IsOptional()
-  @Transform(({ value }) => parseFloat(value))
-  min_confidence?: number = 0.5;
-
-  @ApiPropertyOptional({
-    description: 'Array of category names, provided as a comma-separated string.',
-    example: 'food,retail',
-    type: String
-  })
-  @IsOptional()
-  @Transform((params) => String(params.value).split(',').map(String))
-  categories?: string[];
 
   @ApiPropertyOptional({
     description: 'Response format, defaulting to JSON. Options are "json", "csv", or "geojson".',
@@ -89,4 +65,15 @@ export class GetPlacesDto extends GetByLocationDto {
   @IsString()
   @IsIn(['json', 'csv', 'geojson'])
   format?: string = 'json';
+
+  
+  @ApiPropertyOptional({
+    description: 'Array of fields to include in the properties field of the response, provided as a comma-separated string. Any fields not in the list will be excluded from the properties object. This is used to make the response lighter so your application is faster.',
+    example: ['id', 'geometry', 'properties'],
+    type: [String],
+  })
+  @IsOptional()
+  @Transform(({ value }) => String(value).split(','))
+  @IsString({ each: true })
+  includes?: string[];
 }

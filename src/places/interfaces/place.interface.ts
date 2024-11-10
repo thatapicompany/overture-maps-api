@@ -1,7 +1,9 @@
+import { Point, Polygon } from "geojson";
+import { Bbox } from "../../common/interfaces/geometry.interface";
 
 export interface Place {
     id: string;
-    geometry: Geometry;
+    geometry: Point|Polygon;
     bbox?: Bbox;
     version: string;
     sources: Source[];
@@ -14,22 +16,11 @@ export interface Place {
     phones?: string[];
     brand?: Brand;
     addresses: Address[];
-    distance_m?: number;
+    ext_distance?: number;
     theme?: string;
     type?: string;
   }
   
-  export interface Geometry {
-    type: string; // "Point"
-    coordinates: number[]; // [longitude, latitude]
-  }
-  
-  export interface Bbox {
-    xmin: number;
-    xmax: number;
-    ymin: number;
-    ymax: number;
-  }
   
   export interface Source {
     property: string;

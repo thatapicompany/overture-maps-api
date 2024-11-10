@@ -6,7 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
-import { PlaceResponseDto, toPlaceDto } from './dto/place-response.dto';
+import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
 import { GetBrandsDto } from './dto/requests/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { GetCategoriesDto } from './dto/requests/get-categories.dto';

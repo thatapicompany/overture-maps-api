@@ -41,6 +41,7 @@ export class GcsService {
     try {
       const exists = await file.exists();
       if (exists[0]) {
+        this.logger.log('Cached JSON found in GCS.');
         const [content] = await file.download();
         //get size of file
         const fileSize = content.length;
@@ -54,7 +55,7 @@ export class GcsService {
     return null;
   }
 
-  async storeJSON(data: any, fileName: string): Promise<void> {
+  async storeJSON(data: any, fileName: string): Promise<boolean> {
     const file = this.bucket.file(this.generateCacheFileName(fileName));
 
     try {
@@ -62,9 +63,11 @@ export class GcsService {
         contentType: 'application/json',
         resumable: false,
       });
-      this.logger.log('Cached places saved to GCS.');
+      this.logger.log('Cache JSON saved to GCS.');
+      return true
     } catch (error) {
         this.logger.error('Error saving cached places:', error);
+        return false
     }
   }
   // Method to set lifecycle policy on the bucket

@@ -1,7 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Place } from '../interfaces/place.interface';
-import { BrandDto } from './models/brand.dto';
-import { CategoryDto } from './models/category.dto';
+import { Place } from '../../interfaces/place.interface';
+import { BrandDto } from '../models/brand.dto';
+import { CategoryDto } from '../models/category.dto';
+import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
+import { Geometry, Point, Polygon } from 'geojson';
+import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
 
 export class RulesDto {
   @ApiProperty({ description: 'Variant of the rule.', example: 'Abbreviation' })
@@ -48,19 +51,8 @@ export class AddressDto {
   country?: string;
 }
 
-export class GeometryDto {
-  @ApiProperty({ description: 'Type of geometry', example: 'Point' })
-  type: string;
 
-  @ApiProperty({
-    description: 'Coordinates representing the geometry.',
-    example: [40.7128, -74.0060],
-    type: [Number],
-  })
-  coordinates: number[];
-}
-
-export class PropertiesDto {
+export class PlacePropertiesDto {
   @ApiProperty({ description: 'Primary category of the place.', type: () => CategoryDto })
   categories: CategoryDto;
 
@@ -112,8 +104,16 @@ export class PropertiesDto {
   })
   names: PlaceNamesDto;
 
+
+  @ApiProperty({
+    description: 'Name of the place.',
+    type: () => PlaceNamesDto,
+  })
+  ext_name?: string;
+
   constructor(data={}) {
     Object.assign(this, data);
+    this.ext_name = this.names?.primary;
   }
 }
 
@@ -128,32 +128,50 @@ export class PlaceResponseDto {
     description: 'Geometric representation of the place.',
     type: () => GeometryDto,
   })
-  geometry: GeometryDto;
+  geometry: Point|Polygon;
 
   @ApiProperty({
     description: 'Properties and additional details of the place.',
-    type: () => PropertiesDto,
+    type: () => PlacePropertiesDto,
   })
-  properties: PropertiesDto;
+  properties: PlacePropertiesDto;
 
   constructor(place: Place) {
     this.id = place.id;
     this.geometry = place.geometry;
     //if(!this.properties) this.properties = new PropertiesDto();
     //Object.assign(this.properties, place);
+    this.properties = new PlacePropertiesDto(place);
+
   }
 }
 
-export const toPlaceDto = (place: Place):PlaceResponseDto => {
+export const toPlaceDto = (place: Place, requestQuery:GetByLocationDto):PlaceResponseDto => {
 
-  const excludeFieldsFromProperties = ['properties','geometry','distance_m','bbox'];
-  const properties = {...place};
+  const excludeFieldsFromProperties = ['properties','geometry','ext_distance','bbox'];
+
+  
+  const rPlace =  new PlaceResponseDto(place)
+
+  const properties = {...rPlace.properties};
   excludeFieldsFromProperties.forEach(field => delete properties[field]);
 
-  const rPlace =  new PlaceResponseDto(place)
   rPlace.properties = properties;
+
   rPlace.geometry = place.geometry;
 
+  //remove any fields that are not requested
+  if(requestQuery.includes && requestQuery.includes.length > 0) {
+    const filteredProperties = {};
+    requestQuery.includes.forEach((field) => {
+
+        if(rPlace.properties[field]) {
+            filteredProperties[field] = rPlace.properties[field];
+        }
+    });
+    //@ts-ignore
+    rPlace.properties = filteredProperties;
+}
   return rPlace;
 }
 

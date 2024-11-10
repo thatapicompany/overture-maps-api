@@ -4,7 +4,7 @@ import { PlacesService } from './places.service';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
-import { PlaceResponseDto, toPlaceDto } from './dto/place-response.dto';
+import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
 import { ConfigService } from '@nestjs/config';
 import { CloudStorageCacheService } from '../cloudstorage-cache/cloudstorage-cache.service';
 
