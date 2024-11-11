@@ -20,7 +20,15 @@ export interface Place {
     theme?: string;
     type?: string;
   }
-  
+
+export interface PlaceWithBuilding extends Place {
+   
+  building: {
+    id:string
+    geometry: Polygon;
+    distance: number;
+  }
+}
   
   export interface Source {
     property: string;
@@ -60,3 +68,17 @@ export interface Place {
     country: string;
   }
   
+
+  export interface PlaceWithNearestBuilding extends Place {
+
+    nearest_building: {
+      id: string;
+      geometry: Point;
+      bbox: Bbox;
+      version: string;
+      sources: Source[];
+      names: Names;
+      addresses: Address[];
+      ext_distance: number;
+    }
+  }

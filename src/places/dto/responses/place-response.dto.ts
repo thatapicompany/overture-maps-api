@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Place } from '../../interfaces/place.interface';
+import { Place, PlaceWithBuilding } from '../../interfaces/place.interface';
 import { BrandDto } from '../models/brand.dto';
 import { CategoryDto } from '../models/category.dto';
 import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
 import { Geometry, Point, Polygon } from 'geojson';
 import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+import { applyIncludesToDto } from 'src/common/dto/responses/includes.dto';
 
 export class RulesDto {
   @ApiProperty({ description: 'Variant of the rule.', example: 'Abbreviation' })
@@ -111,6 +112,14 @@ export class PlacePropertiesDto {
   })
   ext_name?: string;
 
+  ext_building?: {
+    id:string;
+    geometry:Polygon;
+    distance:number
+  }
+
+  ext_place_geometry?:Point;
+
   constructor(data={}) {
     Object.assign(this, data);
     this.ext_name = this.names?.primary;
@@ -161,17 +170,26 @@ export const toPlaceDto = (place: Place, requestQuery:GetByLocationDto):PlaceRes
   rPlace.geometry = place.geometry;
 
   //remove any fields that are not requested
-  if(requestQuery.includes && requestQuery.includes.length > 0) {
-    const filteredProperties = {};
-    requestQuery.includes.forEach((field) => {
+  if(requestQuery.includes && requestQuery.includes.length > 0)rPlace.properties = applyIncludesToDto(rPlace.properties,requestQuery.includes);
 
-        if(rPlace.properties[field]) {
-            filteredProperties[field] = rPlace.properties[field];
-        }
-    });
-    //@ts-ignore
-    rPlace.properties = filteredProperties;
-}
   return rPlace;
 }
+
+export const toPlaceWithBuildingDto = (place: PlaceWithBuilding, requestQuery:GetByLocationDto):PlaceResponseDto => {
+  
+    const rPlace =  toPlaceDto(place,requestQuery)
+
+    const placeGeometry = rPlace.geometry;
+    //swap geometry for building_geometry
+    rPlace.geometry = place.building.geometry;
+
+    //ensure properties.building is deleted and only ext_building exists
+    //assign building to properties
+    rPlace.properties.ext_building = place.building
+    rPlace.properties.ext_place_geometry = placeGeometry as Point;
+
+    if(requestQuery.includes && requestQuery.includes.length > 0)rPlace.properties = applyIncludesToDto(rPlace.properties,requestQuery.includes);
+
+    return rPlace;
+  }
 

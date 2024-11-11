@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
 
 export class GetPlacesDto extends GetByLocationDto {
@@ -33,6 +33,7 @@ export class GetPlacesDto extends GetByLocationDto {
   @Transform(({ value }) => parseFloat(value))
   @IsNumber()
   @Min(1)
+  @Max(10000)
   radius?: number = 1000;
 
   @ApiPropertyOptional({

@@ -1,9 +1,11 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { BigQuery } from '@google-cloud/bigquery';
-import { Place } from '../places/interfaces/place.interface';
+import { Place, PlaceWithBuilding } from '../places/interfaces/place.interface';
 import { Building } from '../buildings/interfaces/building.interface';
 import { parsePointToGeoJSON, parsePolygonToGeoJSON } from '../utils/geojson';
+import { parsePlaceRow, parsePlaceWithBuildingRow } from './row-parsers/bq-place-row.parser';
+import { parseBuildingRow } from './row-parsers/bq-building-row.parser';
 
 interface IQueryStatistics {
   totalBytesProcessed: number;
@@ -31,105 +33,6 @@ export class BigQueryService {
     });
   }
   
-  private parseBuildingRow(row: any): Building {
-
-    return {
-
-      id: row.id,
-      geometry: parsePolygonToGeoJSON(row.geometry.value),
-      bbox: {
-        xmin: parseFloat(row.bbox.xmin),
-        xmax: parseFloat(row.bbox.xmax),
-        ymin: parseFloat(row.bbox.ymin),
-        ymax: parseFloat(row.bbox.ymax),
-      },
-      version: row.version,
-      sources: row.sources.list.map((source: any) => ({
-        property: source.element.property,
-        dataset: source.element.dataset,
-        record_id: source.element.record_id,
-        update_time: source.element.update_time,
-        confidence: source.element.confidence ? parseFloat(source.element.confidence) : null,
-      })),
-
-      subtype: row.subtype,
-      class: row.class,
-      names: row.names,
-      level: row.level,
-      has_parts: row.has_parts,
-      height: row.height,
-      is_underground: row.is_underground,
-      num_floors: row.num_floors,
-      num_floors_underground: row.num_floors_underground,
-      min_height: row.min_height,
-      min_floor: row.min_floor,
-      facade_color: row.facade_color,
-      facade_material: row.facade_material,
-      roof_material: row.roof_material,
-      roof_shape: row.roof_shape,
-      roof_direction: row.roof_direction,
-      roof_orientation: row.roof_orientation,
-      roof_color: row.roof_color,
-      roof_height: row.roof_height,
-      ext_distance: parseFloat(row.ext_distance),
-      theme: row.theme,
-      type: row.type,
-
-
-    }
-  }
-
-  private parsePlaceRow(row: any): Place {
-
-    return {
-        id: row.id,
-        geometry:  parsePointToGeoJSON(row.geometry.value),
-        bbox: {
-          xmin: parseFloat(row.bbox.xmin),
-          xmax: parseFloat(row.bbox.xmax),
-          ymin: parseFloat(row.bbox.ymin),
-          ymax: parseFloat(row.bbox.ymax),
-        },
-        version: row.version,
-        sources: row.sources.list.map((source: any) => ({
-          property: source.element.property,
-          dataset: source.element.dataset,
-          record_id: source.element.record_id,
-          update_time: source.element.update_time,
-          confidence: source.element.confidence ? parseFloat(source.element.confidence) : null,
-        })),
-        names: {
-          primary: row.names.primary,
-          common: row.names.common,
-          rules: row.names.rules,
-        },
-        categories: {
-          primary: row.categories?.primary,
-          alternate: row.categories?.alternate?.split ? row.categories?.alternate?.split(',') : [],
-        },
-        confidence: parseFloat(row.confidence),
-        websites: row.websites?.split ? row.websites.split(',') : [],
-        socials: row.socials?.list ? row.socials.list.map((social: any) => social.element) : [],
-        emails: row.emails?.split ? row.emails.split(',') : [],
-        phones: row.phones?.list ? row.phones.list.map((phone: any) => phone.element) : [],
-        brand: row.brand ? {
-          names: {
-            primary: row.brand?.names?.primary,
-            common: row.brand?.names?.common,
-            rules: row.brand?.names?.rules,
-          },
-          wikidata: row.brand?.wikidata,
-        } : undefined,
-        addresses: row.addresses?.list ? row.addresses?.list.map((address: any) => ({
-          freeform: address.element?.freeform,
-          locality: address.element?.locality,
-          postcode: address.element?.postcode,
-          region: address.element?.region,
-          country: address.element?.country,
-        })) : [],
-        ext_distance: parseFloat(row.ext_distance),
-      }
-    }
 
   // New method to get brands based on country or lat/lng/radius
   async getBrandsNearby(
@@ -224,49 +127,125 @@ export class BigQueryService {
         brands: row.count_brands
       }
     }));
-  }
-
-  async getBuildingsNearby(
+  }async getPlacesWithNearestBuilding(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<Building[]> {
-  
+    brand_wikidata?: string,
+    brand_name?: string,
+    country?: string,
+    categories?: string[],
+    min_confidence?: number,
+    limit?: number,
+    match_nearest_building: boolean = true
+  ): Promise<PlaceWithBuilding[]> {
+    
+    // Build the query
     let queryParts: string[] = [];
   
-    queryParts.push(
-    `-- Overture Maps API: Get Buildings Nearby
-    -- Step 1: define the search area as the largest neighborhood that contains the point
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = (
-  SELECT
-    geometry
-  FROM
-    \`bigquery-public-data.overture_maps.division_area\`
-  WHERE
-    country = 'AU'
-    AND subtype = "neighborhood"
-    AND ST_INTERSECTS(geometry, ST_GeogPoint(${longitude}, ${latitude}))
-  ORDER BY
-    ST_AREA(geometry) DESC
-  LIMIT 1
-);
-
--- Step 2: Select buildings within the search area
-SELECT
-  *
- ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
-FROM
-  \`bigquery-public-data.overture_maps.building\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
-
-    // Order by distance if latitude and longitude are provided
-    if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+    queryParts.push(`
+    -- Overture Maps API: Get Places with Buildings
+    -- Step 1: Define the search area as a circular polygon around the point with a specified radius
+    DECLARE search_area_geometry GEOGRAPHY;
+    SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+    `);
+  
+    // Build the WHERE clause for additional filters
+    let whereClauses: string[] = [];
+    
+    // Add radius condition if not already in WHERE clause
+    whereClauses.push(`ST_DWithin(p.geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+  
+    if (brand_wikidata) {
+      whereClauses.push(`p.brand.wikidata = "${brand_wikidata}"`);
+    }
+    
+    if (brand_name) {
+      whereClauses.push(`p.brand.names.primary = "${brand_name}"`);
+    }
+    
+    if (country) {
+      whereClauses.push(`p.addresses[OFFSET(0)].country = "${country}"`);
+    }
+    
+    if (categories && categories.length > 0) {
+      whereClauses.push(`p.categories.primary IN UNNEST(["${categories.join('","')}"])`);
+    }
+    
+    if (min_confidence !== undefined) {
+      whereClauses.push(`p.confidence >= ${min_confidence}`);
     }
   
-    // Limit results if no filters are provided
+    // Determine if we match nearest building or only containing buildings
+    if (match_nearest_building) {
+      queryParts.push(`
+      -- Step 2: Select buildings within the search area and calculate the distance
+      WITH nearby_buildings AS (
+        SELECT
+          id AS building_id,
+          geometry AS building_geometry,
+          ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS building_distance
+        FROM
+          \`bigquery-public-data.overture_maps.building\`
+        WHERE
+          ST_WITHIN(geometry, search_area_geometry)
+          AND ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})
+      ),
+    
+      -- Step 3: Select places within the search area and join to the nearest building
+      place_with_nearest_building AS (
+        SELECT
+          p.*,
+          b.building_id as building_id,
+          b.building_geometry AS building_geometry,
+          ST_Distance(p.geometry, b.building_geometry) AS distance_to_nearest_building,
+          ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY ST_Distance(p.geometry, b.building_geometry)) AS distance_rank
+        FROM
+          \`bigquery-public-data.overture_maps.place\` AS p
+        JOIN
+          nearby_buildings AS b
+        ON
+          ST_DWithin(p.geometry, b.building_geometry, ${radius})
+        WHERE
+          ST_WITHIN(p.geometry, search_area_geometry)
+        `
++ (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
+      `
+
+      )
+    
+      -- Step 4: Select only the nearest building for each place
+      SELECT
+        * except(distance_rank)
+      FROM
+        place_with_nearest_building
+      WHERE
+        distance_rank = 1
+      `);
+    } else {
+      queryParts.push(`
+      -- Step 2: Select places and buildings within the search area where the building contains the place geometry
+      SELECT
+        p.*,
+        b.id as building_id,
+        b.geometry AS building_geometry,
+        0 as distance_to_nearest_building
+      FROM
+        \`bigquery-public-data.overture_maps.place\` AS p
+      JOIN
+        \`bigquery-public-data.overture_maps.building\` AS b
+      ON
+        ST_WITHIN(p.geometry, b.geometry)
+      WHERE
+        ST_WITHIN(p.geometry, search_area_geometry)
+        `
++ (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
+      `
+      `);
+    }
+  
+  
+    // Limit results if specified
     if (limit) {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
@@ -275,9 +254,14 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     const query = queryParts.join(' ') + ';';
     this.logger.debug(`Running query: ${query}`);
   
+    // Execute the query
     const { rows } = await this.runQuery(query);
-    return rows.map((row: any) => this.parseBuildingRow(row));
+  
+    // Map results to the response type
+    return rows.map((row: any) => parsePlaceWithBuildingRow(row));
   }
+  
+  
   
 
   async getPlacesNearby(
@@ -350,9 +334,52 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
-    return rows.map((row: any) => this.parsePlaceRow(row));
+    return rows.map((row: any) => parsePlaceRow(row));
   }  
 
+    
+
+  async getBuildingsNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    limit?: number
+  ): Promise<Building[]> {
+  
+    let queryParts: string[] = [];
+  
+    queryParts.push(
+    `-- Overture Maps API: Get Buildings Nearby
+    -- Step 1: define the search area to limit the cost in step 2 taking advantage of the 'geometry' clustering
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+
+-- Step 2: Select buildings within the search area
+SELECT
+  *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+FROM
+  \`bigquery-public-data.overture_maps.building\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY ext_distance`);
+    }
+  
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+  
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+    this.logger.debug(`Running query: ${query}`);
+  
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => parseBuildingRow(row));
+  }
+  
   applyMaxLimit(limit: number): number {
     return Math.min(limit, MAX_LIMIT);
   }
@@ -387,17 +414,21 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
       const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
       const totalBytesBilled = parseInt(result.statistics.query.totalBytesBilled);
       
+      const costPerTB = 5; // USD per TB
+      const bytesPerTB = 1e12;
+      const costInUSD = (totalBytesBilled / bytesPerTB) * costPerTB;
+
       const statistics:IQueryStatistics = {
           totalBytesProcessed,
           totalBytesBilled,
           billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
           bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
           durationMs: Date.now() - start,
-          costInUSD: (Math.round(totalBytesBilled / 1000000000) * 5)/100
+          costInUSD
       }
 
       const QueryFirstLine = query.split('\n')[0];
-      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $${statistics.costInUSD}. Query Line 1: ${QueryFirstLine}`);
+      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $$${costInUSD.toFixed(4)}. Query Line 1: ${QueryFirstLine}`);
       
       return {rows,statistics};
     }

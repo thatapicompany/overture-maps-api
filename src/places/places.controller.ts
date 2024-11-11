@@ -1,9 +1,9 @@
 
-import { Controller, Get, Logger, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpException, Logger, Query, UseGuards } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
-import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
+import { PlaceResponseDto, toPlaceDto, toPlaceWithBuildingDto } from './dto/responses/place-response.dto';
 import { GetBrandsDto } from './dto/requests/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { GetCategoriesDto } from './dto/requests/get-categories.dto';
@@ -59,55 +59,19 @@ export class PlacesController {
   @ApiResponse({ status: 200, description: 'Return Places with Buildings.' , type: PlaceResponseDto, isArray: true})
   async getPlacesWithBuildings(@Query() query: GetPlacesWithBuildingsDto, @AuthedUser() user: User) {
 
-    if(query.radius>5000) {
-      throw new Error("Radius is too large, please use a radius less than 5000 meters")
-      //ToDo: implement building matching via SQL for larger radius queries
+    if(query.match_nearest_building!==true) {
+      throw new HttpException("match_nearest_building must be true to get building shapes due to cost reasons", 400);
+      //ToDo: refactor query to be optimised for this use case as is currently $2.25 per query instead of $0.02
     }
 
-    // Execute getPlaces and getBuildings concurrently
-    const [places, buildings] = await Promise.all([
-      this.placesService.getPlaces(query),
-      //limit should be higher than the number of places as needs more to choose from as places are higher density
-      this.buildingsService.getBuildings({...query,limit:10000}),
-    ]);
-  
-    // Extract building geometries for quick reference and log a specific building if needed
-    const buildingGeoms = buildings.map((building) => building.geometry);
-    this.logger.log(`Building geometries extracted. Looking for specific ID if applicable.`);
-  
-    // Find the building containing each place or the nearest neighbor if no match is found
-    let numMatches = 0;
-    const results = places.map((place) => {
-      if (!place.geometry) {
-        return place;
-      }
 
-      if(place.geometry.type!="Point") {
-        return place;
-      }
-      
-      const matchingBuilding = buildings.find((building) => isPointInPolygon(place.geometry, building.geometry));
-  
-      if (matchingBuilding) {
-        place.geometry = matchingBuilding.geometry;
-        numMatches++;
-      } else if (query.match_nearest_building) {
-
-        // If no exact match is found, try to find the nearest building geometry
-        const nearestGeometry = findNearestPolygon(place.geometry, buildingGeoms, 100);
-        if (nearestGeometry) {
-          place.geometry = nearestGeometry;
-          numMatches++;
-        }
-      }
-  
-      return place;
-    });
-  
-    this.logger.log(`Found ${numMatches} matches`);
+    // test if query.match_nearest_building is true
+    this.logger.log(`Query: ${JSON.stringify(query)} ${query.match_nearest_building===true}`);
+    
+    const placesWithBuildings = await this.placesService.getPlacesWithNearestBuilding(query);
   
     // Map results to DTOs and wrap in GeoJSON if requested
-    const dtoResults = results.map((place) => toPlaceDto(place, query));
+    const dtoResults = placesWithBuildings.map((place) => toPlaceWithBuildingDto(place, query));
     return query.format === Format.GEOJSON ? wrapAsGeoJSON(dtoResults) : dtoResults;
   }
   
