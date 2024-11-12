@@ -11,7 +11,6 @@ export class CountHeaderInterceptor implements NestInterceptor {
     return next.handle().pipe(
       map((data) => {
         if (Array.isArray(data)) {
-          console.log('applyHeader', data.length);
           response.set('X-Total-Count', data.length.toString());
         }
         return data;

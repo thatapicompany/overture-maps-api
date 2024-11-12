@@ -63,7 +63,7 @@ export class PlacesController {
   async getPlacesWithBuildings(@Query() query: GetPlacesWithBuildingsDto, @AuthedUser() user: User) {
 
     if(query.match_nearest_building!==true) {
-      throw new HttpException("match_nearest_building must be true to get building shapes due to cost reasons", 400);
+      throw new HttpException("match_nearest_building must be true in the Demo API to get building shapes due to cost reasons", 400);
       //ToDo: refactor query to be optimised for this use case as is currently $2.25 per query instead of $0.02
     }
 
