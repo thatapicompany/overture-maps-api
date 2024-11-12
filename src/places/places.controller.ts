@@ -19,7 +19,7 @@ import { Format } from '../common/dto/requests/get-by-location.dto';
 import { BuildingsService } from '../buildings/buildings.service';
 import { Feature, GeoJsonObject, Geometry } from 'geojson';
 import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildings';
-import { CountHeader } from 'src/decorators/count-header.decorator';
+import { CountHeader } from '../decorators/count-header.decorator';
 
 @ApiTags('places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger

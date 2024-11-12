@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 
 export class GetPlacesDto extends GetByLocationDto {
   @ApiProperty({

@@ -4,8 +4,8 @@ import { BrandDto } from '../models/brand.dto';
 import { CategoryDto } from '../models/category.dto';
 import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
 import { Geometry, Point, Polygon } from 'geojson';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
-import { applyIncludesToDto } from 'src/common/dto/responses/includes.dto';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
+import { applyIncludesToDto } from '../../../common/dto/responses/includes.dto';
 
 export class RulesDto {
   @ApiProperty({ description: 'Variant of the rule.', example: 'Abbreviation' })

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 
 export class GetCategoriesDto extends GetByLocationDto {
   @ApiPropertyOptional({
