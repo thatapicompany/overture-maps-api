@@ -11,7 +11,7 @@ export function ValidateLatLngUser(): MethodDecorator {
       const lng = request?.lng;
       const user = args[1]
 
-      if (lat && lng && user.isDemoAccount) {
+      if (lat && lng && user?.isDemoAccount) {
         throw new ForbiddenException('Demo accounts cannot access this feature');
       }
 

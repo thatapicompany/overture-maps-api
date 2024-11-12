@@ -19,6 +19,7 @@ import { Format } from '../common/dto/requests/get-by-location.dto';
 import { BuildingsService } from '../buildings/buildings.service';
 import { Feature, GeoJsonObject, Geometry } from 'geojson';
 import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildings';
+import { CountHeader } from 'src/decorators/count-header.decorator';
 
 @ApiTags('places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -35,6 +36,7 @@ export class PlacesController {
   ) {}
 
   @Get()
+  @CountHeader() 
   @ValidateLatLngUser()
   @ApiOperation({ summary: 'Get Places using Query params as filters' })
   @ApiQuery({type:GetPlacesDto})
@@ -53,7 +55,8 @@ export class PlacesController {
   }
 
   @Get('buildings')
-  //@ValidateLatLngUser()
+  @CountHeader() 
+  @ValidateLatLngUser()
   @ApiOperation({ summary: 'Get Places with their Building shapes using Query params as filters' })
   @ApiQuery({type:GetPlacesWithBuildingsDto})
   @ApiResponse({ status: 200, description: 'Return Places with Buildings.' , type: PlaceResponseDto, isArray: true})
@@ -77,11 +80,12 @@ export class PlacesController {
   
   
     
-  @Get('brands')
-  @ValidateLatLngUser()
-  @ApiOperation({ summary: 'Get all Brands from Places using Query params as filters' })
-  @ApiResponse({ status: 200, description: 'Return all Brands, along with a count of all Places for each.' , type: BrandDto, isArray: true})
-  @ApiQuery({type:GetBrandsDto})
+    @Get('brands')
+    @CountHeader() 
+    @ValidateLatLngUser()
+    @ApiOperation({ summary: 'Get all Brands from Places using Query params as filters' })
+    @ApiResponse({ status: 200, description: 'Return all Brands, along with a count of all Places for each.' , type: BrandDto, isArray: true})
+    @ApiQuery({type:GetBrandsDto})
     async getBrands(@Query() query: GetBrandsDto, @AuthedUser() user: User) {
 
       return await this.placesService.getBrands(query);
@@ -89,6 +93,7 @@ export class PlacesController {
     }
 
     @Get('countries')
+    @CountHeader() 
     @ValidateLatLngUser()
     @ApiOperation({ summary: 'Get all Countries from Places using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return all Countries, as well as a count of all the Places and Brands in each.', type:CountryResponseDto, isArray: true})
@@ -99,11 +104,12 @@ export class PlacesController {
     }
 
     @Get('categories')
+    @CountHeader() 
     @ValidateLatLngUser()
     @ApiOperation({ summary: 'Get all Categories from Places using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return all Categories, along with a count of all Brands and Places for each' , type: CategoryResponseDto, isArray: true})
     @ApiQuery({type:GetCategoriesDto})
-    async getCategories(@Query() query: GetCategoriesDto):Promise<CategoryResponseDto[]> {
+    async getCategories(@Query() query: GetCategoriesDto, @AuthedUser() user: User):Promise<CategoryResponseDto[]> {
 
         return await this.placesService.getCategories(query);
         

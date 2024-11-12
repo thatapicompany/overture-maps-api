@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 
 //format string enums
 export enum Format {
@@ -43,16 +43,17 @@ export class GetByLocationDto {
   radius?: number = 1000;
 
   @ApiPropertyOptional({
-    description: 'Limit on the number of results returned, defaulting to 100 if not provided.',
+    description: 'Limit on the number of results returned, defaulting to 1000 if not provided.',
     example: 10,
     minimum: 1,
-    default: 100,
+    default: 1000,
   })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
   @Min(1)
-  limit?: number = 100;
+  @Max(25000, { message: 'Limit must be less than 25000, if you need a larger export then directly query the API otherwise the response will be too large' })
+  limit?: number = 25000;
 
 
   @ApiPropertyOptional({
@@ -76,4 +77,5 @@ export class GetByLocationDto {
   @Transform(({ value }) => String(value).split(','))
   @IsString({ each: true })
   includes?: string[];
+  
 }

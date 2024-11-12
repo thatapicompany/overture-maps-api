@@ -104,7 +104,7 @@ export class PlacesService {
             return cachedResult;
           }
           
-          const results = await this.bigQueryService.getCategories(query.country);
+          const results = await this.bigQueryService.getCategories(query.country, query.lat, query.lng, query.radius);
           
           await this.cloudStorageCache.storeJSON (results, cacheKey);
             return results.map((category: any) => toCategoryResponseDto(category));

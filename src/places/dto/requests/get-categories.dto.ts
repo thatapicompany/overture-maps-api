@@ -1,7 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
 
-export class GetCategoriesDto {
+export class GetCategoriesDto extends GetByLocationDto {
   @ApiPropertyOptional({
     description: 'ISO 3166 country code consisting of 2 characters.',
     example: 'US',
