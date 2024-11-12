@@ -10,7 +10,6 @@ import { Feature, MultiPolygon, Point, Polygon } from 'geojson';
 export const parseWKTToGeoJSON = (wkt: string): Point|Polygon|MultiPolygon => {
     //if MULTI use parseMultiPolygonToGeoJSON
     if(wkt.includes("MULTIPOLYGON")){
-        console.log('function to handle parsing of MULTI e.g. ', wkt);
         return parseMultiPolygonToGeoJSON(wkt);
     }
     //if POLYGON the use parsePolygonToGeoJSON

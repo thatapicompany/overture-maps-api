@@ -271,7 +271,6 @@ export class BigQueryService {
   
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-    this.logger.debug(`Running query: ${query}`);
   
     // Execute the query
     const { rows } = await this.runQuery(query);
@@ -350,7 +349,6 @@ export class BigQueryService {
   
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-    this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parsePlaceRow(row));
@@ -393,7 +391,6 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-    this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parseBuildingRow(row));
