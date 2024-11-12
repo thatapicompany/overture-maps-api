@@ -1,9 +1,9 @@
-import { Point, Polygon } from "geojson";
+import { MultiPolygon, Point, Polygon } from "geojson";
 import { Bbox } from "../../common/interfaces/geometry.interface";
 
 export interface Place {
     id: string;
-    geometry: Point|Polygon;
+    geometry: Point|Polygon|MultiPolygon;
     bbox?: Bbox;
     version: string;
     sources: Source[];
@@ -25,7 +25,7 @@ export interface PlaceWithBuilding extends Place {
    
   building: {
     id:string
-    geometry: Polygon;
+    geometry: Point|Polygon|MultiPolygon;
     distance: number;
   }
 }

@@ -4,8 +4,24 @@ Expect string to be in format "POLYGON((151.2762519003 -33.8915747100951, 151.27
 
 */
 import * as turf from '@turf/turf'
-import { Feature, Point, Polygon } from 'geojson';
+import { Feature, MultiPolygon, Point, Polygon } from 'geojson';
 //import geojson 
+
+export const parseWKTToGeoJSON = (wkt: string): Point|Polygon|MultiPolygon => {
+    //if MULTI use parseMultiPolygonToGeoJSON
+    if(wkt.includes("MULTIPOLYGON")){
+        console.log('function to handle parsing of MULTI e.g. ', wkt);
+        return parseMultiPolygonToGeoJSON(wkt);
+    }
+    //if POLYGON the use parsePolygonToGeoJSON
+    if(wkt.includes("POLYGON")){
+        return parsePolygonToGeoJSON(wkt);
+    }
+    //if POINT
+    if(wkt.includes("POINT")){
+        return parsePointToGeoJSON(wkt);
+    }
+}
 
 export const parsePolygonToGeoJSON  = (polygon: string): Polygon => {
     try{
@@ -25,7 +41,7 @@ export const parsePolygonToGeoJSON  = (polygon: string): Polygon => {
             num = parseFloat(c);
         }
         if(isNaN(num)){
-            console.log('Coordinate is NaN', c);
+            console.log('Coordinate is NaN', c, polygon);
         }
         return num
      }           
@@ -48,6 +64,49 @@ export const parsePolygonToGeoJSON  = (polygon: string): Polygon => {
     }
 }
 
+/*
+function to handle parsing of MULTI e.g. MULTI(-73.9944007 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
+Coordinate is NaN (-73.9942489 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
+*/
+export const parseMultiPolygonToGeoJSON = (multiPolygonStr):MultiPolygon => {
+  // Regular expression to match polygons inside MULTIPOLYGON((...))
+  const multiPolygonRegex = /MULTIPOLYGON\s*\(\(\((.*?)\)\)\)/g;
+  const coordinateRegex = /(-?\d+\.\d+)\s+(-?\d+\.\d+)/g;
+
+  // Function to parse a single polygon string into GeoJSON coordinates
+  const parsePolygon = (polygonStr) => {
+    const coordinates = [];
+    let match;
+    while ((match = coordinateRegex.exec(polygonStr)) !== null) {
+      const [_, lon, lat] = match;
+      coordinates.push([parseFloat(lon), parseFloat(lat)]);
+    }
+    return coordinates;
+  };
+
+  // Check for MULTIPOLYGON match and iterate through each polygon set
+  const polygons = [];
+  let match;
+  while ((match = multiPolygonRegex.exec(multiPolygonStr)) !== null) {
+    const polygonStr = match[1];
+    const polygonCoordinates = polygonStr
+      .split(/\)\s*,\s*\(/) // Split into individual polygons
+      .map(parsePolygon);    // Parse each polygon string
+    polygons.push(polygonCoordinates);
+  }
+
+  if (polygons.length === 0) {
+    throw new Error("No valid MULTIPOLYGON data found in input.");
+  }
+
+  // Construct GeoJSON object
+  const geoJSON = {
+    type: "MultiPolygon",
+    coordinates: polygons
+  };
+
+  return geoJSON as MultiPolygon;
+}
 /*
 export string of POINT(151.2772322 -33.8913828)
 */
