@@ -8,8 +8,11 @@ import { GetBuildingsQuery } from './dto/requests/get-buildings-query.dto';
 import { BuildingDto, toBuildingDto } from './dto/responses/building-response.dto';
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 
 
+@ApiTags('Buildings')
+@ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
 @Controller('buildings')
 export class BuildingsController { 
 
