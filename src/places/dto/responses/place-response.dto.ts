@@ -54,12 +54,6 @@ export class AddressDto {
 
 
 export class PlacePropertiesDto {
-  @ApiProperty({
-    description: 'Name of the place.',
-    type: () => PlaceNamesDto,
-  })
-  ext_name?: string;
-
 
   @ApiProperty({ description: 'Primary category of the place.', type: () => CategoryDto })
   categories: CategoryDto;
@@ -113,6 +107,12 @@ export class PlacePropertiesDto {
   names: PlaceNamesDto;
 
 
+  @ApiProperty({
+    description: 'Name of the place.',
+    type: () => PlaceNamesDto,
+  })
+  ext_name?: string;
+
 
   ext_building?: {
     id:string;
@@ -123,8 +123,8 @@ export class PlacePropertiesDto {
   ext_place_geometry?:Point;
 
   constructor(data={}) {
-    this.ext_name = this.names?.primary;
     Object.assign(this, data);
+    this.ext_name = this.names?.primary;
   }
 }
 
