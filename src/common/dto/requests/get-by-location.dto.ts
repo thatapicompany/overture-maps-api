@@ -78,4 +78,12 @@ export class GetByLocationDto {
   @IsString({ each: true })
   includes?: string[];
   
+  @ApiPropertyOptional({
+    description: 'ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided.',
+    example: 'US',
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
 }
