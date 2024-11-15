@@ -7,7 +7,7 @@ import { DocumentBuilder, SwaggerModule, SwaggerCustomOptions, SwaggerDocumentOp
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);  
-  app.useGlobalPipes(new ValidationPipe({forbidNonWhitelisted:true, whitelist:true}));
+  app.useGlobalPipes(new ValidationPipe({forbidNonWhitelisted:false, whitelist:true}));
   app.use(bodyParser.json({limit: '50mb'}));
   app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
