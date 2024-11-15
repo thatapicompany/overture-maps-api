@@ -81,8 +81,8 @@ export class BigQueryService {
     const {rows} = await this.runQuery(query);
 
     return rows.map((row: any) => ({
-      names: row.brand.names,
-      wikidata: row.brand.wikidata,
+      names: row.brand?.names,
+      wikidata: row.brand?.wikidata,
       counts:{
         places: row.count_places
       }
