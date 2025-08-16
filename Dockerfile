@@ -1,16 +1,20 @@
 
+
 # ---- Build Stage ----
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# Install dependencies
+# Install all dependencies (including dev) so nest CLI is available
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Copy source files and build
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build
+
+# Remove dev dependencies after build
+RUN npm prune --production
 
 # ---- Production Stage ----
 FROM node:22-alpine
