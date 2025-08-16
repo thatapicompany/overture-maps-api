@@ -36,7 +36,7 @@ export class BigQueryService {
 
   // New method to get brands based on country or lat/lng/radius
   async getBrandsNearby(
-    country_code?: string,
+    country?: string,
     latitude?: number,
     longitude?: number,
     radius: number = 1000,
@@ -51,8 +51,14 @@ export class BigQueryService {
       FROM \`${SOURCE_DATASET}.place\`
     `;
 
-    if (country_code) {
-      query += ` WHERE addresses.list[OFFSET(0)].element.country = "${country_code}"`;
+    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata });
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+    
+/*
+    if (country) {
+      query += ` WHERE addresses.list[OFFSET(0)].element.country = "${country}"`;
     } else if (latitude && longitude) {
       query += ` WHERE ST_DISTANCE(
         ST_GEOGPOINT(${longitude}, ${latitude}),
@@ -65,7 +71,7 @@ export class BigQueryService {
     }
     if (require_wikidata) {
       query += ` AND brand.wikidata IS NOT NULL`;
-    }
+    }*/
     query += ` GROUP BY ALL`;
     if (minimum_places) {
       query += ` HAVING count_places >= ${minimum_places}`;
@@ -75,8 +81,8 @@ export class BigQueryService {
     const {rows} = await this.runQuery(query);
 
     return rows.map((row: any) => ({
-      names: row.brand.names,
-      wikidata: row.brand.wikidata,
+      names: row.brand?.names,
+      wikidata: row.brand?.wikidata,
       counts:{
         places: row.count_places
       }
@@ -102,7 +108,15 @@ export class BigQueryService {
     }));
   }
 
-  async getCategories(country?:string): Promise<{ primary: string; counts:{ places:number } }[]> {
+  async getCategories(
+    country?:string,
+    latitude?: number,
+    longitude?: number,
+    radius: number = 1000
+  ): Promise<{ primary: string; counts:{ places:number } }[]> {
+
+
+
     let query = `-- Overture Maps API: Get categories
       SELECT DISTINCT categories.primary AS category_primary,
       count(1) as count_places,
@@ -110,10 +124,11 @@ export class BigQueryService {
       FROM \`${SOURCE_DATASET}.place\`
       WHERE categories.primary IS NOT NULL
     `;
-    if (country) {
-      query += ` AND addresses.list[OFFSET(0)].element.country = "${country}"`
+    
+    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius });
+    if (whereClauses.length > 0) {
+      query += ` AND ${whereClauses.join(' AND ')}`;
     }
-
     query += ` GROUP BY category_primary
       ORDER BY count_places DESC;
     `;
@@ -127,7 +142,10 @@ export class BigQueryService {
         brands: row.count_brands
       }
     }));
-  }async getPlacesWithNearestBuilding(
+  }
+  
+  
+  async getPlacesWithNearestBuilding(
     latitude: number,
     longitude: number,
     radius: number = 1000,
@@ -153,9 +171,10 @@ export class BigQueryService {
     // Build the WHERE clause for additional filters
     let whereClauses: string[] = [];
     
+    if (latitude && longitude && radius) {
     // Add radius condition if not already in WHERE clause
-    whereClauses.push(`ST_DWithin(p.geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
-  
+      whereClauses.push(`ST_DWithin(p.geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+    }
     if (brand_wikidata) {
       whereClauses.push(`p.brand.wikidata = "${brand_wikidata}"`);
     }
@@ -165,7 +184,7 @@ export class BigQueryService {
     }
     
     if (country) {
-      whereClauses.push(`p.addresses[OFFSET(0)].country = "${country}"`);
+      whereClauses.push(`p.addresses[OFFSET(0)].element.country = "${country}"`);
     }
     
     if (categories && categories.length > 0) {
@@ -252,7 +271,6 @@ export class BigQueryService {
   
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-    this.logger.debug(`Running query: ${query}`);
   
     // Execute the query
     const { rows } = await this.runQuery(query);
@@ -338,6 +356,7 @@ export class BigQueryService {
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
+
     this.logger.debug(`Running query: ${query}`);
 
     const { rows } = await this.runQuery(query);
@@ -381,7 +400,6 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-    this.logger.debug(`Running query: ${query}`);
   
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parseBuildingRow(row));
@@ -439,4 +457,53 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
       
       return {rows,statistics};
     }
+
+    private buildWhereClauses({
+      country,
+      latitude,
+      longitude,
+      radius,
+      brand_wikidata,
+      brand_name,
+      categories,
+      min_confidence,
+      require_wikidata
+    }: {
+      country?: string;
+      latitude?: number;
+      longitude?: number;
+      radius?: number;
+      brand_wikidata?: string;
+      brand_name?: string;
+      categories?: string[];
+      min_confidence?: number;
+      require_wikidata?: boolean;
+    }): string[] {
+      const whereClauses: string[] = [];
+      
+      if (latitude && longitude && radius) {
+        whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+      }
+      if (country) {
+        whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
+      }
+      if (brand_wikidata) {
+        whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
+      }
+      if (brand_name) {
+        whereClauses.push(`brand.names.primary = "${brand_name}"`);
+      }
+      if (categories && categories.length > 0) {
+        whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
+      }
+      if (min_confidence !== undefined) {
+        whereClauses.push(`confidence >= ${min_confidence}`);
+      }
+      if (require_wikidata) {
+        whereClauses.push(`brand.wikidata IS NOT NULL`);
+      }
+  
+      return whereClauses;
+    }
+  
 }
