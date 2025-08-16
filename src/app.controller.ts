@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import ApiRequest from 'theauthapi/dist/services/ApiRequest/ApiRequest';
+
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('root')
