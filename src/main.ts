@@ -35,7 +35,7 @@ async function bootstrap() {
     .setDescription('OpenAPI docs for the Overture Maps API')
     .setVersion('1.0')
     .addServer('http://localhost:8080/', 'Local environment')
-    .addServer('https://overture-maps-api.thatapicompany.com','Cloud API Service')
+    .addServer('https://api.overturemapsapi.com','Cloud API Service')
     .setContact("Aden Forshaw", "https://thatapicompany.com/overture-maps-api", "aden@thatapicompany.com")
     .addApiKey(
       { type: 'apiKey', name: 'x-api-key', in: 'header' },
