@@ -283,6 +283,7 @@ export class BigQueryService {
   
 
   async getPlacesNearby(
+
     latitude: number,
     longitude: number,
     radius: number = 1000,
@@ -291,11 +292,12 @@ export class BigQueryService {
     country?: string,
     categories?: string[],
     min_confidence?: number,
-    limit?: number
+    limit?: number,
+    source?: string
   ): Promise<Place[]> {
-  
+
     let queryParts: string[] = [];
-  
+
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *`);
@@ -303,23 +305,23 @@ export class BigQueryService {
     if (latitude && longitude) {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance`);
     }
-  
+
     queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
-  
+
     // Conditional filters
     let whereClauses: string[] = [];
     
     if (latitude && longitude && radius) {
       whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
     } 
-  
+
     if (brand_wikidata) {
       whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
     }
     if (brand_name) {
       whereClauses.push(`brand.names.primary = "${brand_name}"`);
     }
-  
+
     if (country) {
       whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
     }
@@ -327,29 +329,36 @@ export class BigQueryService {
     if(categories && categories.length > 0){
       whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
     }
-  
+
     if (min_confidence) {
       whereClauses.push(`confidence >= ${min_confidence}`);
     }
-  
+
+    if (source) {
+      // Filter for at least one sources element with matching dataset
+      whereClauses.push(`EXISTS (SELECT 1 FROM UNNEST(sources) AS s WHERE s.dataset = "${source}")`);
+    }
+
     // Combine where clauses
     if (whereClauses.length > 0) {
       queryParts.push(`WHERE ${whereClauses.join(' AND ')}`);
     }
-  
+
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
       queryParts.push(`ORDER BY ext_distance`);
     }
-  
+
     // Limit results if no filters are provided
     if (limit) {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
-  
+
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-  
+
+    this.logger.debug(`Running query: ${query}`);
+
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parsePlaceRow(row));
   }  
