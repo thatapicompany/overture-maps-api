@@ -17,16 +17,15 @@ async function bootstrap() {
   });
 
   const corsOptions = {
-    origin: (origin, callback) => {
-      callback(null, origin || true);
-    },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-    credentials: true,
-    allowedHeaders: 'Content-Type, Authorization, Accept, Observe,  api_key',
-    exposedHeaders: 'Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version',
-  };
+    "origin": "*",
+    "methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    "preflightContinue": false,
+    "optionsSuccessStatus": 204,
+    "credentials":true,
+    "allowedHeaders": 'Content-Type, Authorization, Accept, Observe, x-api-key',
+    "exposedHeaders":"Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version"
+  }
+
   app.enableCors(corsOptions);
   app.useGlobalPipes(new ValidationPipe({transform: true}));
 
