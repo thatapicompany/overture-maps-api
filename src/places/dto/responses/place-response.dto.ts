@@ -3,8 +3,10 @@ import { Place, PlaceWithBuilding } from '../../interfaces/place.interface';
 import { BrandDto } from '../models/brand.dto';
 import { CategoryDto } from '../models/category.dto';
 import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
-import { Geometry, Point, Polygon } from 'geojson';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+
+import { Geometry, MultiPolygon, Point, Polygon } from 'geojson';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
+
 import { applyIncludesToDto } from '../../../common/dto/responses/includes.dto';
 
 export class RulesDto {
@@ -54,6 +56,7 @@ export class AddressDto {
 
 
 export class PlacePropertiesDto {
+
   @ApiProperty({ description: 'Primary category of the place.', type: () => CategoryDto })
   categories: CategoryDto;
 
@@ -112,9 +115,10 @@ export class PlacePropertiesDto {
   })
   ext_name?: string;
 
+
   ext_building?: {
     id:string;
-    geometry:Polygon;
+    geometry:Point|Polygon|MultiPolygon;
     distance:number
   }
 
@@ -137,7 +141,7 @@ export class PlaceResponseDto {
     description: 'Geometric representation of the place.',
     type: () => GeometryDto,
   })
-  geometry: Point|Polygon;
+  geometry: Point|Polygon|MultiPolygon;
 
   @ApiProperty({
     description: 'Properties and additional details of the place.',

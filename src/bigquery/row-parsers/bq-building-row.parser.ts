@@ -1,12 +1,12 @@
 import { Building } from "../../buildings/interfaces/building.interface"
-import { parsePolygonToGeoJSON } from "../../utils/geojson"
+import { parsePolygonToGeoJSON, parseWKTToGeoJSON } from "../../utils/geojson"
 
 export const  parseBuildingRow = (row: any): Building => {
 
     return {
 
       id: row.id,
-      geometry: parsePolygonToGeoJSON(row.geometry.value),
+      geometry: parseWKTToGeoJSON(row.geometry.value),
       bbox: {
         xmin: parseFloat(row.bbox.xmin),
         xmax: parseFloat(row.bbox.xmax),

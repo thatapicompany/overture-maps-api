@@ -1,12 +1,12 @@
 import { Source } from "../../places/interfaces/place.interface";
 import { Bbox } from "../../common/interfaces/geometry.interface";
-import { Geometry, Polygon } from "geojson";
+import { Geometry, MultiPolygon, Polygon ,Point} from "geojson";
 
 
 export interface Building {
     
     id: string;
-    geometry: Polygon;
+    geometry: Point|Polygon|MultiPolygon;
     bbox?: Bbox;
     version: string;
     sources: Source[];

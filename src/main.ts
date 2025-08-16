@@ -7,7 +7,7 @@ import { DocumentBuilder, SwaggerModule, SwaggerCustomOptions, SwaggerDocumentOp
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);  
-  app.useGlobalPipes(new ValidationPipe({forbidNonWhitelisted:true, whitelist:true}));
+  app.useGlobalPipes(new ValidationPipe({forbidNonWhitelisted:false, whitelist:true}));
   app.use(bodyParser.json({limit: '50mb'}));
   app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
@@ -50,7 +50,7 @@ async function bootstrap() {
   const customOptions: SwaggerCustomOptions = {
     customfavIcon: 'https://overturemaps.org/wp-content/uploads/sites/16/2022/12/cropped-Favicon-150x150.png',
     customCss: '.swagger-ui .topbar { display: none }', // Hide the top bar of Swagger UI
-    jsonDocumentUrl: '/api-docs-json', swaggerUrl: '/api-docs-ui',
+    jsonDocumentUrl: '/api-docs.json', swaggerUrl: '/api-docs-ui',
     customSiteTitle: 'Overture Maps API Documentation',
   };
 

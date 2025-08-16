@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
 import { Building } from '../../interfaces/building.interface';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 import { Geometry } from 'geojson';
 
 export class BuildingPropertiesDto {

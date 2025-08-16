@@ -5,6 +5,7 @@ import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.d
 
 export class GetPlacesDto extends GetByLocationDto {
 
+
   @ApiPropertyOptional({
     description: 'Filter places to only those with a source dataset matching this value.',
     example: 'meta',
@@ -51,6 +52,7 @@ export class GetPlacesDto extends GetByLocationDto {
   @IsOptional()
   @IsString()
   country?: string;
+
 
 
 

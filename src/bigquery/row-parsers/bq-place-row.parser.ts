@@ -1,5 +1,5 @@
 import { Place, PlaceWithBuilding } from "../../places/interfaces/place.interface"
-import { parsePointToGeoJSON, parsePolygonToGeoJSON } from "../../utils/geojson"
+import { parsePointToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from "../../utils/geojson"
 
 export const parsePlaceRow = (row: any): Place => {
 
@@ -59,7 +59,7 @@ export const parsePlaceWithBuildingRow = (row: any): PlaceWithBuilding => {
      const building = {
         id: row.building_id,
         distance: parseFloat(row.distance_to_nearest_building),
-        geometry: parsePolygonToGeoJSON(row.building_geometry.value),
+        geometry: parseWKTToGeoJSON(row.building_geometry.value),
 
      }
     return {
