@@ -6,23 +6,38 @@
 
 [See the API in Action at https://www.OvertureMapsAPI.com/](https://www.overturemapsapi.com/)
 
+## Hosted Version
 
-## Endpoints
+The hosted version of the Overture Maps API has additional datasets including that are expensive to build & host, and are not included in the self-hosted version:
 
-- [OpenAPI Spec Doc](https://overture-maps-api.thatapicompany.com/api-docs.json)
-- [./Places](https://docs.overturemaps.org/guides/places/) - The Overture places theme has one feature type, called place, and contains more than 53 million point representations of real-world entities: schools, businesses, hospitals, religious organizations, landmarks, mountain peaks, and much more.
-- ./Places/Brands - Lists all the Brands used in the Places data, along with counts of Places for each.
-- ./Places/Categories - Lists all the Categories used in the Places data, along with counts of Places and Brands in each
-- ./Places/Countries - Lists all the Countries used in the Places data, along with counts of Places and Brands in each
+- OpenStreetMap entity Id for each Place where available
+- additional data sources for Places
+- additional metadata fields for each Place
+- Endpoint: [https://api.overturemapsapi.com](https://api.overturemapsapi.com)
+- OpenAPI Doc: [https://api.overturemapsapi.com/api-docs](https://api.overturemapsapi.com/api-docs)
+
+[Sign up at https://overturemapsapi.com](https://overturemapsapi.com/)
+
+## Self Hosting
+
+- [Deploy to Google Cloud Platform using Cloudrun and BigQuery](./docs/google-cloud-platform.md)
+
+## API Endpoints
+
+- [OpenAPI Spec Doc](https://api.overturemapsapi.com/api-docs.json)
+- [./Places](https://www.overturemapsapi.com/docs/api-endpoints/places/) - The Overture places theme has one feature type, called place, and contains more than 53 million point representations of real-world entities: schools, businesses, hospitals, religious organizations, landmarks, mountain peaks, and much more.
+- [./Places/Brands](https://www.overturemapsapi.com/docs/api-endpoints/places-brands) - Lists all the Brands used in the Places data, along with counts of Places for each.
+- [./Places/Categories](https://www.overturemapsapi.com/docs/api-endpoints/places-categories) - Lists all the Categories used in the Places data, along with counts of Places and Brands in each.
+- [./Places/Countries](https://www.overturemapsapi.com/docs/api-endpoints/places-countries) - Lists all the Countries used in the Places data, along with counts of Places and Brands in each.
+- [./Places/Buildings](https://www.overturemapsapi.com/docs/api-endpoints/places-buildings) - Returns the Building shapes with the Places
 
 ### Schemas & Design
 
 - [API Design](./docs/api-design.md)
 - [Response Formats GeoJSON & JSON](./docs/response-formats.md)
-- [Place](https://docs.overturemaps.org/schema/reference/places/place/)
-- [Address](https://docs.overturemaps.org/schema/reference/addresses/address/)
+- [Place Schema](https://docs.overturemaps.org/schema/reference/places/place/)
+- [Address Schema](https://docs.overturemaps.org/schema/reference/addresses/address/)
 - [Overture Maps Official site](https://overturemaps.org/)
-- [Overture Maps API](https://docs.overturemaps.org/)
 
 ### API Roadmap
 
@@ -41,10 +56,6 @@ Extras:
 
 - [ ] Fill `wikidata` holes in the data
 - [ ] Add `wikidata` to the appropriate response for things like Brand logos, and more info
-
-### Deployment & Datasets
-
-- [Google Cloud Platform](./docs/google-cloud-platform.md)
 
 ### API Key management
 

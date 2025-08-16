@@ -16,8 +16,8 @@ export class AppController {
       "service":this.appService.getAppName(),
       "version":this.appService.getVersion(), 
       message:"API by ThatAPICompany.com, Data by OvertureMaps.org",
-      docs_openapi:"https://overture-maps-api.thatapicompany.com/api-docs",
-      docs_ui:"https://overture-maps-api.thatapicompany.com/api-docs-ui"
+      docs_openapi:"https://api.overturemapsapi.com/api-docs",
+      docs_ui:"https://api.overturemapsapi.com/api-docs-ui"
     };
   }
 }
