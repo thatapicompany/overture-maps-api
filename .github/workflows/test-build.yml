@@ -2,6 +2,7 @@ name: Default test
 on:
   push:
     branches-ignore:
+      - 'main'
       - 'master'
       - 'staging'
 

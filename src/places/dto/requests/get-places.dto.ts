@@ -6,6 +6,55 @@ import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.d
 export class GetPlacesDto extends GetByLocationDto {
 
 
+  @ApiPropertyOptional({
+    description: 'Filter places to only those with a source dataset matching this value.',
+    example: 'meta',
+  })
+  @IsOptional()
+  @IsString()
+  source?: string;
+  @ApiProperty({
+    description: 'Latitude coordinate. Required if country code is not provided.',
+    example: 40.7128,
+  })
+  @ValidateIf(o => !o.country)
+  @Transform(({ value }) => parseFloat(value))
+  @IsNumber()
+  lat: number;
+
+  @ApiProperty({
+    description: 'Longitude coordinate. Required if country code is not provided.',
+    example: -74.0060,
+  })
+  @ValidateIf(o => !o.country)
+  @Transform(({ value }) => parseFloat(value))
+  @IsNumber()
+  lng: number;
+
+  @ApiPropertyOptional({
+    description: 'Search radius in meters, defaulting to 1000 meters if not provided.',
+    example: 1000,
+    minimum: 1,
+    default: 1000,
+  })
+  @ValidateIf(o => !o.country)
+  @IsOptional()
+  @Transform(({ value }) => parseFloat(value))
+  @IsNumber()
+  @Min(1)
+  @Max(10000)
+  radius?: number = 1000;
+
+  @ApiPropertyOptional({
+    description: 'ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided.',
+    example: 'US',
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+
+
 
   @ApiPropertyOptional({
     description: 'Wikidata brand ID associated with the place.',

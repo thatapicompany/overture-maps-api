@@ -216,4 +216,43 @@ describe('PlacesService', () => {
     expect(result).toEqual(mockPlaceResponseDto);
   });
 
+  it('should filter places by source dataset if source is provided', async () => {
+    mockGcsGetJSON.mockResolvedValueOnce(null);
+    // Add two places, only one matches the source filter
+    const response = [
+      {
+        ...mockBigQueryGetPlacesNearbyResponse[0],
+        sources: [
+          { property: '', dataset: 'meta', record_id: '1', update_time: '2024-08-02T00:00:00.000Z', confidence: null },
+        ],
+      },
+      {
+        ...mockBigQueryGetPlacesNearbyResponse[0],
+        id: 'other',
+        sources: [
+          { property: '', dataset: 'other', record_id: '2', update_time: '2024-08-02T00:00:00.000Z', confidence: null },
+        ],
+      },
+    ];
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(response);
+    mockGcsStoreJSON.mockResolvedValueOnce(undefined);
+
+    const query: GetPlacesDto = {
+      lat: 43.8711004,
+      lng: -1.1516016,
+      radius: 1000,
+      country: 'FR',
+      min_confidence: 0.5,
+      brand_wikidata: null,
+      brand_name: 'Intermarché',
+      categories: ['supermarket'],
+      limit: 10,
+      source: 'meta',
+    };
+
+    const result = await service.getPlaces(query);
+    expect(result.length).toBe(1);
+    expect(result[0].sources[0].dataset).toBe('meta');
+  });
+
 });
