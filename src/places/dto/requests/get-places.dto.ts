@@ -1,9 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
-import { GetByLocationDto } from 'src/common/dto/requests/get-by-location.dto';
+import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 
 export class GetPlacesDto extends GetByLocationDto {
+
+  @ApiPropertyOptional({
+    description: 'Filter places to only those with a source dataset matching this value.',
+    example: 'meta',
+  })
+  @IsOptional()
+  @IsString()
+  source?: string;
   @ApiProperty({
     description: 'Latitude coordinate. Required if country code is not provided.',
     example: 40.7128,

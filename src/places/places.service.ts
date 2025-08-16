@@ -32,10 +32,8 @@ export class PlacesService {
     ) {}
     async getPlaces(query: GetPlacesDto):Promise<Place[]> {
 
-        const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit } = query;
-    
+        const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, source } = query;
         const cacheKey = `get-places-${JSON.stringify(query)}`;
-    
         // Check if cached results exist in GCS
         let results:Place[] = await this.cloudStorageCache.getJSON(cacheKey);
         if (!results) {
@@ -43,10 +41,12 @@ export class PlacesService {
           results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata,brand_name, country, categories, min_confidence,limit);
           // Cache the results in GCS
           await this.cloudStorageCache.storeJSON (results,cacheKey);
-    
         }
-          return results
-        
+        // Filter by source if provided
+        if (source) {
+          results = results.filter(place => Array.isArray(place.sources) && place.sources.some(s => s.dataset === source));
+        }
+        return results;
       }
 
     
