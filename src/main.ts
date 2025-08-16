@@ -22,7 +22,7 @@ async function bootstrap() {
     "preflightContinue": false,
     "optionsSuccessStatus": 204,
     "credentials":true,
-    "allowedHeaders": 'Content-Type, Authorization, Accept, Observe,  api_key',
+    "allowedHeaders": 'Content-Type, Authorization, Accept, Observe, x-api-key',
     "exposedHeaders":"Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version"
   }
   app.enableCors(corsOptions);
