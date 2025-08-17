@@ -8,11 +8,11 @@ import { Request, Response } from 'express';
 import { AuthAPIMiddleware } from './middleware/auth-api.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CacheModule } from './cache/cache.module';
+import { AppCacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
-    CacheModule,
+    AppCacheModule,
     BuildingsModule,
     PlacesModule,
     ConfigModule.forRoot(),

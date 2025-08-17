@@ -2,7 +2,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Bucket } from '@google-cloud/storage';
-import { CACHE_CONFIG, GCS_BUCKET, CacheConfig } from './cache.module';
+import { CACHE_CONFIG, GCS_BUCKET, CacheConfig } from './cache.constants';
 
 @Injectable()
 export class CacheService {
