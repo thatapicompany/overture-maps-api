@@ -51,7 +51,7 @@ export function ValidateLatLngUser(): MethodDecorator {
         );
         if (!withinRadius) {
           throw new BadRequestException(
-            `Demo accounts can only access locations within 10,000 meters of demo cities. Demo cities: ${demoCities.map(city => JSON.stringify(city)).join(", ")}`
+            `Demo accounts can only access locations within 10,000 meters of demo cities. Demo cities: ${demoCities.map(city => JSON.stringify(city)).join(", ")}. Signup for a Free account at https://overturemaps.com/`
           );
         }
       }
