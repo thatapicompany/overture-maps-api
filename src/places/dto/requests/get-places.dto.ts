@@ -42,7 +42,7 @@ export class GetPlacesDto extends GetByLocationDto {
   @Transform(({ value }) => parseFloat(value))
   @IsNumber()
   @Min(1)
-  @Max(10000)
+  @Max(25000, { message: '25000 is the maximum on your plan. Increase plan or request data at a country level' })
   radius?: number = 1000;
 
   @ApiPropertyOptional({
