@@ -4,19 +4,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { redisStore } from 'cache-manager-redis-yet';
 import { Storage, Bucket } from '@google-cloud/storage';
 import { CacheService } from './cache.service';
-
-export interface CacheConfig {
-  redisUrl?: string;
-  maxObjectBytes: number;
-  gcsBucket?: string;
-}
-
-export const CACHE_CONFIG = 'CACHE_CONFIG';
-export const GCS_BUCKET = 'GCS_BUCKET';
+import { CACHE_CONFIG, GCS_BUCKET, CacheConfig } from './cache.constants';
 
 @Global()
 @Module({
   imports: [
+    ConfigModule,
     NestCacheModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -58,6 +51,6 @@ export const GCS_BUCKET = 'GCS_BUCKET';
     },
     CacheService,
   ],
-  exports: [CacheService, NestCacheModule, CACHE_CONFIG],
+  exports: [CacheService, CACHE_CONFIG],
 })
-export class CacheModule {}
+export class AppCacheModule {}

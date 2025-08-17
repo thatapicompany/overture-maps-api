@@ -1,5 +1,5 @@
 import { CacheService } from './cache.service';
-import { CACHE_CONFIG, GCS_BUCKET, CacheConfig } from './cache.module';
+import { CacheConfig } from './cache.constants';
 import { Cache } from 'cache-manager';
 import { Bucket } from '@google-cloud/storage';
 
