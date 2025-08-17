@@ -17,11 +17,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "export $(cat .env.test | xargs) && NODE_ENV=test && jest --config ./test/jest-e2e.json"
+    "test:e2e": "bash -c 'if [ -f .env.test ]; then export $(cat .env.test | xargs); fi; NODE_ENV=test jest --config ./test/jest-e2e.json'"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.1",
     "@google-cloud/storage": "^7.13.0",
+    "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.0.0",
@@ -29,6 +30,8 @@
     "@nestjs/swagger": "^8.0.1",
     "@turf/turf": "^7.1.0",
     "@types/geojson": "^7946.0.14",
+    "cache-manager": "^7.1.1",
+    "cache-manager-redis-yet": "^5.1.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.5",

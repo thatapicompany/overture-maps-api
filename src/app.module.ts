@@ -1,23 +1,22 @@
-import { CloudstorageCacheModule } from './cloudstorage-cache/cloudstorage-cache.module';
+import { Module, NestMiddleware, MiddlewareConsumer, Logger } from '@nestjs/common';
 import { BuildingsModule } from './buildings/buildings.module';
 import { PlacesModule } from './places/places.module';
-import { PlacesService } from './places/places.service';
-
-import { Module, NestMiddleware, MiddlewareConsumer, Logger, RequestMethod } from '@nestjs/common';
-import { PlacesController } from './places/places.controller';
 import { BigQueryService } from './bigquery/bigquery.service';
 import { GcsService } from './gcs/gcs.service';
 import { ConfigModule } from '@nestjs/config';
-import { Request, Response } from 'express'
+import { Request, Response } from 'express';
 import { AuthAPIMiddleware } from './middleware/auth-api.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AppCacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
-    CloudstorageCacheModule,
+    AppCacheModule,
     BuildingsModule,
-    PlacesModule, ConfigModule.forRoot()],
+    PlacesModule,
+    ConfigModule.forRoot(),
+  ],
   controllers: [AppController],
   providers: [BigQueryService, GcsService, AppService],
 })
