@@ -2,16 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { BigQueryService } from '../bigquery/bigquery.service';
-import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
 import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
 import { ConfigService } from '@nestjs/config';
-import { CloudStorageCacheService } from '../cloudstorage-cache/cloudstorage-cache.service';
+import { CacheService } from '../cache/cache.service';
 
 describe('PlacesService', () => {
   let service: PlacesService;
   let bigQueryService: BigQueryService;
-  let cacheService: CloudStorageCacheService;
+  let cacheService: CacheService;
 
   const mockBigQueryGetPlacesNearbyResponse = [
     {
@@ -122,8 +121,8 @@ describe('PlacesService', () => {
       }
   ];
 
-  const mockGcsGetJSON = jest.fn();
-  const mockGcsStoreJSON = jest.fn();
+  const mockCacheGet = jest.fn();
+  const mockCacheSet = jest.fn();
   const mockBigQueryGetPlacesNearby = jest.fn();
 
   beforeEach(async () => {
@@ -139,8 +138,8 @@ describe('PlacesService', () => {
           useValue: { getPlacesNearby: mockBigQueryGetPlacesNearby },
         },
         {
-          provide: CloudStorageCacheService,
-          useValue: { getJSON: mockGcsGetJSON, storeJSON: mockGcsStoreJSON },
+          provide: CacheService,
+          useValue: { get: mockCacheGet, set: mockCacheSet, del: jest.fn() },
         },
         {
           provide: Logger,
@@ -151,7 +150,7 @@ describe('PlacesService', () => {
 
     service = module.get<PlacesService>(PlacesService);
     bigQueryService = module.get<BigQueryService>(BigQueryService);
-    cacheService = module.get<CloudStorageCacheService>(CloudStorageCacheService);
+    cacheService = module.get<CacheService>(CacheService);
   });
 
   afterEach(() => {
@@ -159,7 +158,7 @@ describe('PlacesService', () => {
   });
 
   it('should return places from cache if available', async () => {
-    mockGcsGetJSON.mockResolvedValueOnce(mockPlaceResponseDto);
+    mockCacheGet.mockResolvedValueOnce(mockPlaceResponseDto);
 
     const query: GetPlacesDto = {
       lat: 43.8711004,
@@ -175,15 +174,15 @@ describe('PlacesService', () => {
 
     const result = await service.getPlaces(query);
 
-    expect(mockGcsGetJSON).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
+    expect(mockCacheGet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
     expect(mockBigQueryGetPlacesNearby).not.toHaveBeenCalled();
     expect(result).toEqual(mockPlaceResponseDto);
   });
 
   it('should query BigQuery and cache results if cache is empty', async () => {
-    mockGcsGetJSON.mockResolvedValueOnce(null);
+    mockCacheGet.mockResolvedValueOnce(null);
     mockBigQueryGetPlacesNearby.mockResolvedValueOnce(mockBigQueryGetPlacesNearbyResponse);
-    mockGcsStoreJSON.mockResolvedValueOnce(undefined);
+    mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
       lat: 43.8711004,
@@ -199,7 +198,7 @@ describe('PlacesService', () => {
 
     const result = await service.getPlaces(query);
 
-    expect(mockGcsGetJSON).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
+    expect(mockCacheGet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
     expect(mockBigQueryGetPlacesNearby).toHaveBeenCalledWith(
       query.lat,
       query.lng,
@@ -212,12 +211,12 @@ describe('PlacesService', () => {
       query.limit
     );
     
-    expect(mockGcsStoreJSON).toHaveBeenCalledWith(mockBigQueryGetPlacesNearbyResponse, `get-places-${JSON.stringify(query)}`);
+    expect(mockCacheSet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`, mockBigQueryGetPlacesNearbyResponse, 3600);
     expect(result).toEqual(mockPlaceResponseDto);
   });
 
   it('should filter places by source dataset if source is provided', async () => {
-    mockGcsGetJSON.mockResolvedValueOnce(null);
+    mockCacheGet.mockResolvedValueOnce(null);
     // Add two places, only one matches the source filter
     const response = [
       {
@@ -235,7 +234,7 @@ describe('PlacesService', () => {
       },
     ];
     mockBigQueryGetPlacesNearby.mockResolvedValueOnce(response);
-    mockGcsStoreJSON.mockResolvedValueOnce(undefined);
+    mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
       lat: 43.8711004,

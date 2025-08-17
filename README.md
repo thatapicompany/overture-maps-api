@@ -94,6 +94,16 @@ curl -H "x-api-key: DEMO-API-KEY" -X GET -G 'http://localhost:8080/places/brands
 -d 'country=AU' -d 'categories=airlines,airline'
 ```
 
+### Caching
+
+The application uses a hybrid cache layer to reduce calls to external services.
+
+- `REDIS_URL` &mdash; optional Redis connection string (e.g. `redis://localhost:6379`).
+- `CACHE_MAX_OBJECT_BYTES` &mdash; maximum payload size (defaults to ~1&nbsp;MB). Objects larger than this spill to GCS.
+- `GCS_BUCKET` &mdash; when set, large objects or instances without Redis are written to this bucket using the same cache interface. Ensure standard GCS authentication variables are configured.
+- When neither Redis nor `GCS_BUCKET` are configured, the in-memory store is used exclusively.
+- Cached entries currently have a default TTL of 3600 seconds (1 hour). GCS objects persist until explicitly deleted or lifecycle rules are applied.
+
 
 #### Credits
 
