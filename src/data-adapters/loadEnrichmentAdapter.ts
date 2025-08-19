@@ -19,7 +19,7 @@ export function loadEnrichmentAdapter(): EnrichmentAdapter {
     }
 
     // Default to built-in BigQuery adapter
-    const { BqEnrichmentAdapter } = require('../bq-enrichment/BqEnrichmentAdapter');
+    const { BqEnrichmentAdapter } = require('./bq-enrichment/BqEnrichmentAdapter');
     return new BqEnrichmentAdapter();
   } catch (err: any) {
     logger.warn(`Failed to load enrichment adapter: ${err.message}`);
