@@ -20,6 +20,8 @@ import { BuildingsService } from '../buildings/buildings.service';
 import { Feature, GeoJsonObject, Geometry } from 'geojson';
 import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildings';
 import { CountHeader } from '../decorators/count-header.decorator';
+import { loadEnrichmentAdapter } from '../data-adapters/loadEnrichmentAdapter';
+import { EnrichmentAdapter } from '../data-adapters/EnrichmentAdapter';
 
 @ApiTags('Places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -35,6 +37,8 @@ export class PlacesController {
 
   ) {}
 
+  private enrichmentAdapter: EnrichmentAdapter = loadEnrichmentAdapter();
+
   @Get()
   @ApiOperation({ summary: 'Get Places using Query params as filters' })
   @ApiQuery({type:GetPlacesDto})
@@ -48,10 +52,26 @@ export class PlacesController {
     const  results = await this.placesService.getPlaces(query);
     const dtoResults = results.map((place: any) =>toPlaceDto(place,query));
 
-    if(query.format ===  Format.GEOJSON) {
-      return wrapAsGeoJSON  (dtoResults)
+    let finalResults = dtoResults;
+    try {
+      const fields = query.enrichment_fields;
+      if (fields && fields.length) {
+        const ids = dtoResults.map((p) => p.id);
+        const enrichment = await this.enrichmentAdapter.fetchEnrichmentByIds(ids, { fields });
+        finalResults = dtoResults.map((p) => {
+          const data = enrichment[p.id];
+          if (!data || Object.keys(data).length === 0) return p;
+          return { ...p, enrichment: { source: 'hosted', fields: data } };
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Enrichment failed: ${err.message}`);
     }
-    return dtoResults
+
+    if(query.format ===  Format.GEOJSON) {
+      return wrapAsGeoJSON  (finalResults)
+    }
+    return finalResults
   }
 
   @Get('buildings')

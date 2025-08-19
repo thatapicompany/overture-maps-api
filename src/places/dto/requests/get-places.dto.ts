@@ -91,6 +91,15 @@ export class GetPlacesDto extends GetByLocationDto {
   categories?: string[];
 
   @ApiPropertyOptional({
+    description: 'Comma-separated list of enrichment fields to include.',
+    example: 'wikidata,extra_info',
+    type: String,
+  })
+  @IsOptional()
+  @Transform((params) => String(params.value).split(',').map((s) => s.trim()))
+  enrichment_fields?: string[];
+
+  @ApiPropertyOptional({
     description: 'Response format, defaulting to JSON. Options are "json", "csv", or "geojson".',
     example: 'json',
     default: 'json',
