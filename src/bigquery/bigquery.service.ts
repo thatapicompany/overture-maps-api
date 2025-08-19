@@ -27,10 +27,17 @@ export class BigQueryService {
   logger = new Logger('BigQueryService');
 
   constructor() {
-    this.bigQueryClient = new BigQuery({
-      projectId: process.env.BIGQUERY_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
+
+    const config: any = {
+      projectId: process.env.BIGQUERY_PROJECT_ID
+    };
+
+    // Only add keyFilename if GOOGLE_APPLICATION_CREDENTIALS is set
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
+
+    this.bigQueryClient = new BigQuery(config);
   }
   
 

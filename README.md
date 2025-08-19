@@ -22,6 +22,17 @@ The hosted version of the Overture Maps API has additional datasets including th
 
 - [Deploy to Google Cloud Platform using Cloudrun and BigQuery](./docs/google-cloud-platform.md)
 
+### Enrichment
+
+Enrichment is disabled by default. Set `ENABLE_ENRICHMENT=true` in hosted deployments and provide the following environment variables to enable the built-in BigQuery-backed enrichment:
+
+- `ENRICHMENT_BQ_PROJECT`
+- `ENRICHMENT_BQ_DATASET`
+- `ENRICHMENT_BQ_TABLE`
+- `ENRICHMENT_FIELDS_ALLOWLIST` (optional comma-separated field names)
+
+Alternative adapters can be supplied via `ENRICHMENT_ADAPTER_PACKAGE`. This allows future data sources such as Postgres without changing the public API.
+
 ## API Endpoints
 
 - [OpenAPI Spec Doc](https://api.overturemapsapi.com/api-docs.json)
