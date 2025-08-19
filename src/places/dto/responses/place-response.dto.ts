@@ -130,6 +130,14 @@ export class PlacePropertiesDto {
   }
 }
 
+export class PlaceEnrichmentDto {
+  @ApiProperty({ enum: ['hosted'] })
+  source: 'hosted';
+
+  @ApiProperty({ type: Object })
+  fields: Record<string, unknown>;
+}
+
 export class PlaceResponseDto {
   @ApiProperty({ description: 'Unique identifier of the place.', example: '12345' })
   id: string;
@@ -148,6 +156,12 @@ export class PlaceResponseDto {
     type: () => PlacePropertiesDto,
   })
   properties: PlacePropertiesDto;
+
+  @ApiPropertyOptional({
+    description: 'Hosted enrichment data.',
+    type: () => PlaceEnrichmentDto,
+  })
+  enrichment?: PlaceEnrichmentDto;
 
   constructor(place: Place) {
     this.id = place.id;
