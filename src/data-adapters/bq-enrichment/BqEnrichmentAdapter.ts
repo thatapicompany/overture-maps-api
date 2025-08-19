@@ -1,5 +1,6 @@
 import { BigQuery } from '@google-cloud/bigquery';
-import { EnrichmentAdapter } from '../data-adapters/EnrichmentAdapter';
+import { EnrichmentAdapter } from '../EnrichmentAdapter';
+import { Logger } from '@nestjs/common';
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -17,7 +18,11 @@ export class BqEnrichmentAdapter implements EnrichmentAdapter {
   private allowlist: string[];
   private cachedFields?: string[];
 
+  private logger: Logger;
   constructor() {
+
+      this.logger = new Logger('BqEnrichmentAdapter');
+
     this.project = process.env.ENRICHMENT_BQ_PROJECT || '';
     this.dataset = process.env.ENRICHMENT_BQ_DATASET || '';
     this.table = process.env.ENRICHMENT_BQ_TABLE || '';
@@ -25,11 +30,19 @@ export class BqEnrichmentAdapter implements EnrichmentAdapter {
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-
-    this.client = new BigQuery({
+    this.logger.log(
+      `Enrichment fields allowlist: ${this.allowlist.join(', ')}`
+    );
+    const config: any = {
       projectId: this.project,
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
+    };
+
+    // Only add keyFilename if GOOGLE_APPLICATION_CREDENTIALS is set
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
+
+    this.client = new BigQuery(config);
   }
 
   async supportedFields(): Promise<string[]> {
@@ -54,9 +67,13 @@ export class BqEnrichmentAdapter implements EnrichmentAdapter {
   ): Promise<Record<string, Record<string, unknown>>> {
     if (!ids.length) return {};
     const allowed = await this.supportedFields();
+    if (!allowed.length) {
+      return {};
+    }
     const requested = options?.fields?.length
       ? options.fields.filter((f) => allowed.includes(f))
       : allowed;
+
     const projection = requested.length ? requested.join(', ') : '';
     const results: Record<string, Record<string, unknown>> = {};
     for (const batch of chunk(ids, 5000)) {

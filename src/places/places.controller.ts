@@ -59,12 +59,16 @@ export class PlacesController {
         const ids = dtoResults.map((p) => p.id);
         const enrichment = await this.enrichmentAdapter.fetchEnrichmentByIds(ids, { fields });
         finalResults = dtoResults.map((p) => {
+          if (!enrichment || !enrichment[p.id]) {
+            return p;
+          }
           const data = enrichment[p.id];
           if (!data || Object.keys(data).length === 0) return p;
           return { ...p, enrichment: { source: 'hosted', fields: data } };
         });
       }
     } catch (err: any) {
+      console.log(err)
       this.logger.warn(`Enrichment failed: ${err.message}`);
     }
 

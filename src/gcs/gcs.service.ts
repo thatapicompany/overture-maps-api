@@ -17,10 +17,17 @@ export class GcsService {
       this.logger.error('GCS environment variables not set');
       return;
     }
-    this.storage = new Storage({
-      projectId: process.env.BIGQUERY_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
+
+    const config: any = {
+      projectId: process.env.BIGQUERY_PROJECT_ID
+    };
+
+    // Only add keyFilename if GOOGLE_APPLICATION_CREDENTIALS is set
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
+
+    this.storage = new Storage(config);
 
     this.bucket = this.storage.bucket(process.env.GCS_BUCKET_NAME);
 
