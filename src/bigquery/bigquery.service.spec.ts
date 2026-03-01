@@ -77,7 +77,9 @@ describe('BigQueryService', () => {
       const spy = jest.spyOn(service, 'runQuery');
       await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'US', ['food'], 0.5, 5, 'meta');
       const sql = spy.mock.calls[0][0];
-      expect(sql).toContain('EXISTS (SELECT 1 FROM UNNEST(sources) AS s WHERE s.dataset = "meta")');
+      const params = spy.mock.calls[0][1];
+      expect(sql).toContain('EXISTS (SELECT 1 FROM UNNEST(sources) AS s WHERE s.dataset = @source)');
+      expect(params.source).toBe('meta');
     });
   });
 
