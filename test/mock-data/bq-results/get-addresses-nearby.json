@@ -1,0 +1,18 @@
+[
+    {
+        "id": "address-1",
+        "geometry": {
+            "value": "POINT(-122.4194 37.7749)"
+        },
+        "version": 0,
+        "update_time": "2023-01-01T00:00:00Z",
+        "theme": "addresses",
+        "type": "address",
+        "address": "123 Main St",
+        "postcode": "94105",
+        "locality": "San Francisco",
+        "region": "CA",
+        "country": "US",
+        "ext_distance": 10.5
+    }
+]

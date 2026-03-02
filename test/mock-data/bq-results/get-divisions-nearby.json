@@ -1,0 +1,15 @@
+[
+    {
+        "id": "division-1",
+        "geometry": {
+            "value": "POLYGON((-122.4194 37.7749, -122.4195 37.7750, -122.4193 37.7751, -122.4194 37.7749))"
+        },
+        "version": 0,
+        "update_time": "2023-01-01T00:00:00Z",
+        "theme": "divisions",
+        "type": "division_area",
+        "subtype": "county",
+        "class": "county",
+        "ext_distance": 5.5
+    }
+]

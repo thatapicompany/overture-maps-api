@@ -1,6 +1,10 @@
 import { Module, NestMiddleware, MiddlewareConsumer, Logger } from '@nestjs/common';
 import { BuildingsModule } from './buildings/buildings.module';
 import { PlacesModule } from './places/places.module';
+import { AddressesModule } from './addresses/addresses.module';
+import { BaseModule } from './base/base.module';
+import { TransportationModule } from './transportation/transportation.module';
+import { DivisionsModule } from './divisions/divisions.module';
 import { BigQueryService } from './bigquery/bigquery.service';
 import { GcsService } from './gcs/gcs.service';
 import { ConfigModule } from '@nestjs/config';
@@ -15,6 +19,10 @@ import { AppCacheModule } from './cache/cache.module';
     AppCacheModule,
     BuildingsModule,
     PlacesModule,
+    AddressesModule,
+    BaseModule,
+    TransportationModule,
+    DivisionsModule,
     ConfigModule.forRoot(),
   ],
   controllers: [AppController],
