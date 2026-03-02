@@ -6,6 +6,14 @@ import { Building } from '../buildings/interfaces/building.interface';
 import { parsePointToGeoJSON, parsePolygonToGeoJSON } from '../utils/geojson';
 import { parsePlaceRow, parsePlaceWithBuildingRow } from './row-parsers/bq-place-row.parser';
 import { parseBuildingRow } from './row-parsers/bq-building-row.parser';
+import { Address } from '../addresses/interfaces/address.interface';
+import { parseAddressRow } from './row-parsers/bq-address-row.parser';
+import { BaseFeature } from '../base/interfaces/base.interface';
+import { parseBaseRow } from './row-parsers/bq-base-row.parser';
+import { TransportationSegment } from '../transportation/interfaces/transportation.interface';
+import { parseTransportationRow } from './row-parsers/bq-transportation-row.parser';
+import { DivisionArea } from '../divisions/interfaces/division.interface';
+import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
 
 interface IQueryStatistics {
   totalBytesProcessed: number;
@@ -19,7 +27,7 @@ interface IQueryStatistics {
 const MAX_LIMIT = 100000;
 
 // replace this with your own dataset if you have optimised ot to only include the country you are interested in
-const SOURCE_DATASET="bigquery-public-data.overture_maps" 
+const SOURCE_DATASET = "bigquery-public-data.overture_maps"
 
 @Injectable()
 export class BigQueryService {
@@ -39,7 +47,7 @@ export class BigQueryService {
 
     this.bigQueryClient = new BigQuery(config);
   }
-  
+
 
   // New method to get brands based on country or lat/lng/radius
   async getBrandsNearby(
@@ -51,7 +59,7 @@ export class BigQueryService {
     minimum_places?: number,
     require_wikidata: boolean = false
 
-  ): Promise<{ names: {primary:string,common:string,rules:string}; wikidata: string; counts:{ places:number}  }[]> {
+  ): Promise<{ names: { primary: string, common: string, rules: string }; wikidata: string; counts: { places: number } }[]> {
 
     let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand , count(id) as count_places
@@ -62,41 +70,41 @@ export class BigQueryService {
     if (whereClauses.length > 0) {
       query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
-    
-/*
-    if (country) {
-      query += ` WHERE addresses.list[OFFSET(0)].element.country = "${country}"`;
-    } else if (latitude && longitude) {
-      query += ` WHERE ST_DISTANCE(
-        ST_GEOGPOINT(${longitude}, ${latitude}),
-        ST_GEOGPOINT(CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(0)] AS FLOAT64), CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(1)] AS FLOAT64))
-      ) <= ${radius}`;
-    }
-    query += ` AND brand IS NOT NULL`;
-    if(categories && categories.length > 0){
-      query += ` AND categories.primary IN UNNEST(["${categories.join('","')}"])`;
-    }
-    if (require_wikidata) {
-      query += ` AND brand.wikidata IS NOT NULL`;
-    }*/
+
+    /*
+        if (country) {
+          query += ` WHERE addresses.list[OFFSET(0)].element.country = "${country}"`;
+        } else if (latitude && longitude) {
+          query += ` WHERE ST_DISTANCE(
+            ST_GEOGPOINT(${longitude}, ${latitude}),
+            ST_GEOGPOINT(CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(0)] AS FLOAT64), CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(1)] AS FLOAT64))
+          ) <= ${radius}`;
+        }
+        query += ` AND brand IS NOT NULL`;
+        if(categories && categories.length > 0){
+          query += ` AND categories.primary IN UNNEST(["${categories.join('","')}"])`;
+        }
+        if (require_wikidata) {
+          query += ` AND brand.wikidata IS NOT NULL`;
+        }*/
     query += ` GROUP BY ALL`;
     if (minimum_places) {
       query += ` HAVING count_places >= ${minimum_places}`;
     }
     query += ` ORDER BY count_places DESC;`;
 
-    const {rows} = await this.runQuery(query);
+    const { rows } = await this.runQuery(query);
 
     return rows.map((row: any) => ({
       names: row.brand?.names,
       wikidata: row.brand?.wikidata,
-      counts:{
+      counts: {
         places: row.count_places
       }
     }));
   }
 
-  async getPlaceCountsByCountry(): Promise<{ country: string; counts:{ places:number, brands:number} }[]> {
+  async getPlaceCountsByCountry(): Promise<{ country: string; counts: { places: number, brands: number } }[]> {
     const query = `-- Overture Maps API: Get place counts by country
       SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
       FROM \`${SOURCE_DATASET}.place\`
@@ -104,11 +112,11 @@ export class BigQueryService {
       ORDER BY count_places DESC;
     `;
 
-    const {rows} = await this.runQuery(query);
+    const { rows } = await this.runQuery(query);
 
     return rows.map((row: any) => ({
       country: row.country,
-      counts:{
+      counts: {
         places: row.count_places,
         brands: row.count_brands
       }
@@ -116,11 +124,11 @@ export class BigQueryService {
   }
 
   async getCategories(
-    country?:string,
+    country?: string,
     latitude?: number,
     longitude?: number,
     radius: number = 1000
-  ): Promise<{ primary: string; counts:{ places:number } }[]> {
+  ): Promise<{ primary: string; counts: { places: number } }[]> {
 
 
 
@@ -131,7 +139,7 @@ export class BigQueryService {
       FROM \`${SOURCE_DATASET}.place\`
       WHERE categories.primary IS NOT NULL
     `;
-    
+
     const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius });
     if (whereClauses.length > 0) {
       query += ` AND ${whereClauses.join(' AND ')}`;
@@ -140,18 +148,18 @@ export class BigQueryService {
       ORDER BY count_places DESC;
     `;
 
-    const {rows} = await this.runQuery(query);
+    const { rows } = await this.runQuery(query);
 
     return rows.map((row: any) => ({
       primary: row.category_primary,
-      counts:{
+      counts: {
         places: row.count_places,
         brands: row.count_brands
       }
     }));
   }
-  
-  
+
+
   async getPlacesWithNearestBuilding(
     latitude: number,
     longitude: number,
@@ -164,44 +172,44 @@ export class BigQueryService {
     limit?: number,
     match_nearest_building: boolean = true
   ): Promise<PlaceWithBuilding[]> {
-    
+
     // Build the query
     let queryParts: string[] = [];
-  
+
     queryParts.push(`
     -- Overture Maps API: Get Places with Buildings
     -- Step 1: Define the search area as a circular polygon around the point with a specified radius
     DECLARE search_area_geometry GEOGRAPHY;
     SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
     `);
-  
+
     // Build the WHERE clause for additional filters
     let whereClauses: string[] = [];
-    
+
     if (latitude && longitude && radius) {
-    // Add radius condition if not already in WHERE clause
+      // Add radius condition if not already in WHERE clause
       whereClauses.push(`ST_DWithin(p.geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
     }
     if (brand_wikidata) {
       whereClauses.push(`p.brand.wikidata = "${brand_wikidata}"`);
     }
-    
+
     if (brand_name) {
       whereClauses.push(`p.brand.names.primary = "${brand_name}"`);
     }
-    
+
     if (country) {
       whereClauses.push(`p.addresses[OFFSET(0)].element.country = "${country}"`);
     }
-    
+
     if (categories && categories.length > 0) {
       whereClauses.push(`p.categories.primary IN UNNEST(["${categories.join('","')}"])`);
     }
-    
+
     if (min_confidence !== undefined) {
       whereClauses.push(`p.confidence >= ${min_confidence}`);
     }
-  
+
     // Determine if we match nearest building or only containing buildings
     if (match_nearest_building) {
       queryParts.push(`
@@ -235,8 +243,8 @@ export class BigQueryService {
         WHERE
           ST_WITHIN(p.geometry, search_area_geometry)
         `
-+ (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
-      `
+        + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
+        `
 
       )
     
@@ -265,29 +273,29 @@ export class BigQueryService {
       WHERE
         ST_WITHIN(p.geometry, search_area_geometry)
         `
-+ (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
-      `
+        + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
+        `
       `);
     }
-  
-  
+
+
     // Limit results if specified
     if (limit) {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
-  
+
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-  
+
     // Execute the query
     const { rows } = await this.runQuery(query);
-  
+
     // Map results to the response type
     return rows.map((row: any) => parsePlaceWithBuildingRow(row));
   }
-  
-  
-  
+
+
+
 
   async getPlacesNearby(
 
@@ -308,7 +316,7 @@ export class BigQueryService {
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *`);
-    
+
     if (latitude && longitude) {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance`);
     }
@@ -317,10 +325,10 @@ export class BigQueryService {
 
     // Conditional filters
     let whereClauses: string[] = [];
-    
+
     if (latitude && longitude && radius) {
       whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
-    } 
+    }
 
     if (brand_wikidata) {
       whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
@@ -333,7 +341,7 @@ export class BigQueryService {
       whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
     }
 
-    if(categories && categories.length > 0){
+    if (categories && categories.length > 0) {
       whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
     }
 
@@ -368,9 +376,9 @@ export class BigQueryService {
 
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parsePlaceRow(row));
-  }  
+  }
 
-    
+
 
   async getBuildingsNearby(
     latitude: number,
@@ -378,11 +386,11 @@ export class BigQueryService {
     radius: number = 1000,
     limit?: number
   ): Promise<Building[]> {
-  
+
     let queryParts: string[] = [];
-  
+
     queryParts.push(
-    `-- Overture Maps API: Get Buildings Nearby
+      `-- Overture Maps API: Get Buildings Nearby
     -- Step 1: define the search area to limit the cost in step 2 taking advantage of the 'geometry' clustering
 DECLARE search_area_geometry GEOGRAPHY;
 SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
@@ -399,118 +407,276 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     if (latitude && longitude) {
       queryParts.push(`ORDER BY ext_distance`);
     }
-  
+
     // Limit results if no filters are provided
     if (limit) {
       queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
     }
-  
+
     // Finalize the query
     const query = queryParts.join(' ') + ';';
-  
+
     const { rows } = await this.runQuery(query);
     return rows.map((row: any) => parseBuildingRow(row));
   }
-  
+
+  async getAddressesNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    limit?: number
+  ): Promise<Address[]> {
+
+    let queryParts: string[] = [];
+
+    queryParts.push(
+      `-- Overture Maps API: Get Addresses Nearby
+    -- Step 1: define the search area
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+
+-- Step 2: Select addresses within the search area
+SELECT
+  *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+FROM
+  \`bigquery-public-data.overture_maps.address\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY ext_distance`);
+    }
+
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => parseAddressRow(row));
+  }
+
+  async getBaseNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    limit?: number
+  ): Promise<BaseFeature[]> {
+
+    let queryParts: string[] = [];
+
+    queryParts.push(
+      `-- Overture Maps API: Get Base Features Nearby
+    -- Step 1: define the search area
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+
+-- Step 2: Select base features within the search area
+SELECT
+  *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+FROM
+  \`bigquery-public-data.overture_maps.base\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY ext_distance`);
+    }
+
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => parseBaseRow(row));
+  }
+
+  async getTransportationNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    limit?: number
+  ): Promise<TransportationSegment[]> {
+
+    let queryParts: string[] = [];
+
+    queryParts.push(
+      `-- Overture Maps API: Get Transportation Segments Nearby
+    -- Step 1: define the search area
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+
+-- Step 2: Select transportation segments within the search area
+SELECT
+  *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+FROM
+  \`bigquery-public-data.overture_maps.segment\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY ext_distance`);
+    }
+
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => parseTransportationRow(row));
+  }
+
+  async getDivisionsNearby(
+    latitude: number,
+    longitude: number,
+    radius: number = 1000,
+    limit?: number
+  ): Promise<DivisionArea[]> {
+
+    let queryParts: string[] = [];
+
+    queryParts.push(
+      `-- Overture Maps API: Get Division Areas Nearby
+    -- Step 1: define the search area
+DECLARE search_area_geometry GEOGRAPHY;
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+
+-- Step 2: Select division areas within the search area
+SELECT
+  *
+ ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+FROM
+  \`bigquery-public-data.overture_maps.division_area\` AS s
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+
+    // Order by distance if latitude and longitude are provided
+    if (latitude && longitude) {
+      queryParts.push(`ORDER BY ext_distance`);
+    }
+
+    // Limit results if no filters are provided
+    if (limit) {
+      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+    }
+
+    // Finalize the query
+    const query = queryParts.join(' ') + ';';
+
+    const { rows } = await this.runQuery(query);
+    return rows.map((row: any) => parseDivisionRow(row));
+  }
+
   applyMaxLimit(limit: number): number {
     return Math.min(limit, MAX_LIMIT);
   }
 
-  getDefaultLabels() : any
-  {
+  getDefaultLabels(): any {
 
-      const  labels =  {
-          "product":  "overture-maps-api",
-          "env": process.env.ENV
-      }
-      return labels;
+    const labels = {
+      "product": "overture-maps-api",
+      "env": process.env.ENV
+    }
+    return labels;
   }
 
-  async runQuery(query:string, labels:any={}):Promise<{rows:any[], statistics:IQueryStatistics}>
-  {
-      
-      let start = Date.now()
-      const options = {
-          query: query,
-          // Location must match that of the dataset(s) referenced in the query.
-          location: 'US',
-          labels: {...labels, ...this.getDefaultLabels()},
-      };
-      // Run the query as a job
-      const [job] = await this.bigQueryClient.createQueryJob(options);
+  async runQuery(query: string, labels: any = {}): Promise<{ rows: any[], statistics: IQueryStatistics }> {
 
-      // Wait for the query to finish
-      const [rows] = await job.getQueryResults();
-      const [result] = await job.getMetadata();
-      
-      const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
-      const totalBytesBilled = parseInt(result.statistics.query.totalBytesBilled);
-      
-      const costPerTB = 5; // USD per TB
-      const bytesPerTB = 1e12;
-      const costInUSD = (totalBytesBilled / bytesPerTB) * costPerTB;
+    let start = Date.now()
+    const options = {
+      query: query,
+      // Location must match that of the dataset(s) referenced in the query.
+      location: 'US',
+      labels: { ...labels, ...this.getDefaultLabels() },
+    };
+    // Run the query as a job
+    const [job] = await this.bigQueryClient.createQueryJob(options);
 
-      const statistics:IQueryStatistics = {
-          totalBytesProcessed,
-          totalBytesBilled,
-          billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
-          bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
-          durationMs: Date.now() - start,
-          costInUSD
-      }
+    // Wait for the query to finish
+    const [rows] = await job.getQueryResults();
+    const [result] = await job.getMetadata();
 
-      const QueryFirstLine = query.split('\n')[0];
-      this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $$${costInUSD.toFixed(4)}. Query Line 1: ${QueryFirstLine}`);
-      
-      return {rows,statistics};
+    const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
+    const totalBytesBilled = parseInt(result.statistics.query.totalBytesBilled);
+
+    const costPerTB = 5; // USD per TB
+    const bytesPerTB = 1e12;
+    const costInUSD = (totalBytesBilled / bytesPerTB) * costPerTB;
+
+    const statistics: IQueryStatistics = {
+      totalBytesProcessed,
+      totalBytesBilled,
+      billedAmountInGB: Math.round(totalBytesBilled / 1000000000),
+      bytesProcessedInGB: Math.round(totalBytesProcessed / 1000000000),
+      durationMs: Date.now() - start,
+      costInUSD
     }
 
-    private buildWhereClauses({
-      country,
-      latitude,
-      longitude,
-      radius,
-      brand_wikidata,
-      brand_name,
-      categories,
-      min_confidence,
-      require_wikidata
-    }: {
-      country?: string;
-      latitude?: number;
-      longitude?: number;
-      radius?: number;
-      brand_wikidata?: string;
-      brand_name?: string;
-      categories?: string[];
-      min_confidence?: number;
-      require_wikidata?: boolean;
-    }): string[] {
-      const whereClauses: string[] = [];
-      
-      if (latitude && longitude && radius) {
-        whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
-      }
-      if (country) {
-        whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
-      }
-      if (brand_wikidata) {
-        whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
-      }
-      if (brand_name) {
-        whereClauses.push(`brand.names.primary = "${brand_name}"`);
-      }
-      if (categories && categories.length > 0) {
-        whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
-      }
-      if (min_confidence !== undefined) {
-        whereClauses.push(`confidence >= ${min_confidence}`);
-      }
-      if (require_wikidata) {
-        whereClauses.push(`brand.wikidata IS NOT NULL`);
-      }
-  
-      return whereClauses;
+    const QueryFirstLine = query.split('\n')[0];
+    this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $$${costInUSD.toFixed(4)}. Query Line 1: ${QueryFirstLine}`);
+
+    return { rows, statistics };
+  }
+
+  private buildWhereClauses({
+    country,
+    latitude,
+    longitude,
+    radius,
+    brand_wikidata,
+    brand_name,
+    categories,
+    min_confidence,
+    require_wikidata
+  }: {
+    country?: string;
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+    brand_wikidata?: string;
+    brand_name?: string;
+    categories?: string[];
+    min_confidence?: number;
+    require_wikidata?: boolean;
+  }): string[] {
+    const whereClauses: string[] = [];
+
+    if (latitude && longitude && radius) {
+      whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
     }
-  
+    if (country) {
+      whereClauses.push(`addresses.list[OFFSET(0)].element.country = "${country}"`);
+    }
+    if (brand_wikidata) {
+      whereClauses.push(`brand.wikidata = "${brand_wikidata}"`);
+    }
+    if (brand_name) {
+      whereClauses.push(`brand.names.primary = "${brand_name}"`);
+    }
+    if (categories && categories.length > 0) {
+      whereClauses.push(`categories.primary IN UNNEST(["${categories.join('","')}"])`);
+    }
+    if (min_confidence !== undefined) {
+      whereClauses.push(`confidence >= ${min_confidence}`);
+    }
+    if (require_wikidata) {
+      whereClauses.push(`brand.wikidata IS NOT NULL`);
+    }
+
+    return whereClauses;
+  }
+
 }
