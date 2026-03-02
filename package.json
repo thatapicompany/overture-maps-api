@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "bash -c 'if [ -f .env.test ]; then export $(cat .env.test | xargs); fi; NODE_ENV=test jest --config ./test/jest-e2e.json'"
+    "test:e2e": "bash -c 'if [ -f .env.test ]; then export $(cat .env.test | xargs); fi; NODE_ENV=test jest --config ./test/jest-e2e.json'",
+    "test:live": "bash -c 'if [ -f .env.test ]; then export $(grep -v \"^#\" .env.test | xargs); fi; export DEMO_API_KEY=$TEST_API_KEY; NODE_ENV=test npx jest --config ./test/jest-e2e.json test/live.e2e-spec.ts'"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.1",
