@@ -470,17 +470,22 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
     let queryParts: string[] = [];
 
     queryParts.push(
-      `-- Overture Maps API: Get Base Features Nearby
+      `-- Overture Maps API: Get Base Features Nearby (Land Use + Land Cover)
     -- Step 1: define the search area
 DECLARE search_area_geometry GEOGRAPHY;
 SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
 
--- Step 2: Select base features within the search area
+-- Step 2: Select base features within the search area merging land_use and land_cover
+WITH combined_base AS (
+  SELECT id, geometry, bbox, version, sources, subtype, class FROM \`bigquery-public-data.overture_maps.land_use\`
+  UNION ALL
+  SELECT id, geometry, bbox, version, sources, subtype, CAST(NULL as string) as class FROM \`bigquery-public-data.overture_maps.land_cover\`
+)
 SELECT
   *
  ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
 FROM
-  \`bigquery-public-data.overture_maps.base\` AS s
+  combined_base AS s
 WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
 
     // Order by distance if latitude and longitude are provided

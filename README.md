@@ -58,7 +58,7 @@ Alternative adapters can be supplied via `ENRICHMENT_ADAPTER_PACKAGE`. This allo
 - [x] Places/Countries endpoint
 - [x] Places/Buildings endpoint
 - [x] Addresses endpoint for Overture Maps 'Address' Theme
-- [x] Base endpoint for Overture Maps 'Base' Theme
+- [x] Base endpoint for Overture Maps 'Base' Theme (Land Use + Land Cover)
 - [x] Buildings endpoint for Overture Maps 'Building' Theme
 - [x] Transportation endpoint for Overture Maps 'Transportation' Theme
 - [x] Divisions endpoint for Overture Maps 'Division' Theme
