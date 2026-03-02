@@ -5,7 +5,6 @@ export interface BaseFeature {
     geometry: Geometry;
     bbox?: any;
     version: string;
-    update_time: string;
     sources: any[];
     theme: string;
     type: string;
