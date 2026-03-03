@@ -507,20 +507,21 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   ): Promise<Address[]> {
 
     let queryParts: string[] = [];
+    const params: any = { latitude, longitude, radius };
 
     queryParts.push(
       `-- Overture Maps API: Get Addresses Nearby
     -- Step 1: define the search area
 DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
 
 -- Step 2: Select addresses within the search area
 SELECT
   *
- ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+ ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.address\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -529,13 +530,14 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     // Limit results if no filters are provided
     if (limit) {
-      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+      queryParts.push(`LIMIT @limit`);
+      params.limit = this.applyMaxLimit(limit);
     }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
-    const { rows } = await this.runQuery(query);
+    const { rows } = await this.runQuery(query, params);
     return rows.map((row: any) => parseAddressRow(row));
   }
 
@@ -547,12 +549,13 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   ): Promise<BaseFeature[]> {
 
     let queryParts: string[] = [];
+    const params: any = { latitude, longitude, radius };
 
     queryParts.push(
       `-- Overture Maps API: Get Base Features Nearby (Land Use + Land Cover)
     -- Step 1: define the search area
 DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
 
 -- Step 2: Select base features within the search area merging land_use and land_cover
 WITH combined_base AS (
@@ -562,10 +565,10 @@ WITH combined_base AS (
 )
 SELECT
   *
- ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+ ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   combined_base AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -574,13 +577,14 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     // Limit results if no filters are provided
     if (limit) {
-      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+      queryParts.push(`LIMIT @limit`);
+      params.limit = this.applyMaxLimit(limit);
     }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
-    const { rows } = await this.runQuery(query);
+    const { rows } = await this.runQuery(query, params);
     return rows.map((row: any) => parseBaseRow(row));
   }
 
@@ -592,20 +596,21 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   ): Promise<TransportationSegment[]> {
 
     let queryParts: string[] = [];
+    const params: any = { latitude, longitude, radius };
 
     queryParts.push(
       `-- Overture Maps API: Get Transportation Segments Nearby
     -- Step 1: define the search area
 DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
 
 -- Step 2: Select transportation segments within the search area
 SELECT
   *
- ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+ ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.segment\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -614,13 +619,14 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     // Limit results if no filters are provided
     if (limit) {
-      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+      queryParts.push(`LIMIT @limit`);
+      params.limit = this.applyMaxLimit(limit);
     }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
-    const { rows } = await this.runQuery(query);
+    const { rows } = await this.runQuery(query, params);
     return rows.map((row: any) => parseTransportationRow(row));
   }
 
@@ -632,20 +638,21 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
   ): Promise<DivisionArea[]> {
 
     let queryParts: string[] = [];
+    const params: any = { latitude, longitude, radius };
 
     queryParts.push(
       `-- Overture Maps API: Get Division Areas Nearby
     -- Step 1: define the search area
 DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(${longitude}, ${latitude}), ${radius});
+SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
 
 -- Step 2: Select division areas within the search area
 SELECT
   *
- ,ST_Distance(geometry, ST_GeogPoint(${longitude}, ${latitude})) AS ext_distance
+ ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.division_area\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(${longitude}, ${latitude}), ${radius})`);
+WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -654,13 +661,14 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     // Limit results if no filters are provided
     if (limit) {
-      queryParts.push(`LIMIT ${this.applyMaxLimit(limit)}`);
+      queryParts.push(`LIMIT @limit`);
+      params.limit = this.applyMaxLimit(limit);
     }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
-    const { rows } = await this.runQuery(query);
+    const { rows } = await this.runQuery(query, params);
     return rows.map((row: any) => parseDivisionRow(row));
   }
   private buildWhereClauses({

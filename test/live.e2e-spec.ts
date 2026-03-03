@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 
@@ -31,7 +31,7 @@ describe('Live Endpoints (e2e)', () => {
             .compile();
 
         app = moduleFixture.createNestApplication();
-        app.useGlobalPipes(new import_1.ValidationPipe({ whitelist: true, transform: true }));
+        app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
         await app.init();
     });
 
