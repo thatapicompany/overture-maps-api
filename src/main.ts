@@ -4,14 +4,15 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
 import { DocumentBuilder, SwaggerModule, SwaggerCustomOptions, SwaggerDocumentOptions } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);  
-  app.useGlobalPipes(new ValidationPipe({forbidNonWhitelisted:false, whitelist:true}));
-  app.use(bodyParser.json({limit: '50mb'}));
-  app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+  const app = await NestFactory.create(AppModule);
+  app.use(helmet());
+  app.use(bodyParser.json({ limit: '50mb' }));
+  app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-  app.use(function(req, res, next) {
+  app.use(function (req, res, next) {
     res.header('x-powered-by', 'API by ThatAPICompany.com, Data by OvertureMaps.org');
     next();
   });
@@ -21,13 +22,13 @@ async function bootstrap() {
     "methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     "preflightContinue": false,
     "optionsSuccessStatus": 204,
-    "credentials":true,
+    "credentials": false,
     "allowedHeaders": 'Content-Type, Authorization, Accept, Observe, x-api-key',
-    "exposedHeaders":"Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version"
+    "exposedHeaders": "Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version"
   }
 
   app.enableCors(corsOptions);
-  app.useGlobalPipes(new ValidationPipe({transform: true}));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
 
   // Configure Swagger
@@ -36,7 +37,7 @@ async function bootstrap() {
     .setDescription('OpenAPI docs for the Overture Maps API')
     .setVersion('1.0')
     .addServer('http://localhost:8080/', 'Local environment')
-    .addServer('https://api.overturemapsapi.com','Cloud API Service')
+    .addServer('https://api.overturemapsapi.com', 'Cloud API Service')
     .setContact("Aden Forshaw", "https://thatapicompany.com/overture-maps-api", "aden@thatapicompany.com")
     .addApiKey(
       { type: 'apiKey', name: 'x-api-key', in: 'header' },
@@ -61,7 +62,7 @@ async function bootstrap() {
   };
 
   // Serve the Swagger document at /api-docs
-  SwaggerModule.setup('api-docs', app, document,customOptions);
+  SwaggerModule.setup('api-docs', app, document, customOptions);
 
 
   await app.listen(8080);
