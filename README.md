@@ -74,7 +74,7 @@ You can either use the hardcoded API key in the code `DEMO-API-KEY`, or use the 
 
 ### Running Locally
 
-- GCP: setup a key as per the [GCP guide](./docs/google-cloud-platform.md), then download the Service Account .json file locally, and set the name in the `.env` variable `GOOGLE_APPLICATION_CREDENTIALS` to the path of the file.
+- GCP: setup a key as per the [GCP guide](./docs/google-cloud-platform.md). Ensure the Service Account has both the **BigQuery Data Viewer** (`roles/bigquery.dataViewer`) and **BigQuery Job User** (`roles/bigquery.jobUser`) roles. Download the Service Account `.json` file locally, and set the name in the `.env` variable `GOOGLE_APPLICATION_CREDENTIALS` to the path of the file.
 
 ```bash
  npm install
