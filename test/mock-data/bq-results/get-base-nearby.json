@@ -1,0 +1,15 @@
+[
+    {
+        "id": "base-1",
+        "geometry": {
+            "value": "POLYGON((-122.4194 37.7749, -122.4195 37.7750, -122.4193 37.7751, -122.4194 37.7749))"
+        },
+        "version": 0,
+        "update_time": "2023-01-01T00:00:00Z",
+        "theme": "base",
+        "type": "landUse",
+        "subtype": "park",
+        "class": "national_park",
+        "ext_distance": 20.1
+    }
+]
