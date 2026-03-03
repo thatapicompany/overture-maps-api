@@ -1,0 +1,15 @@
+[
+    {
+        "id": "transportation-1",
+        "geometry": {
+            "value": "LINESTRING(-122.4194 37.7749, -122.4195 37.7750)"
+        },
+        "version": 0,
+        "update_time": "2023-01-01T00:00:00Z",
+        "theme": "transportation",
+        "type": "segment",
+        "subtype": "road",
+        "class": "primary",
+        "ext_distance": 15.2
+    }
+]
