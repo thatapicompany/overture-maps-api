@@ -1,0 +1,53 @@
+name: Discord Notification
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - 'main'
+
+jobs:
+  discord_notification:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Webhook
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGED_BY: ${{ github.actor }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "Discord webhook URL is not set. Skipping..."
+            exit 0
+          fi
+          
+          # Escape quotes and newlines for JSON
+          SAFE_MSG=$(echo "$PR_TITLE" | jq -Rsa .)
+          
+          JSON_PAYLOAD=$(cat <<EOF
+          {
+            "content": "[api.overturemapsapi.com](https://api.overturemapsapi.com) **PR Merged from \`$BRANCH_NAME\`**",
+            "embeds": [
+              {
+                "title": "View Pull Request",
+                "url": "$PR_URL",
+                "description": $SAFE_MSG,
+                "color": 3447003,
+                "author": {
+                  "name": "Author: $PR_AUTHOR"
+                },
+                "footer": {
+                  "text": "Merged by $MERGED_BY"
+                }
+              }
+            ]
+          }
+          EOF
+          )
+          
+          curl -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$DISCORD_WEBHOOK"
