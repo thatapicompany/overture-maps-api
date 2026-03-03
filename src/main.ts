@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
 import { DocumentBuilder, SwaggerModule, SwaggerCustomOptions, SwaggerDocumentOptions } from '@nestjs/swagger';
-import helmet from 'helmet';
+const helmet = require('helmet');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
