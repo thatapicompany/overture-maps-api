@@ -28,7 +28,15 @@ jobs:
       run: |
         npm test 
         
+    - name: create credentials file
+      run: |
+        echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}' > gcp-credentials.json
+
     - name: npm test:e2e
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: ./gcp-credentials.json
+        BIGQUERY_PROJECT_ID: ${{ secrets.BIGQUERY_PROJECT_ID }}
+        GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
       run: |
         npm run test:e2e 
       
