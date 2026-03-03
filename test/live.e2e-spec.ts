@@ -31,6 +31,7 @@ describe('Live Endpoints (e2e)', () => {
             .compile();
 
         app = moduleFixture.createNestApplication();
+        app.useGlobalPipes(new import_1.ValidationPipe({ whitelist: true, transform: true }));
         await app.init();
     });
 
