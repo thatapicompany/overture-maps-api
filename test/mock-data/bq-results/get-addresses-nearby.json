@@ -4,15 +4,26 @@
         "geometry": {
             "value": "POINT(-122.4194 37.7749)"
         },
-        "version": 0,
+        "version": 1,
         "update_time": "2023-01-01T00:00:00Z",
-        "theme": "addresses",
-        "type": "address",
-        "address": "123 Main St",
-        "postcode": "94105",
-        "locality": "San Francisco",
-        "region": "CA",
         "country": "US",
+        "postcode": "94105",
+        "street": "Main St",
+        "number": "123",
+        "address_levels": {
+            "list": [
+                {
+                    "element": {
+                        "value": "CA"
+                    }
+                },
+                {
+                    "element": {
+                        "value": "San Francisco"
+                    }
+                }
+            ]
+        },
         "ext_distance": 10.5
     }
 ]
