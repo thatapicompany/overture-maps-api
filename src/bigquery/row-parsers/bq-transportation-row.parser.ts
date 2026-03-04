@@ -8,6 +8,9 @@ export const parseTransportationRow = (row: any): TransportationSegment => {
     } catch {
         geometry = typeof row.geometry === 'string' ? JSON.parse(row.geometry) : row.geometry;
     }
+
+    const unpackList = (obj: any) => obj?.list ? obj.list.map((o: any) => o.element) : undefined;
+
     return {
         id: row.id,
         geometry: geometry,
@@ -19,15 +22,23 @@ export const parseTransportationRow = (row: any): TransportationSegment => {
         } : undefined,
         version: row.version,
         update_time: row.update_time,
-        sources: row.sources?.list ? row.sources.list.map((source: any) => ({
-            property: source.element.property,
-            dataset: source.element.dataset,
-            record_id: source.element.record_id,
-        })) : [],
-        theme: row.theme,
-        type: row.type,
+        sources: unpackList(row.sources) || [],
         subtype: row.subtype,
         class: row.class,
+        subclass: row.subclass,
+        names: row.names,
+        connectors: unpackList(row.connectors),
+        routes: unpackList(row.routes),
+        subclass_rules: unpackList(row.subclass_rules),
+        access_restrictions: unpackList(row.access_restrictions),
+        level_rules: unpackList(row.level_rules),
+        destinations: unpackList(row.destinations),
+        prohibited_transitions: unpackList(row.prohibited_transitions),
+        road_surface: unpackList(row.road_surface),
+        road_flags: unpackList(row.road_flags),
+        speed_limits: unpackList(row.speed_limits),
+        width_rules: unpackList(row.width_rules),
+        rail_flags: unpackList(row.rail_flags),
         ext_distance: row.ext_distance ? parseFloat(row.ext_distance) : undefined,
     }
 }

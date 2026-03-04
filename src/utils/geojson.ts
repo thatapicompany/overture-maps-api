@@ -7,58 +7,70 @@ import * as turf from '@turf/turf'
 import { Feature, MultiPolygon, Point, Polygon } from 'geojson';
 //import geojson 
 
-export const parseWKTToGeoJSON = (wkt: string): Point|Polygon|MultiPolygon => {
+export const parseWKTToGeoJSON = (wkt: string): Point | Polygon | MultiPolygon => {
     //if MULTI use parseMultiPolygonToGeoJSON
-    if(wkt.includes("MULTIPOLYGON")){
+    if (wkt.includes("MULTIPOLYGON")) {
         return parseMultiPolygonToGeoJSON(wkt);
     }
     //if POLYGON the use parsePolygonToGeoJSON
-    if(wkt.includes("POLYGON")){
+    if (wkt.includes("POLYGON")) {
         return parsePolygonToGeoJSON(wkt);
     }
     //if POINT
-    if(wkt.includes("POINT")){
+    if (wkt.includes("POINT")) {
         return parsePointToGeoJSON(wkt);
     }
 }
 
-export const parsePolygonToGeoJSON  = (polygon: string): Polygon => {
-    try{
-        if(polygon === undefined){
+export const parsePolygonToGeoJSON = (polygonStr: string): Polygon => {
+    try {
+        if (!polygonStr) {
             return null;
         }
-        let coordinates = polygon
-            .replace('POLYGON((','')
-            .replace('))','')
-            .split(',')
-            .map((c) => c.trim().split(' ').map((c) => {
-     {
-        let num = parseFloat(c);
-        //temp code whilst investigate if some data is dirty as some coordinates are in unexpected brackets
-        if(c.charAt(0) === '('){
-            c = c.substring(1);
-            num = parseFloat(c);
-        }
-        if(isNaN(num)){
-            console.log('Coordinate is NaN', c, polygon);
-        }
-        return num
-     }           
-    }));
 
-        //filter out any empty coordinates or where either coordinate is null
-        coordinates = coordinates.filter((c) => c.length === 2 && c[0] !== null && c[1] !== null);
-        
-        //check first pair of coordinates and add it to the end if it is not the same
-        if(coordinates[0][0] !== coordinates[coordinates.length-1][0] || coordinates[0][1] !== coordinates[coordinates.length-1][1]){
-            coordinates.push(coordinates[0]);
+        // Extract the coordinate rings inside POLYGON(...)
+        // WKT Polygons look like: POLYGON ((lon lat, lon lat), (lon lat, lon lat))
+        // So we match everything inside the outermost parentheses
+        const ringsMatch = polygonStr.match(/POLYGON\s*\(\s*(.*)\s*\)/i);
+        if (!ringsMatch) return null;
+
+        const innerContent = ringsMatch[1];
+
+        // Split by "), (" to isolate individual rings 
+        // e.g. "(lon lat, lon lat), (lon lat, lon lat)" -> ["(lon lat, lon lat", "lon lat, lon lat)"]
+        // A safer way is using regex to find strings of coordinates enclosed in parentheses
+        const ringRegex = /\(([^)]+)\)/g;
+        const coordinates: number[][][] = [];
+
+        let match;
+        while ((match = ringRegex.exec(innerContent)) !== null) {
+            const ringStr = match[1];
+
+            // Extract the pairs of coordinates from the ring
+            const ringCoordinates: number[][] = ringStr
+                .split(',')
+                .map(pair => pair.trim().split(/\s+/).map(Number))
+                .filter(pair => pair.length === 2 && !isNaN(pair[0]) && !isNaN(pair[1]));
+
+            if (ringCoordinates.length > 0) {
+                // GeoJSON requires the first and last coordinates to be identical
+                const first = ringCoordinates[0];
+                const last = ringCoordinates[ringCoordinates.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    ringCoordinates.push([first[0], first[1]]);
+                }
+                coordinates.push(ringCoordinates);
+            }
         }
+
+        if (coordinates.length === 0) return null;
+
         return {
             type: 'Polygon',
-            coordinates: [coordinates]
+            coordinates: coordinates
         };
-    }catch(e){
-        console.log(e);
+    } catch (e) {
+        console.log("Error parsing POLYGON:", e);
         return null;
     }
 }
@@ -67,56 +79,56 @@ export const parsePolygonToGeoJSON  = (polygon: string): Polygon => {
 function to handle parsing of MULTI e.g. MULTI(-73.9944007 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
 Coordinate is NaN (-73.9942489 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
 */
-export const parseMultiPolygonToGeoJSON = (multiPolygonStr):MultiPolygon => {
-  // Regular expression to match polygons inside MULTIPOLYGON((...))
-  const multiPolygonRegex = /MULTIPOLYGON\s*\(\(\((.*?)\)\)\)/g;
-  const coordinateRegex = /(-?\d+\.\d+)\s+(-?\d+\.\d+)/g;
+export const parseMultiPolygonToGeoJSON = (multiPolygonStr): MultiPolygon => {
+    // Regular expression to match polygons inside MULTIPOLYGON((...))
+    const multiPolygonRegex = /MULTIPOLYGON\s*\(\(\((.*?)\)\)\)/g;
+    const coordinateRegex = /(-?\d+\.\d+)\s+(-?\d+\.\d+)/g;
 
-  // Function to parse a single polygon string into GeoJSON coordinates
-  const parsePolygon = (polygonStr) => {
-    const coordinates = [];
+    // Function to parse a single polygon string into GeoJSON coordinates
+    const parsePolygon = (polygonStr) => {
+        const coordinates = [];
+        let match;
+        while ((match = coordinateRegex.exec(polygonStr)) !== null) {
+            const [_, lon, lat] = match;
+            coordinates.push([parseFloat(lon), parseFloat(lat)]);
+        }
+        return coordinates;
+    };
+
+    // Check for MULTIPOLYGON match and iterate through each polygon set
+    const polygons = [];
     let match;
-    while ((match = coordinateRegex.exec(polygonStr)) !== null) {
-      const [_, lon, lat] = match;
-      coordinates.push([parseFloat(lon), parseFloat(lat)]);
+    while ((match = multiPolygonRegex.exec(multiPolygonStr)) !== null) {
+        const polygonStr = match[1];
+        const polygonCoordinates = polygonStr
+            .split(/\)\s*,\s*\(/) // Split into individual polygons
+            .map(parsePolygon);    // Parse each polygon string
+        polygons.push(polygonCoordinates);
     }
-    return coordinates;
-  };
 
-  // Check for MULTIPOLYGON match and iterate through each polygon set
-  const polygons = [];
-  let match;
-  while ((match = multiPolygonRegex.exec(multiPolygonStr)) !== null) {
-    const polygonStr = match[1];
-    const polygonCoordinates = polygonStr
-      .split(/\)\s*,\s*\(/) // Split into individual polygons
-      .map(parsePolygon);    // Parse each polygon string
-    polygons.push(polygonCoordinates);
-  }
+    if (polygons.length === 0) {
+        throw new Error("No valid MULTIPOLYGON data found in input.");
+    }
 
-  if (polygons.length === 0) {
-    throw new Error("No valid MULTIPOLYGON data found in input.");
-  }
+    // Construct GeoJSON object
+    const geoJSON = {
+        type: "MultiPolygon",
+        coordinates: polygons
+    };
 
-  // Construct GeoJSON object
-  const geoJSON = {
-    type: "MultiPolygon",
-    coordinates: polygons
-  };
-
-  return geoJSON as MultiPolygon;
+    return geoJSON as MultiPolygon;
 }
 /*
 export string of POINT(151.2772322 -33.8913828)
 */
 export const parsePointToGeoJSON = (point: string): Point => {
-    try{
-        if(point === undefined){
+    try {
+        if (point === undefined) {
             return null;
         }
         const coordinates = point
-            .replace('POINT(','')
-            .replace(')','')
+            .replace('POINT(', '')
+            .replace(')', '')
             .split(' ')
             .map((c) => parseFloat(c));
 
@@ -125,30 +137,30 @@ export const parsePointToGeoJSON = (point: string): Point => {
             type: 'Point',
             coordinates: coordinates
         };
-    }catch(e){
+    } catch (e) {
         console.log(e);
         return null;
     }
 }
 
-export const wrapAsGeoJSON = (features: any[] = []):any => { 
-    
+export const wrapAsGeoJSON = (features: any[] = []): any => {
+
     //add a type: "Feature" to each building
     features.forEach((item: any) => {
         item.type = "Feature";
     });
     return {
-      "type":"FeatureCollection",
-      "features":   features
+        "type": "FeatureCollection",
+        "features": features
 
     };
 }
 
-export const isPointInPolygon = (point: Point|Polygon, polygon: Polygon): boolean => {
+export const isPointInPolygon = (point: Point | Polygon, polygon: Polygon): boolean => {
 
-    if(point.type!="Point") {
+    if (point.type != "Point") {
         return false
-      }
+    }
     return turf.booleanPointInPolygon(point, polygon);
 }
 
@@ -168,17 +180,17 @@ export const isPointInPolygonWithoutTurf = (point: Point, polygon: Polygon): boo
     return inside;
 }
 
-  export const   findNearestPolygon = (point: Point, polygons: Polygon[], maxAllowedDistance:number=100): Polygon | null => {
-    let nearestPolygon: Polygon| null = null;
+export const findNearestPolygon = (point: Point, polygons: Polygon[], maxAllowedDistance: number = 100): Polygon | null => {
+    let nearestPolygon: Polygon | null = null;
     let minDistance = Infinity;
-    
+
     for (const polygon of polygons) {
         // Calculate the centroid of the polygon
         const centroid = turf.centroid(polygon);
-    
+
         // Calculate the distance from the point to the polygon's centroid
         const distance = turf.distance(point, centroid, { units: 'kilometers' });
-    
+
         // Check if this is the nearest polygon so far
         if (distance < minDistance) {
             minDistance = distance;
@@ -188,6 +200,6 @@ export const isPointInPolygonWithoutTurf = (point: Point, polygon: Polygon): boo
     if (minDistance > maxAllowedDistance) {
         return null;
     }
-    
+
     return nearestPolygon;
-    }
+}
