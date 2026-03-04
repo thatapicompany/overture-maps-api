@@ -5,16 +5,26 @@ import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.d
 import { Geometry } from 'geojson';
 
 export class AddressPropertiesDto {
-    @ApiProperty({ description: 'The address components', required: false })
-    address: string;
-    @ApiProperty({ description: 'Postcode', required: false })
-    postcode: string;
-    @ApiProperty({ description: 'Locality', required: false })
-    locality: string;
-    @ApiProperty({ description: 'Region', required: false })
-    region: string;
     @ApiProperty({ description: 'Country', required: false })
-    country: string;
+    country?: string;
+
+    @ApiProperty({ description: 'Postcode', required: false })
+    postcode?: string;
+
+    @ApiProperty({ description: 'Street name', required: false })
+    street?: string;
+
+    @ApiProperty({ description: 'Street number', required: false })
+    number?: string;
+
+    @ApiProperty({ description: 'Unit number', required: false })
+    unit?: string;
+
+    @ApiProperty({ description: 'Address levels (e.g., state, city)', required: false, isArray: true, type: String })
+    address_levels?: string[];
+
+    @ApiProperty({ description: 'Postal city', required: false })
+    postal_city?: string;
 }
 
 export class AddressDto {
@@ -38,6 +48,7 @@ export class AddressDto {
 
     constructor(data: Address) {
         this.id = data.id;
+        this.type = 'Feature';
         this.geometry = data.geometry;
         if (!this.properties) this.properties = new AddressPropertiesDto();
     }

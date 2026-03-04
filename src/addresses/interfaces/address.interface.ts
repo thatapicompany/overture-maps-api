@@ -4,15 +4,15 @@ export interface Address {
     id: string;
     geometry: Point;
     bbox?: any;
-    version: string;
-    update_time: string;
+    version: number;
+    update_time?: string;
     sources: any[];
-    theme: string;
-    type: string;
-    address: string;
-    postcode: string;
-    locality: string;
-    region: string;
-    country: string;
+    country?: string;
+    postcode?: string;
+    street?: string;
+    number?: string;
+    unit?: string;
+    address_levels?: any[];
+    postal_city?: string;
     ext_distance?: number;
 }
