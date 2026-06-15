@@ -75,7 +75,7 @@ describe('AppController (e2e)', () => {
     mockBigQueryService.getAddressesNearby.mockResolvedValue(mockData.map(parseAddressRow));
 
     const response = await request(app.getHttpServer())
-      .get('/addresses?lat=37.7749&lng=-122.4194')
+      .get('/addresses?lat=40.7128&lng=-74.0060')
       .set('x-api-key', 'DEMO-API-KEY')
       .expect(200);
 
@@ -90,7 +90,7 @@ describe('AppController (e2e)', () => {
     mockBigQueryService.getBaseNearby.mockResolvedValue(mockData.map(parseBaseRow));
 
     const response = await request(app.getHttpServer())
-      .get('/base?lat=37.7749&lng=-122.4194')
+      .get('/base?lat=40.7128&lng=-74.0060')
       .set('x-api-key', 'DEMO-API-KEY')
       .expect(200);
 
@@ -120,7 +120,7 @@ describe('AppController (e2e)', () => {
     mockBigQueryService.getTransportationNearby.mockResolvedValue(mockData.map(parseTransportationRow));
 
     const response = await request(app.getHttpServer())
-      .get('/transportation?lat=37.7749&lng=-122.4194')
+      .get('/transportation?lat=40.7128&lng=-74.0060')
       .set('x-api-key', 'DEMO-API-KEY')
       .expect(200);
 
@@ -135,7 +135,7 @@ describe('AppController (e2e)', () => {
     mockBigQueryService.getDivisionsNearby.mockResolvedValue(mockData.map(parseDivisionRow));
 
     const response = await request(app.getHttpServer())
-      .get('/divisions?lat=37.7749&lng=-122.4194')
+      .get('/divisions?lat=40.7128&lng=-74.0060')
       .set('x-api-key', 'DEMO-API-KEY')
       .expect(200);
 
