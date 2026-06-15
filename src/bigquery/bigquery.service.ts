@@ -183,9 +183,8 @@ export class BigQueryService {
 
     queryParts.push(`
     -- Overture Maps API: Get Places with Buildings
-    -- Step 1: Define the search area as a circular polygon around the point with a specified radius
-    DECLARE search_area_geometry GEOGRAPHY;
-    SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
+    -- Single statement (no DECLARE) so BigQuery can serve identical repeat queries
+    -- from its free results cache. The search area is inlined as ST_Buffer(...).
     `);
     params.longitude = longitude;
     params.latitude = latitude;
@@ -235,7 +234,7 @@ export class BigQueryService {
         FROM
           \`bigquery-public-data.overture_maps.building\`
         WHERE
-          ST_WITHIN(geometry, search_area_geometry)
+          ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
           AND ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)
       ),
     
@@ -254,7 +253,7 @@ export class BigQueryService {
         ON
           ST_DWithin(p.geometry, b.building_geometry, @radius)
         WHERE
-          ST_WITHIN(p.geometry, search_area_geometry)
+          ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
         `
         + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
         `
@@ -284,7 +283,7 @@ export class BigQueryService {
       ON
         ST_WITHIN(p.geometry, b.geometry)
       WHERE
-        ST_WITHIN(p.geometry, search_area_geometry)
+        ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
         `
         + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
         `
@@ -417,17 +416,15 @@ export class BigQueryService {
 
     queryParts.push(
       `-- Overture Maps API: Get Buildings Nearby
-    -- Step 1: define the search area to limit the cost in step 2 taking advantage of the 'geometry' clustering
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
-
--- Step 2: Select buildings within the search area
+    -- Single statement (no DECLARE) so BigQuery can serve identical repeat queries
+    -- from its free results cache. ST_Buffer is inlined; the 'geometry' clustering
+    -- is still pruned and the result set is unchanged.
 SELECT
   *
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.building\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -529,17 +526,13 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     queryParts.push(
       `-- Overture Maps API: Get Addresses Nearby
-    -- Step 1: define the search area
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
-
--- Step 2: Select addresses within the search area
+    -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
   *
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.address\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -571,11 +564,7 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     queryParts.push(
       `-- Overture Maps API: Get Base Features Nearby (Land Use + Land Cover)
-    -- Step 1: define the search area
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
-
--- Step 2: Select base features within the search area merging land_use and land_cover
+    -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 WITH combined_base AS (
   SELECT id, geometry, bbox, version, sources, subtype, class FROM \`bigquery-public-data.overture_maps.land_use\`
   UNION ALL
@@ -586,7 +575,7 @@ SELECT
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   combined_base AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -618,17 +607,13 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     queryParts.push(
       `-- Overture Maps API: Get Transportation Segments Nearby
-    -- Step 1: define the search area
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
-
--- Step 2: Select transportation segments within the search area
+    -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
   *
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.segment\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
@@ -660,17 +645,13 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     queryParts.push(
       `-- Overture Maps API: Get Division Areas Nearby
-    -- Step 1: define the search area
-DECLARE search_area_geometry GEOGRAPHY;
-SET search_area_geometry = ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius);
-
--- Step 2: Select division areas within the search area
+    -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
   *
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.division_area\` AS s
-WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     if (latitude && longitude) {
