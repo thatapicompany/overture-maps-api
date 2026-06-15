@@ -7,9 +7,10 @@ describe('Live Production Endpoints (e2e)', () => {
     const apiKey = process.env.TEST_API_KEY || 'DEMO-API-KEY';
     const baseUrl = 'https://api.overturemapsapi.com';
 
-    // Base coords for testing
-    const lat = 37.7749;
-    const lng = -122.4194;
+    // Base coords for testing. Use a demo city (New York) so that demo-account
+    // keys pass the demo-location geo-fence; full-account keys work anywhere.
+    const lat = 40.7128;
+    const lng = -74.0060;
     const radius = 100;
     const limit = 2; // small limit to reduce backend costs
     const queryParams = `lat=${lat}&lng=${lng}&radius=${radius}&limit=${limit}`;
