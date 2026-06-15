@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { CloudStorageCacheService } from '../cloudstorage-cache/cloudstorage-cache.service';
 import { GetBuildingsQuery } from './dto/requests/get-buildings-query.dto';
 import { Building } from './interfaces/building.interface';
+import { buildCacheKey } from '../cache/cache-key.util';
 
 @Injectable()
 export class BuildingsService {
@@ -27,8 +28,9 @@ export class BuildingsService {
     async getBuildings(query: GetBuildingsQuery): Promise<Building[]> {
         const {  lat, lng, radius,limit } = query;
   
-        // Check if cached results exist in File Cache
-        const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
+        // Check if cached results exist in File Cache. Key on data-affecting params
+        // only (not presentation/format) so equivalent requests share one entry.
+        const cacheKey = buildCacheKey('get-buildings', { lat, lng, radius, limit });
         const cachedResult = await this.cloudStorageCache.getJSON(cacheKey);
         if (cachedResult) {
           return cachedResult;

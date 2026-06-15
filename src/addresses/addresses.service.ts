@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { CacheService } from '../cache/cache.service';
+import { buildCacheKey, CACHE_TTL_SECONDS } from '../cache/cache-key.util';
 import { GetAddressesQuery } from './dto/requests/get-addresses-query.dto';
 import { Address } from './interfaces/address.interface';
 
@@ -15,13 +16,13 @@ export class AddressesService {
 
     async getAddresses(query: GetAddressesQuery): Promise<Address[]> {
         const { lat, lng, radius, limit } = query;
-        const cacheKey = `get-addresses-${JSON.stringify(query)}`;
+        const cacheKey = buildCacheKey('get-addresses', { lat, lng, radius, limit });
 
         let results: Address[] | undefined = await this.cacheService.get<Address[]>(cacheKey);
 
         if (!results) {
             results = await this.bigQueryService.getAddressesNearby(lat, lng, radius, limit);
-            await this.cacheService.set(cacheKey, results, 3600);
+            await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         }
         return results;
     }
