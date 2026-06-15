@@ -15,6 +15,8 @@ import { AuthAPIMiddleware } from './middleware/auth-api.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppCacheModule } from './cache/cache.module';
+import { UsageModule } from './usage/usage.module';
+import { UsageTrackingMiddleware } from './usage/usage.middleware';
 
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import { AppCacheModule } from './cache/cache.module';
     BaseModule,
     TransportationModule,
     DivisionsModule,
+    UsageModule,
     ConfigModule.forRoot(),
     // Per-client rate limiting. Each BigQuery-backed request can cost real money,
     // so cap request volume. Overridable via env without a redeploy.
@@ -45,6 +48,12 @@ import { AppCacheModule } from './cache/cache.module';
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
+    // Applied first so the per-request usage context wraps the entire pipeline,
+    // including auth resolution and every BigQuery job the controllers run.
+    consumer
+      .apply(UsageTrackingMiddleware)
+      .forRoutes('*');
+
     consumer
       .apply(LoggerMiddleware)
       .forRoutes('*');

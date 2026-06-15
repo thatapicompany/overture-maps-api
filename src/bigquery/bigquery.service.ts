@@ -14,6 +14,7 @@ import { TransportationSegment } from '../transportation/interfaces/transportati
 import { parseTransportationRow } from './row-parsers/bq-transportation-row.parser';
 import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
+import { currentRequestId, recordBqJob } from '../usage/usage.context';
 
 interface IQueryStatistics {
   totalBytesProcessed: number;
@@ -452,9 +453,16 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
   getDefaultLabels(): any {
 
-    const labels = {
+    const labels: any = {
       "product": "overture-maps-api",
       "env": process.env.ENV
+    }
+    // Tag the BigQuery job with the API request id so INFORMATION_SCHEMA.JOBS can be
+    // reconciled against the usage table. UUIDs satisfy BigQuery's label-value rules
+    // ([a-z0-9_-], <=63 chars); guard anyway in case the format ever changes.
+    const requestId = currentRequestId();
+    if (requestId && /^[a-z0-9_-]{1,63}$/.test(requestId)) {
+      labels.request_id = requestId;
     }
     return labels;
   }
@@ -496,6 +504,16 @@ WHERE ST_WITHIN(s.geometry, search_area_geometry) and ST_DWithin(geometry, ST_Ge
 
     const QueryFirstLine = query.split('\n')[0];
     this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $$${costInUSD.toFixed(4)}. Query Line 1: ${QueryFirstLine}`);
+
+    // Attribute this job's cost to the current API request for per-customer usage modelling.
+    recordBqJob({
+      jobId: job.id ?? null,
+      bytesProcessed: totalBytesProcessed,
+      bytesBilled: totalBytesBilled,
+      costUsd: costInUSD,
+      durationMs: statistics.durationMs,
+      statementType: result.statistics?.query?.statementType ?? null,
+    });
 
     return { rows, statistics };
   }
