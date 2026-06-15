@@ -40,6 +40,7 @@ export class GetByLocationDto {
   @Transform(({ value }) => parseFloat(value))
   @IsNumber()
   @Min(1)
+  @Max(25000, { message: 'Radius must be 25000 meters or less. For larger areas query by country or request a bulk export.' })
   radius?: number = 1000;
 
   @ApiPropertyOptional({
