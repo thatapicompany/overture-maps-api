@@ -18,6 +18,7 @@ import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorato
 import { Place, PlaceWithBuilding } from './interfaces/place.interface';
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../cache/cache.service';
+import { buildCacheKey, CACHE_TTL_SECONDS } from '../cache/cache-key.util';
 import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildings';
 
 @Injectable()
@@ -32,11 +33,13 @@ export class PlacesService {
     async getPlaces(query: GetPlacesDto):Promise<Place[]> {
 
         const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, source } = query;
-        const cacheKey = `get-places-${JSON.stringify(query)}`;
+        // Key on data-affecting params only. `source` is applied as a post-query
+        // filter below, so it must not split the cache.
+        const cacheKey = buildCacheKey('get-places', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit });
         let results: Place[] | undefined = await this.cacheService.get<Place[]>(cacheKey);
         if (!results) {
           results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit);
-          await this.cacheService.set(cacheKey, results, 3600);
+          await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         }
         // Filter by source if provided
         if (source) {
@@ -49,12 +52,12 @@ export class PlacesService {
       async getPlacesWithNearestBuilding(query: GetPlacesWithBuildingsDto):Promise<PlaceWithBuilding[]> {
 
         const { lat, lng, radius, country, min_confidence, brand_wikidata,brand_name,categories,limit, match_nearest_building} = query;
-    
-        const cacheKey = `get-places-${JSON.stringify(query)}`;
+
+        const cacheKey = buildCacheKey('get-places-with-building', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, match_nearest_building });
         let results: PlaceWithBuilding[] | undefined = await this.cacheService.get<PlaceWithBuilding[]>(cacheKey);
         if (!results) {
           results = await this.bigQueryService.getPlacesWithNearestBuilding(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, match_nearest_building);
-          await this.cacheService.set(cacheKey, results, 3600);
+          await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         }
         return results;
         
@@ -62,15 +65,15 @@ export class PlacesService {
 
     async getBrands(query: GetBrandsDto): Promise<BrandDto[]> {
         const { country, lat, lng, radius, categories } = query;
-  
-        const cacheKey = `get-places-brands-${JSON.stringify(query)}`;
+
+        const cacheKey = buildCacheKey('get-places-brands', { country, lat, lng, radius, categories });
         const cachedResult = await this.cacheService.get<any[]>(cacheKey);
         if (cachedResult) {
-          return cachedResult;
+          return cachedResult.map((brand: any) => new BrandDto(brand));
         }
 
         const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
-        await this.cacheService.set(cacheKey, results, 3600);
+        await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         return results.map((brand: any) => new BrandDto(brand));
       }
 
@@ -78,25 +81,25 @@ export class PlacesService {
         const cacheKey = `get-places-countries`;
         const cachedResult = await this.cacheService.get<any[]>(cacheKey);
         if (cachedResult) {
-          return cachedResult;
+          return cachedResult.map((country: any) => toCountryResponseDto(country));
         }
 
         const results = await this.bigQueryService.getPlaceCountsByCountry();
-        await this.cacheService.set(cacheKey, results, 3600);
+        await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         return results.map((country: any) => toCountryResponseDto(country));
     }
 
     async getCategories(query: GetCategoriesDto): Promise<CategoryResponseDto[]> {
 
-        const cacheKey = `get-places-categories-${JSON.stringify(query)}`;
+        const cacheKey = buildCacheKey('get-places-categories', { country: query.country, lat: query.lat, lng: query.lng, radius: query.radius });
         const cachedResult = await this.cacheService.get<any[]>(cacheKey);
         if (cachedResult) {
-          return cachedResult;
+          return cachedResult.map((category: any) => toCategoryResponseDto(category));
         }
 
         const results = await this.bigQueryService.getCategories(query.country, query.lat, query.lng, query.radius);
 
-        await this.cacheService.set(cacheKey, results, 3600);
+        await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
         return results.map((category: any) => toCategoryResponseDto(category));
       }
 
