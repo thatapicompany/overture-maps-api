@@ -6,6 +6,15 @@ import { GetPlacesDto } from './dto/requests/get-places.dto';
 import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../cache/cache.service';
+import { buildCacheKey, CACHE_TTL_SECONDS } from '../cache/cache-key.util';
+
+// Mirrors the data-affecting params the service keys on (excludes presentation params).
+const placesKey = (q: GetPlacesDto) =>
+  buildCacheKey('get-places', {
+    lat: q.lat, lng: q.lng, radius: q.radius, country: q.country,
+    min_confidence: q.min_confidence, brand_wikidata: q.brand_wikidata,
+    brand_name: q.brand_name, categories: q.categories, limit: q.limit,
+  });
 
 describe('PlacesService', () => {
   let service: PlacesService;
@@ -174,7 +183,7 @@ describe('PlacesService', () => {
 
     const result = await service.getPlaces(query);
 
-    expect(mockCacheGet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
+    expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
     expect(mockBigQueryGetPlacesNearby).not.toHaveBeenCalled();
     expect(result).toEqual(mockPlaceResponseDto);
   });
@@ -198,7 +207,7 @@ describe('PlacesService', () => {
 
     const result = await service.getPlaces(query);
 
-    expect(mockCacheGet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`);
+    expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
     expect(mockBigQueryGetPlacesNearby).toHaveBeenCalledWith(
       query.lat,
       query.lng,
@@ -211,7 +220,7 @@ describe('PlacesService', () => {
       query.limit
     );
     
-    expect(mockCacheSet).toHaveBeenCalledWith(`get-places-${JSON.stringify(query)}`, mockBigQueryGetPlacesNearbyResponse, 3600);
+    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), mockBigQueryGetPlacesNearbyResponse, CACHE_TTL_SECONDS);
     expect(result).toEqual(mockPlaceResponseDto);
   });
 
