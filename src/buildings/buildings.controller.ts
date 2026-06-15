@@ -11,11 +11,12 @@ import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { UseGuards } from '@nestjs/common';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
+import { DemoLocationGuard } from '../guards/demo-location.guard';
 
 @ApiTags('Buildings')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
 @Controller('buildings')
-@UseGuards(IsAuthenticatedGuard)
+@UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class BuildingsController {
 
   logger = new Logger('BuildingsController');

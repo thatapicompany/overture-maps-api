@@ -7,11 +7,12 @@ import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
+import { DemoLocationGuard } from '../guards/demo-location.guard';
 
 @ApiTags('Addresses')
 @ApiSecurity('API_KEY')
 @Controller('addresses')
-@UseGuards(IsAuthenticatedGuard)
+@UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class AddressesController {
 
     logger = new Logger('AddressesController');

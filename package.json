@@ -30,6 +30,7 @@
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^8.0.1",
+    "@nestjs/throttler": "^5.2.0",
     "@turf/turf": "^7.1.0",
     "@types/geojson": "^7946.0.14",
     "cache-manager": "^7.1.1",

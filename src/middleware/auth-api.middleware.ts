@@ -11,7 +11,16 @@ import { User } from '../decorators/authed-user.decorator';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const TheAuthAPI = require('theauthapi');
 
-const DEMO_API_KEY = process.env.DEMO_API_KEY || 'DEMO-API-KEY';
+// Only enabled when explicitly configured. No literal fallback so an unset env
+// var can never leave a publicly-known demo credential valid in production.
+const DEMO_API_KEY = process.env.DEMO_API_KEY;
+
+// Avoid writing raw API keys to logs.
+function maskKey(key?: string): string {
+  if (!key) return '(none)';
+  if (key.length <= 4) return '****';
+  return `${key.slice(0, 2)}****${key.slice(-2)}`;
+}
 
 
 @Injectable()
@@ -51,52 +60,55 @@ export class AuthAPIMiddleware implements NestMiddleware {
 
     const apiKeyString = this.getAPIKeyFromHeaderOrQuery(req);
 
-    //if no api key, or user is already set, skip
-    if (!apiKeyString || req.res.locals['user']?.id) {
+    //if no api key, or user is already set, skip — the route guard decides whether anonymous is allowed
+    if (!apiKeyString || req.res.locals['user']?.userId) {
       next();
-    } else {
+      return;
+    }
 
-      try {
+    try {
 
-        // if theAuthAPI.com is integrated, check the key
-        if (this.theAuthAPI) {
+      // if theAuthAPI.com is integrated, check the key
+      if (this.theAuthAPI) {
 
-          const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString);
-          if (apiKey) {
-            const metaData = apiKey.customMetaData as any;
-            const userObj: User = {
-              isDemoAccount: metaData.isDemoAccount || false,
-              accountId: apiKey.customAccountId,
-              userId: apiKey.customUserId,
-            };
+        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString);
+        if (apiKey) {
+          const metaData = apiKey.customMetaData as any;
+          const userObj: User = {
+            isDemoAccount: metaData.isDemoAccount || false,
+            accountId: apiKey.customAccountId,
+            userId: apiKey.customUserId,
+          };
 
-            //set to both req and locals for backwards compatibility
-            req['user'] = req.res.locals['user'] = userObj;
-          }
+          //set to both req and locals for backwards compatibility
+          req['user'] = req.res.locals['user'] = userObj;
           next();
           return;
         }
-      } catch (error) {
-        Logger.error('APIKeyMiddleware Error:', error, ` key: ${apiKeyString}`);
-      }
 
-      //if demo key, set user to demo user
-      if (apiKeyString === DEMO_API_KEY) {
-        const demoUser: User = {
-          isDemoAccount: true,
-          accountId: 'demo-account-id',
-          userId: 'demo-user-id'
-        };
-        req['user'] = req.res.locals['user'] = demoUser;
-        next();
+        // a key was supplied but did not authenticate — reject explicitly
+        // instead of silently continuing as anonymous.
+        res.status(401).send('Unauthorized - check the spelling of your API Key');
         return;
       }
+    } catch (error) {
+      Logger.error('APIKeyMiddleware Error:', error, ` key: ${maskKey(apiKeyString)}`);
+    }
 
-      //if we got this far and they passed a key we should tell the user their key doesn't work and to check for a spelling mistake
-      res.status(401).send('Unauthorized - check the spelling of your API Key');
-
-      next()
+    //if demo key, set user to demo user
+    if (DEMO_API_KEY && apiKeyString === DEMO_API_KEY) {
+      const demoUser: User = {
+        isDemoAccount: true,
+        accountId: 'demo-account-id',
+        userId: 'demo-user-id'
+      };
+      req['user'] = req.res.locals['user'] = demoUser;
+      next();
       return;
     }
+
+    //if we got this far and they passed a key we should tell the user their key doesn't work and to check for a spelling mistake
+    res.status(401).send('Unauthorized - check the spelling of your API Key');
+    return;
   }
 }
