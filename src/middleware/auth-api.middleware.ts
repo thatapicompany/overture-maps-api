@@ -70,8 +70,8 @@ export class AuthAPIMiddleware implements NestMiddleware {
 
       // if theAuthAPI.com is integrated, check the key
       if (this.theAuthAPI) {
-
-        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString);
+        const origin = (req.headers['origin'] as string) || (req.headers['referer'] as string);
+        const apiKey = await this.theAuthAPI.apiKeys.authenticateKey(apiKeyString, origin);
         if (apiKey) {
           const metaData = apiKey.customMetaData as any;
           const userObj: User = {
@@ -91,8 +91,12 @@ export class AuthAPIMiddleware implements NestMiddleware {
         res.status(401).send('Unauthorized - check the spelling of your API Key');
         return;
       }
-    } catch (error) {
+    } catch (error: any) {
       Logger.error('APIKeyMiddleware Error:', error, ` key: ${maskKey(apiKeyString)}`);
+      if (error && (error.statusCode === 403 || error.status === 403 || error.response?.status === 403)) {
+        res.status(403).send(error.message || 'Origin domain is not allowed for this API key');
+        return;
+      }
     }
 
     //if demo key, set user to demo user
