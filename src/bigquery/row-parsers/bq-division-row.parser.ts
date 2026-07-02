@@ -3,11 +3,13 @@ import { parsePointToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from ".
 
 export const parseDivisionRow = (row: any): DivisionArea => {
     let geometry;
-    try {
-        geometry = parseWKTToGeoJSON(row.geometry.value)
-    } catch {
-        // Fallback for ST_AsGeoJSON format
-        geometry = typeof row.geometry === 'string' ? JSON.parse(row.geometry) : parsePolygonToGeoJSON(row.geometry?.value || row.geometry);
+    if (row.geometry) {
+        try {
+            geometry = parseWKTToGeoJSON(row.geometry.value)
+        } catch {
+            // Fallback for ST_AsGeoJSON format
+            geometry = typeof row.geometry === 'string' ? JSON.parse(row.geometry) : parsePolygonToGeoJSON(row.geometry?.value || row.geometry);
+        }
     }
     return {
         id: row.id,
@@ -29,6 +31,15 @@ export const parseDivisionRow = (row: any): DivisionArea => {
         type: row.type,
         subtype: row.subtype,
         class: row.class,
+        primary_name: row.names?.primary,
+        names: row.names ? {
+            primary: row.names.primary,
+            common: row.names.common?.key_value ? Object.fromEntries(
+                row.names.common.key_value.map((kv: any) => [kv.key, kv.value])
+            ) : undefined,
+        } : undefined,
+        country: row.country,
+        region: row.region,
         ext_distance: row.ext_distance ? parseFloat(row.ext_distance) : undefined,
     }
 }
