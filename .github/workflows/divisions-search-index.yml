@@ -1,0 +1,40 @@
+name: Rebuild Divisions Search Index
+
+# Rebuilds the divisions search-index artifact in GCS from the latest Overture
+# data (see etl/build-divisions-search-index.ts). Overture releases monthly;
+# running weekly picks each release up within a week of it landing in the
+# BigQuery public dataset, and re-runs are idempotent (~123MB BigQuery scan).
+# The API refreshes its in-memory copy within a day of the artifact changing.
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+  schedule:
+    - cron: '0 4 * * 1' # Mondays 04:00 UTC
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: npm install
+        run: npm ci
+
+      - name: create credentials file
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}' > gcp-credentials.json
+
+      - name: Build and upload divisions search index
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ./gcp-credentials.json
+          BIGQUERY_PROJECT_ID: ${{ secrets.BIGQUERY_PROJECT_ID }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+        run: npm run etl:divisions-search-index

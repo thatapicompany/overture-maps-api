@@ -17,7 +17,8 @@ describe('AppController (e2e)', () => {
     getBaseNearby: jest.fn(),
     getBuildingsNearby: jest.fn(),
     getTransportationNearby: jest.fn(),
-    getDivisionsNearby: jest.fn(),
+    getDivisions: jest.fn(),
+    getDivisionById: jest.fn(),
     // We can add mock implementations for places if needed
   };
 
@@ -132,7 +133,7 @@ describe('AppController (e2e)', () => {
   it('/divisions (GET)', async () => {
     const mockData = readMockFile('get-divisions-nearby.json');
     const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
-    mockBigQueryService.getDivisionsNearby.mockResolvedValue(mockData.map(parseDivisionRow));
+    mockBigQueryService.getDivisions.mockResolvedValue(mockData.map(parseDivisionRow));
 
     const response = await request(app.getHttpServer())
       .get('/divisions?lat=40.7128&lng=-74.0060')
@@ -142,6 +143,72 @@ describe('AppController (e2e)', () => {
     expect(response.body).toBeInstanceOf(Array);
     expect(response.body.length).toBe(1);
     expect(response.body[0].id).toBe('division-1');
+    // Fields guaranteed for admin-area consumers
+    expect(response.body[0].bbox).toEqual({ xmin: -122.4195, xmax: -122.4193, ymin: 37.7749, ymax: 37.7751 });
+    expect(response.body[0].properties.primary_name).toBe('San Francisco County');
+    expect(response.body[0].properties.names.common.en).toBe('San Francisco');
+    expect(response.body[0].properties.country).toBe('US');
+    expect(response.body[0].properties.region).toBe('US-CA');
+    // lat/lng radius queries keep returning geometry (backward compatible)
+    expect(response.body[0].geometry.type).toBe('Polygon');
+    expect(mockBigQueryService.getDivisions).toHaveBeenCalledWith(
+      expect.objectContaining({ includeGeometry: true }),
+    );
+  });
+
+  it('/divisions (GET) by name, subtype and bbox without lat/lng', async () => {
+    const mockData = readMockFile('get-divisions-nearby.json');
+    const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
+    mockBigQueryService.getDivisions.mockResolvedValue(mockData.map(parseDivisionRow));
+
+    const response = await request(app.getHttpServer())
+      .get('/divisions?name=san francisco&subtype=county,locality&bbox=-123,37,-122,38')
+      .set('x-api-key', 'DEMO-API-KEY')
+      .expect(200);
+
+    expect(response.body).toBeInstanceOf(Array);
+    expect(response.body.length).toBe(1);
+    expect(mockBigQueryService.getDivisions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'san francisco',
+        subtypes: ['county', 'locality'],
+        bbox: [-123, 37, -122, 38],
+        // name searches default to metadata-only results
+        includeGeometry: false,
+      }),
+    );
+  });
+
+  it('/divisions (GET) rejects a request with no narrowing filter', async () => {
+    await request(app.getHttpServer())
+      .get('/divisions')
+      .set('x-api-key', 'DEMO-API-KEY')
+      .expect(400);
+  });
+
+  it('/divisions/:id (GET)', async () => {
+    const mockData = readMockFile('get-divisions-nearby.json');
+    const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
+    mockBigQueryService.getDivisionById.mockResolvedValue(parseDivisionRow(mockData[0]));
+
+    const response = await request(app.getHttpServer())
+      .get('/divisions/division-1')
+      .set('x-api-key', 'DEMO-API-KEY')
+      .expect(200);
+
+    expect(response.body.id).toBe('division-1');
+    expect(response.body.geometry.type).toBe('Polygon');
+    expect(response.body.properties.primary_name).toBe('San Francisco County');
+    expect(mockBigQueryService.getDivisionById).toHaveBeenCalledWith('division-1');
+  });
+
+  it('/divisions/:id (GET) returns 404 for an unknown id', async () => {
+    mockBigQueryService.getDivisionById.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/divisions/does-not-exist')
+      .set('x-api-key', 'DEMO-API-KEY')
+      .expect(404);
   });
 
 });
