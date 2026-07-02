@@ -77,6 +77,42 @@ export class GcsService {
         return false
     }
   }
+  // Raw object helpers for named artifacts (e.g. the divisions search index).
+  // Unlike the JSON cache methods these use the object name as-is, so artifacts
+  // are addressable by tooling outside this service.
+
+  async getObjectGeneration(objectName: string): Promise<string | null> {
+    if (!this.bucket) return null;
+    try {
+      const [metadata] = await this.bucket.file(objectName).getMetadata();
+      return metadata.generation ? String(metadata.generation) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async downloadObject(objectName: string): Promise<Buffer | null> {
+    if (!this.bucket) return null;
+    try {
+      const [content] = await this.bucket.file(objectName).download();
+      return content;
+    } catch (error) {
+      this.logger.error(`Error downloading ${objectName}: ${error.message}`);
+      return null;
+    }
+  }
+
+  async uploadObject(objectName: string, data: Buffer, contentType = 'application/octet-stream'): Promise<boolean> {
+    if (!this.bucket) return false;
+    try {
+      await this.bucket.file(objectName).save(data, { contentType, resumable: false });
+      return true;
+    } catch (error) {
+      this.logger.error(`Error uploading ${objectName}: ${error.message}`);
+      return false;
+    }
+  }
+
   // Method to set lifecycle policy on the bucket
   private async setLifecyclePolicy(): Promise<void> {
     try {

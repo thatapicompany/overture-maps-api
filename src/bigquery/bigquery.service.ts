@@ -633,32 +633,81 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     return rows.map((row: any) => parseTransportationRow(row));
   }
 
-  async getDivisionsNearby(
-    latitude: number,
-    longitude: number,
-    radius: number = 1000,
-    limit?: number
-  ): Promise<DivisionArea[]> {
+  async getDivisions(options: {
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+    country?: string;
+    name?: string;
+    subtypes?: string[];
+    bbox?: number[]; // [xmin, ymin, xmax, ymax]
+    limit?: number;
+    includeGeometry?: boolean;
+  }): Promise<DivisionArea[]> {
+
+    const { latitude, longitude, radius = 1000, country, name, subtypes, bbox, limit, includeGeometry = true } = options;
+
+    const hasPoint = latitude !== undefined && longitude !== undefined
+      && !Number.isNaN(latitude) && !Number.isNaN(longitude);
+
+    const params: any = {};
+    const whereClauses: string[] = [];
+
+    if (hasPoint) {
+      whereClauses.push(`ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) AND ST_DWithin(s.geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+      params.latitude = latitude;
+      params.longitude = longitude;
+      params.radius = radius;
+    }
+    if (country) {
+      whereClauses.push(`s.country = @country`);
+      params.country = country;
+    }
+    if (name) {
+      // Substring match on primary / English common name, or an exact ID match,
+      // mirroring a typical admin-area search box.
+      whereClauses.push(`(
+        LOWER(s.names.primary) LIKE @name_like
+        OR EXISTS(SELECT 1 FROM UNNEST(s.names.common.key_value) AS kv WHERE kv.key = 'en' AND LOWER(kv.value) LIKE @name_like)
+        OR s.id = @name_exact
+      )`);
+      params.name_like = `%${name.toLowerCase()}%`;
+      params.name_exact = name;
+    }
+    if (subtypes && subtypes.length > 0) {
+      whereClauses.push(`s.subtype IN UNNEST(@subtypes)`);
+      params.subtypes = subtypes;
+    }
+    if (bbox && bbox.length === 4) {
+      // Intersection test against the precomputed bbox columns — far cheaper
+      // than ST_Intersects on the polygon geometry.
+      whereClauses.push(`s.bbox.xmin <= @bbox_xmax AND s.bbox.xmax >= @bbox_xmin AND s.bbox.ymin <= @bbox_ymax AND s.bbox.ymax >= @bbox_ymin`);
+      [params.bbox_xmin, params.bbox_ymin, params.bbox_xmax, params.bbox_ymax] = bbox;
+    }
+
+    if (whereClauses.length === 0) {
+      // DTO validation requires at least one narrowing filter; guard against a
+      // full-table scan if this is ever called directly without one.
+      throw new Error('getDivisions requires at least one filter (point, country, name or bbox)');
+    }
 
     let queryParts: string[] = [];
-    const params: any = { latitude, longitude, radius };
-
     queryParts.push(
-      `-- Overture Maps API: Get Division Areas Nearby
+      `-- Overture Maps API: Get Division Areas
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
+    -- Excluding geometry skips the by-far-largest column, so search-style queries scan ~99% less.
 SELECT
-  *
- ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
+  ${includeGeometry ? '*' : '* EXCEPT (geometry)'}
+ ${hasPoint ? ',ST_Distance(s.geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance' : ''}
 FROM
   \`bigquery-public-data.overture_maps.division_area\` AS s
-WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+WHERE ${whereClauses.join('\n  AND ')}`);
 
     // Order by distance if latitude and longitude are provided
-    if (latitude && longitude) {
+    if (hasPoint) {
       queryParts.push(`ORDER BY ext_distance`);
     }
 
-    // Limit results if no filters are provided
     if (limit) {
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
@@ -669,6 +718,19 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
 
     const { rows } = await this.runQuery(query, params);
     return rows.map((row: any) => parseDivisionRow(row));
+  }
+
+  async getDivisionById(id: string): Promise<DivisionArea | null> {
+    const query = `-- Overture Maps API: Get Division Area by ID
+SELECT
+  *
+FROM
+  \`bigquery-public-data.overture_maps.division_area\` AS s
+WHERE s.id = @id
+LIMIT 1;`;
+
+    const { rows } = await this.runQuery(query, { id });
+    return rows.length ? parseDivisionRow(rows[0]) : null;
   }
   private buildWhereClauses({
     country,

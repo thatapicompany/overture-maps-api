@@ -4,6 +4,23 @@
         "geometry": {
             "value": "POLYGON((-122.4194 37.7749, -122.4195 37.7750, -122.4193 37.7751, -122.4194 37.7749))"
         },
+        "bbox": {
+            "xmin": -122.4195,
+            "xmax": -122.4193,
+            "ymin": 37.7749,
+            "ymax": 37.7751
+        },
+        "names": {
+            "primary": "San Francisco County",
+            "common": {
+                "key_value": [
+                    { "key": "en", "value": "San Francisco" },
+                    { "key": "es", "value": "San Francisco" }
+                ]
+            }
+        },
+        "country": "US",
+        "region": "US-CA",
         "version": 0,
         "update_time": "2023-01-01T00:00:00Z",
         "theme": "divisions",
