@@ -1,14 +1,33 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GeometryDto } from '../../../common/dto/responses/geometry.dto';
 import { DivisionArea } from '../../interfaces/division.interface';
 import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 import { Geometry } from 'geojson';
+
+export class DivisionBboxDto {
+    @ApiProperty({ description: 'Minimum longitude', example: -74.3 })
+    xmin: number;
+    @ApiProperty({ description: 'Maximum longitude', example: -73.7 })
+    xmax: number;
+    @ApiProperty({ description: 'Minimum latitude', example: 40.5 })
+    ymin: number;
+    @ApiProperty({ description: 'Maximum latitude', example: 40.9 })
+    ymax: number;
+}
 
 export class DivisionPropertiesDto {
     @ApiProperty({ description: 'Subtype of the division', required: false })
     subtype: string;
     @ApiProperty({ description: 'Class of the division', required: false })
     class: string;
+    @ApiPropertyOptional({ description: 'Primary name of the division', example: 'City of Westminster' })
+    primary_name?: string;
+    @ApiPropertyOptional({ description: 'Names of the division, including common names keyed by language code' })
+    names?: { primary?: string; common?: Record<string, string> };
+    @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 country code', example: 'GB' })
+    country?: string;
+    @ApiPropertyOptional({ description: 'ISO 3166-2 region code', example: 'GB-WSM' })
+    region?: string;
 }
 
 export class DivisionDto {
@@ -18,11 +37,17 @@ export class DivisionDto {
     @ApiProperty({ description: 'Type of division.', example: 'division_area' })
     type: string;
 
-    @ApiProperty({
-        description: 'Geometric representation of the division area.',
+    @ApiPropertyOptional({
+        description: 'Bounding box of the division area.',
+        type: () => DivisionBboxDto,
+    })
+    bbox?: DivisionBboxDto;
+
+    @ApiPropertyOptional({
+        description: 'Geometric representation of the division area. Omitted when include_geometry resolves to false; fetch it via GET /divisions/{id}.',
         type: () => GeometryDto,
     })
-    geometry: Geometry;
+    geometry?: Geometry;
 
     @ApiProperty({
         description: 'Properties and additional details.',
@@ -33,6 +58,7 @@ export class DivisionDto {
     constructor(data: DivisionArea) {
         this.id = data.id;
         this.geometry = data.geometry;
+        this.bbox = data.bbox;
         if (!this.properties) this.properties = new DivisionPropertiesDto();
     }
 }
