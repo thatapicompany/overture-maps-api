@@ -174,8 +174,9 @@ export class BigQueryService {
     categories?: string[],
     min_confidence?: number,
     limit?: number,
-    match_nearest_building: boolean = true
-  ): Promise<PlaceWithBuilding[]> {
+    match_nearest_building: boolean = true,
+    page: number = 0
+  ): Promise<{ results: PlaceWithBuilding[], totalCount: number }> {
 
     // Build the query
     let queryParts: string[] = [];
@@ -262,7 +263,7 @@ export class BigQueryService {
     
       -- Step 4: Select only the nearest building for each place
       SELECT
-        * except(distance_rank)
+        *, COUNT(*) OVER() as total_count
       FROM
         place_with_nearest_building
       WHERE
@@ -275,7 +276,8 @@ export class BigQueryService {
         p.*,
         b.id as building_id,
         b.geometry AS building_geometry,
-        0 as distance_to_nearest_building
+        0 as distance_to_nearest_building,
+        COUNT(*) OVER() as total_count
       FROM
         \`bigquery-public-data.overture_maps.place\` AS p
       JOIN
@@ -296,6 +298,10 @@ export class BigQueryService {
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
@@ -303,15 +309,15 @@ export class BigQueryService {
     // Execute the query
     const { rows } = await this.runQuery(query, params);
 
-    // Map results to the response type
-    return rows.map((row: any) => parsePlaceWithBuildingRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parsePlaceWithBuildingRow(row));
+    return { results, totalCount };
   }
 
 
 
 
   async getPlacesNearby(
-
     latitude: number,
     longitude: number,
     radius: number = 1000,
@@ -321,15 +327,16 @@ export class BigQueryService {
     categories?: string[],
     min_confidence?: number,
     limit?: number,
-    source?: string
-  ): Promise<Place[]> {
+    source?: string,
+    page: number = 0
+  ): Promise<{ results: Place[], totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = {};
 
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
-    queryParts.push(`SELECT *`);
+    queryParts.push(`SELECT *, COUNT(*) OVER() as total_count`);
 
     if (latitude && longitude) {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance`);
@@ -392,6 +399,10 @@ export class BigQueryService {
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
@@ -399,7 +410,9 @@ export class BigQueryService {
     this.logger.debug(`Running query: ${query}`);
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parsePlaceRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parsePlaceRow(row));
+    return { results, totalCount };
   }
 
 
@@ -408,8 +421,9 @@ export class BigQueryService {
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<Building[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: Building[], totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -420,7 +434,7 @@ export class BigQueryService {
     -- from its free results cache. ST_Buffer is inlined; the 'geometry' clustering
     -- is still pruned and the result set is unchanged.
 SELECT
-  *
+  *, COUNT(*) OVER() as total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.building\` AS s
@@ -436,12 +450,18 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseBuildingRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parseBuildingRow(row));
+    return { results, totalCount };
   }
 
   applyMaxLimit(limit: number): number {
@@ -518,8 +538,9 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<Address[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: Address[], totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -528,7 +549,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       `-- Overture Maps API: Get Addresses Nearby
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
-  *
+  *, COUNT(*) OVER() as total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.address\` AS s
@@ -544,20 +565,27 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseAddressRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parseAddressRow(row));
+    return { results, totalCount };
   }
 
   async getBaseNearby(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<BaseFeature[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: BaseFeature[], totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -571,7 +599,7 @@ WITH combined_base AS (
   SELECT id, geometry, bbox, version, sources, subtype, CAST(NULL as string) as class FROM \`bigquery-public-data.overture_maps.land_cover\`
 )
 SELECT
-  *
+  *, COUNT(*) OVER() as total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   combined_base AS s
@@ -587,20 +615,27 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseBaseRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parseBaseRow(row));
+    return { results, totalCount };
   }
 
   async getTransportationNearby(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<TransportationSegment[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: TransportationSegment[], totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -609,7 +644,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       `-- Overture Maps API: Get Transportation Segments Nearby
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
-  *
+  *, COUNT(*) OVER() as total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.segment\` AS s
@@ -625,12 +660,18 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseTransportationRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parseTransportationRow(row));
+    return { results, totalCount };
   }
 
   async getDivisions(options: {
@@ -643,9 +684,10 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     bbox?: number[]; // [xmin, ymin, xmax, ymax]
     limit?: number;
     includeGeometry?: boolean;
-  }): Promise<DivisionArea[]> {
+    page?: number;
+  }): Promise<{ results: DivisionArea[], totalCount: number }> {
 
-    const { latitude, longitude, radius = 1000, country, name, subtypes, bbox, limit, includeGeometry = true } = options;
+    const { latitude, longitude, radius = 1000, country, name, subtypes, bbox, limit, includeGeometry = true, page = 0 } = options;
 
     const hasPoint = latitude !== undefined && longitude !== undefined
       && !Number.isNaN(latitude) && !Number.isNaN(longitude);
@@ -697,7 +739,8 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
     -- Excluding geometry skips the by-far-largest column, so search-style queries scan ~99% less.
 SELECT
-  ${includeGeometry ? '*' : '* EXCEPT (geometry)'}
+  ${includeGeometry ? '*' : '* EXCEPT (geometry)'},
+  COUNT(*) OVER() as total_count
  ${hasPoint ? ',ST_Distance(s.geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance' : ''}
 FROM
   \`bigquery-public-data.overture_maps.division_area\` AS s
@@ -712,12 +755,18 @@ WHERE ${whereClauses.join('\n  AND ')}`);
       queryParts.push(`LIMIT @limit`);
       params.limit = this.applyMaxLimit(limit);
     }
+    if (page > 0 && limit) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * limit;
+    }
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseDivisionRow(row));
+    const totalCount = rows.length > 0 && rows[0].total_count !== undefined ? Number(rows[0].total_count) : 0;
+    const results = rows.map((row: any) => parseDivisionRow(row));
+    return { results, totalCount };
   }
 
   async getDivisionById(id: string): Promise<DivisionArea | null> {

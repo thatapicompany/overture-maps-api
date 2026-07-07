@@ -25,17 +25,18 @@ export class DivisionsController {
     @ApiOperation({ summary: 'Get Division areas using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return Division areas.', type: DivisionDto, isArray: true })
     @CountHeader()
-    async getDivisions(@Query() query: GetDivisionsQuery): Promise<DivisionDto[] | any> {
+    async getDivisions(@Query() query: GetDivisionsQuery): Promise<any> {
 
-        const divisions = await this.divisionsService.getDivisions(query);
+        const { results, totalCount } = await this.divisionsService.getDivisions(query);
 
-        const dtoResults = divisions.map((division: any) => toDivisionDto(division, query));
+        const dtoResults = results.map((division: any) => toDivisionDto(division, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        return {
+            results: dtoResults,
+            totalCount,
+            page: query.page ?? 0,
+            limit: query.limit ?? 25000,
+        };
     }
 
     @Get(':id')

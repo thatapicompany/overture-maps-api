@@ -25,17 +25,18 @@ export class TransportationController {
     @ApiOperation({ summary: 'Get Transportation segments using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return Transportation segments.', type: TransportationDto, isArray: true })
     @CountHeader()
-    async getTransportationSegments(@Query() query: GetTransportationQuery): Promise<TransportationDto[] | any> {
+    async getTransportationSegments(@Query() query: GetTransportationQuery): Promise<any> {
 
-        const segments = await this.transportationService.getTransportationSegments(query);
+        const { results, totalCount } = await this.transportationService.getTransportationSegments(query);
 
-        const dtoResults = segments.map((segment: any) => toTransportationDto(segment, query));
+        const dtoResults = results.map((segment: any) => toTransportationDto(segment, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        return {
+            results: dtoResults,
+            totalCount,
+            page: query.page ?? 0,
+            limit: query.limit ?? 25000,
+        };
     }
 
 }

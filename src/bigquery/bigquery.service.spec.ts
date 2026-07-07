@@ -65,10 +65,12 @@ describe('BigQueryService', () => {
     };
     it('should call runQuery with correct SQL for basic params', async () => {
       const service = new BigQueryService();
-      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const validRowWithCount = { ...validRow, total_count: 1 };
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRowWithCount], statistics: {} });
       const result = await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'US', ['food'], 0.5, 5);
       expect(service.runQuery).toHaveBeenCalled();
-      expect(result[0].id).toBe('1');
+      expect(result.results[0].id).toBe('1');
+      expect(result.totalCount).toBe(1);
     });
 
     it('should include source filter in SQL if provided', async () => {

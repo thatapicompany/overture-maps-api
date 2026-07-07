@@ -1,6 +1,6 @@
 import { UseInterceptors, applyDecorators } from '@nestjs/common';
-import { CountHeaderInterceptor } from '../interceptors/count-header.interceptor';
+import { PaginationInterceptor } from '../interceptors/pagination.interceptor';
 
 export function CountHeader() {
-  return applyDecorators(UseInterceptors(CountHeaderInterceptor));
+  return applyDecorators(UseInterceptors(PaginationInterceptor));
 }

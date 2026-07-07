@@ -25,17 +25,18 @@ export class AddressesController {
     @ApiOperation({ summary: 'Get Addresses using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return Addresses.', type: AddressDto, isArray: true })
     @CountHeader()
-    async getAddresses(@Query() query: GetAddressesQuery): Promise<AddressDto[] | any> {
+    async getAddresses(@Query() query: GetAddressesQuery): Promise<any> {
 
-        const addresses = await this.addressesService.getAddresses(query);
+        const { results, totalCount } = await this.addressesService.getAddresses(query);
 
-        const dtoResults = addresses.map((address: any) => toAddressDto(address, query));
+        const dtoResults = results.map((address: any) => toAddressDto(address, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        return {
+            results: dtoResults,
+            totalCount,
+            page: query.page ?? 0,
+            limit: query.limit ?? 25000,
+        };
     }
 
 }
