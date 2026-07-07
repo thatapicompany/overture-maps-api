@@ -79,44 +79,67 @@ export const parsePolygonToGeoJSON = (polygonStr: string): Polygon => {
 function to handle parsing of MULTI e.g. MULTI(-73.9944007 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
 Coordinate is NaN (-73.9942489 MULTIPOLYGON(((-73.9944007 40.7135703, -73.9943494 40.7134777, -73.9942995 40.7133877, -73.9938986 40.7135098, -73.993976 40.7136465, -73.9943661 40.7136157, -73.9943895 40.713585, -73.9944007 40.7135703)), ((-73.9942489 40.7132946, -73.9941596 40.7131396, -73.9941396 40.713141, -73.9941334 40.7131415, -73.9937179 40.713175, -73.9938473 40.7134172, -73.9942297 40.7133005, -73.9942489 40.7132946)))
 */
-export const parseMultiPolygonToGeoJSON = (multiPolygonStr): MultiPolygon => {
-    // Regular expression to match polygons inside MULTIPOLYGON((...))
-    const multiPolygonRegex = /MULTIPOLYGON\s*\(\(\((.*?)\)\)\)/g;
-    const coordinateRegex = /(-?\d+\.\d+)\s+(-?\d+\.\d+)/g;
+export const parseMultiPolygonToGeoJSON = (multiPolygonStr: string): MultiPolygon => {
+    // Clean up string and check format
+    const match = multiPolygonStr.match(/MULTIPOLYGON\s*\((.*)\)/is);
+    if (!match) {
+        throw new Error("No valid MULTIPOLYGON data found in input.");
+    }
+    const content = match[1].trim();
 
-    // Function to parse a single polygon string into GeoJSON coordinates
-    const parsePolygon = (polygonStr) => {
-        const coordinates = [];
-        let match;
-        while ((match = coordinateRegex.exec(polygonStr)) !== null) {
-            const [_, lon, lat] = match;
-            coordinates.push([parseFloat(lon), parseFloat(lat)]);
+    const polygons: number[][][][] = [];
+    let currentPolygon: number[][][] = [];
+    let depth = 0;
+    let buffer = "";
+
+    for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+        if (char === '(') {
+            depth++;
+            if (depth === 2) {
+                // We entered a ring
+                buffer = "";
+            }
+        } else if (char === ')') {
+            if (depth === 2) {
+                // Finished a ring
+                const ringCoordinates: number[][] = buffer
+                    .split(',')
+                    .map(pair => pair.trim().split(/\s+/).map(Number))
+                    .filter(pair => pair.length === 2 && !isNaN(pair[0]) && !isNaN(pair[1]));
+
+                if (ringCoordinates.length > 0) {
+                    // GeoJSON requires closed rings
+                    const first = ringCoordinates[0];
+                    const last = ringCoordinates[ringCoordinates.length - 1];
+                    if (first[0] !== last[0] || first[1] !== last[1]) {
+                        ringCoordinates.push([first[0], first[1]]);
+                    }
+                    currentPolygon.push(ringCoordinates);
+                }
+            } else if (depth === 1) {
+                // Finished a polygon (exited the second parenthesis layer)
+                if (currentPolygon.length > 0) {
+                    polygons.push(currentPolygon);
+                    currentPolygon = [];
+                }
+            }
+            depth--;
+        } else {
+            if (depth === 2) {
+                buffer += char;
+            }
         }
-        return coordinates;
-    };
-
-    // Check for MULTIPOLYGON match and iterate through each polygon set
-    const polygons = [];
-    let match;
-    while ((match = multiPolygonRegex.exec(multiPolygonStr)) !== null) {
-        const polygonStr = match[1];
-        const polygonCoordinates = polygonStr
-            .split(/\)\s*,\s*\(/) // Split into individual polygons
-            .map(parsePolygon);    // Parse each polygon string
-        polygons.push(polygonCoordinates);
     }
 
     if (polygons.length === 0) {
         throw new Error("No valid MULTIPOLYGON data found in input.");
     }
 
-    // Construct GeoJSON object
-    const geoJSON = {
+    return {
         type: "MultiPolygon",
         coordinates: polygons
-    };
-
-    return geoJSON as MultiPolygon;
+    } as MultiPolygon;
 }
 /*
 export string of POINT(151.2772322 -33.8913828)

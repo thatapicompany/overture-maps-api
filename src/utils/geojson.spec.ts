@@ -10,16 +10,18 @@ describe('GeoJSON tests', () => {
    
 
     it('should parse a valid MULTIPOLYGON string to GeoJSON', () => {
-    
         try {
-        const geoJSON = parseMultiPolygonToGeoJSON(multiPolygonStr);
-        expect(geoJSON).toBeDefined();
+            const geoJSON = parseMultiPolygonToGeoJSON(multiPolygonStr);
+            expect(geoJSON).toBeDefined();
+            expect(geoJSON.type).toBe('MultiPolygon');
+            // Check that it has two distinct polygons rather than one polygon with a hole
+            expect(geoJSON.coordinates.length).toBe(2);
+            expect(geoJSON.coordinates[0].length).toBe(1); // Polygon 1 has 1 ring (exterior)
+            expect(geoJSON.coordinates[1].length).toBe(1); // Polygon 2 has 1 ring (exterior)
         } catch (error) {
-        console.error("Error parsing MULTIPOLYGON:", error.message);
-        //fail
+            console.error("Error parsing MULTIPOLYGON:", error.message);
             expect(true).toBe(false);
         }
-
     });
 
     
