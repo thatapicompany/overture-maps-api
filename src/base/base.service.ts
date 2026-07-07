@@ -14,16 +14,16 @@ export class BaseService {
         private readonly cacheService: CacheService,
     ) { }
 
-    async getBaseFeatures(query: GetBaseQuery): Promise<BaseFeature[]> {
-        const { lat, lng, radius, limit } = query;
-        const cacheKey = buildCacheKey('get-base', { lat, lng, radius, limit });
+    async getBaseFeatures(query: GetBaseQuery): Promise<{ results: BaseFeature[], totalCount: number }> {
+        const { lat, lng, radius, limit, page = 0 } = query;
+        const cacheKey = buildCacheKey('get-base', { lat, lng, radius, limit, page });
 
-        let results: BaseFeature[] | undefined = await this.cacheService.get<BaseFeature[]>(cacheKey);
+        let cached = await this.cacheService.get<{ results: BaseFeature[], totalCount: number }>(cacheKey);
 
-        if (!results) {
-            results = await this.bigQueryService.getBaseNearby(lat, lng, radius, limit);
-            await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
+        if (!cached) {
+            cached = await this.bigQueryService.getBaseNearby(lat, lng, radius, limit, page);
+            await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
-        return results;
+        return cached;
     }
 }

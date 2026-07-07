@@ -25,17 +25,18 @@ export class BaseController {
     @ApiOperation({ summary: 'Get Base features using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return Base features.', type: BaseDto, isArray: true })
     @CountHeader()
-    async getBaseFeatures(@Query() query: GetBaseQuery): Promise<BaseDto[] | any> {
+    async getBaseFeatures(@Query() query: GetBaseQuery): Promise<any> {
 
-        const baseFeatures = await this.baseService.getBaseFeatures(query);
+        const { results, totalCount } = await this.baseService.getBaseFeatures(query);
 
-        const dtoResults = baseFeatures.map((feature: any) => toBaseDto(feature, query));
+        const dtoResults = results.map((feature: any) => toBaseDto(feature, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        return {
+            results: dtoResults,
+            totalCount,
+            page: query.page ?? 0,
+            limit: query.limit ?? 25000,
+        };
     }
 
 }

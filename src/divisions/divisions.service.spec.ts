@@ -36,20 +36,20 @@ describe('DivisionsService', () => {
 
     it('serves name searches from the index when it is ready', async () => {
         mockIndex.isReady.mockReturnValue(true);
-        mockIndex.search.mockReturnValue([{ id: 'div-1' }]);
+        mockIndex.search.mockReturnValue({ results: [{ id: 'div-1' }], totalCount: 1 });
 
         const results = await service.getDivisions(query({ name: 'paris', subtype: 'locality', limit: '10' }));
 
-        expect(results).toEqual([{ id: 'div-1' }]);
+        expect(results).toEqual({ results: [{ id: 'div-1' }], totalCount: 1 });
         expect(mockIndex.search).toHaveBeenCalledWith({
-            name: 'paris', country: undefined, subtypes: ['locality'], bbox: undefined, limit: 10,
+            name: 'paris', country: undefined, subtypes: ['locality'], bbox: undefined, limit: 10, page: 0,
         });
         expect(mockBigQuery.getDivisions).not.toHaveBeenCalled();
     });
 
     it('falls back to BigQuery (geometry-free) for name searches when the index is not ready', async () => {
         mockIndex.isReady.mockReturnValue(false);
-        mockBigQuery.getDivisions.mockResolvedValue([]);
+        mockBigQuery.getDivisions.mockResolvedValue({ results: [], totalCount: 0 });
 
         await service.getDivisions(query({ name: 'paris' }));
 
@@ -60,7 +60,7 @@ describe('DivisionsService', () => {
 
     it('uses BigQuery with geometry for point queries even when the index is ready', async () => {
         mockIndex.isReady.mockReturnValue(true);
-        mockBigQuery.getDivisions.mockResolvedValue([]);
+        mockBigQuery.getDivisions.mockResolvedValue({ results: [], totalCount: 0 });
 
         await service.getDivisions(query({ lat: '40.7', lng: '-74.0' }));
 
@@ -72,7 +72,7 @@ describe('DivisionsService', () => {
 
     it('honours an explicit include_geometry=true on a name search (BigQuery path)', async () => {
         mockIndex.isReady.mockReturnValue(true);
-        mockBigQuery.getDivisions.mockResolvedValue([]);
+        mockBigQuery.getDivisions.mockResolvedValue({ results: [], totalCount: 0 });
 
         await service.getDivisions(query({ name: 'paris', include_geometry: 'true' }));
 

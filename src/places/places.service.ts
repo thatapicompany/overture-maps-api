@@ -30,37 +30,26 @@ export class PlacesService {
         private readonly bigQueryService: BigQueryService,
         private readonly cacheService: CacheService,
     ) {}
-    async getPlaces(query: GetPlacesDto):Promise<Place[]> {
-
-        const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, source } = query;
-        // Key on data-affecting params only. `source` is applied as a post-query
-        // filter below, so it must not split the cache.
-        const cacheKey = buildCacheKey('get-places', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit });
-        let results: Place[] | undefined = await this.cacheService.get<Place[]>(cacheKey);
-        if (!results) {
-          results = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit);
-          await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
+    async getPlaces(query: GetPlacesDto): Promise<{ results: Place[], totalCount: number }> {
+        const { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, source, page = 0 } = query;
+        const cacheKey = buildCacheKey('get-places', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, source, page });
+        let cached = await this.cacheService.get<{ results: Place[], totalCount: number }>(cacheKey);
+        if (!cached) {
+          cached = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, source, page);
+          await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
-        // Filter by source if provided
-        if (source) {
-          results = results.filter(place => Array.isArray(place.sources) && place.sources.some(s => s.dataset === source));
-        }
-        return results;
+        return cached;
       }
 
-    
-      async getPlacesWithNearestBuilding(query: GetPlacesWithBuildingsDto):Promise<PlaceWithBuilding[]> {
-
-        const { lat, lng, radius, country, min_confidence, brand_wikidata,brand_name,categories,limit, match_nearest_building} = query;
-
-        const cacheKey = buildCacheKey('get-places-with-building', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, match_nearest_building });
-        let results: PlaceWithBuilding[] | undefined = await this.cacheService.get<PlaceWithBuilding[]>(cacheKey);
-        if (!results) {
-          results = await this.bigQueryService.getPlacesWithNearestBuilding(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, match_nearest_building);
-          await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
+      async getPlacesWithNearestBuilding(query: GetPlacesWithBuildingsDto): Promise<{ results: PlaceWithBuilding[], totalCount: number }> {
+        const { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, match_nearest_building, page = 0 } = query;
+        const cacheKey = buildCacheKey('get-places-with-building', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, match_nearest_building, page });
+        let cached = await this.cacheService.get<{ results: PlaceWithBuilding[], totalCount: number }>(cacheKey);
+        if (!cached) {
+          cached = await this.bigQueryService.getPlacesWithNearestBuilding(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, match_nearest_building, page);
+          await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
-        return results;
-        
+        return cached;
       }
 
     async getBrands(query: GetBrandsDto): Promise<BrandDto[]> {

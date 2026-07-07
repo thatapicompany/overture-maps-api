@@ -12,6 +12,7 @@ import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { UseGuards } from '@nestjs/common';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
+import { CountHeader } from '../decorators/count-header.decorator';
 
 @ApiTags('Buildings')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -26,18 +27,20 @@ export class BuildingsController {
   ) { }
 
   @Get()
-  async getBuildings(@Query() query: GetBuildingsQuery): Promise<BuildingDto[] | any> {
+  @CountHeader()
+  async getBuildings(@Query() query: GetBuildingsQuery): Promise<any> {
 
 
-    const buildings = await this.buildingsService.getBuildings(query);
+    const { results, totalCount } = await this.buildingsService.getBuildings(query);
 
-    const dtoResults = buildings.map((building: any) => toBuildingDto(building, query));
+    const dtoResults = results.map((building: any) => toBuildingDto(building, query));
 
-    if (query.format === Format.GEOJSON) {
-      return wrapAsGeoJSON(dtoResults)
-    } else {
-      return dtoResults
-    }
+    return {
+      results: dtoResults,
+      totalCount,
+      page: query.page ?? 0,
+      limit: query.limit ?? 25000,
+    };
   }
 
 }

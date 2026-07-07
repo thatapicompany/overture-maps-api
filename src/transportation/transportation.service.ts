@@ -14,16 +14,16 @@ export class TransportationService {
         private readonly cacheService: CacheService,
     ) { }
 
-    async getTransportationSegments(query: GetTransportationQuery): Promise<TransportationSegment[]> {
-        const { lat, lng, radius, limit } = query;
-        const cacheKey = buildCacheKey('get-transportation', { lat, lng, radius, limit });
+    async getTransportationSegments(query: GetTransportationQuery): Promise<{ results: TransportationSegment[], totalCount: number }> {
+        const { lat, lng, radius, limit, page = 0 } = query;
+        const cacheKey = buildCacheKey('get-transportation', { lat, lng, radius, limit, page });
 
-        let results: TransportationSegment[] | undefined = await this.cacheService.get<TransportationSegment[]>(cacheKey);
+        let cached = await this.cacheService.get<{ results: TransportationSegment[], totalCount: number }>(cacheKey);
 
-        if (!results) {
-            results = await this.bigQueryService.getTransportationNearby(lat, lng, radius, limit);
-            await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
+        if (!cached) {
+            cached = await this.bigQueryService.getTransportationNearby(lat, lng, radius, limit, page);
+            await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
-        return results;
+        return cached;
     }
 }

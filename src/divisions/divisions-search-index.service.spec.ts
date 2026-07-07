@@ -20,32 +20,39 @@ describe('DivisionsSearchIndexService', () => {
     });
 
     it('searches by name substring, case-insensitively, across primary and en names', () => {
-        const results = service.search({ name: 'westminster' });
+        const { results } = service.search({ name: 'westminster' });
         expect(results.map(r => r.id).sort()).toEqual(['div-westminster', 'div-westminster-co']);
     });
 
     it('matches an exact id passed as the name', () => {
-        const results = service.search({ name: 'div-paris' });
+        const { results } = service.search({ name: 'div-paris' });
         expect(results.map(r => r.id)).toEqual(['div-paris']);
     });
 
     it('filters by subtype and country', () => {
-        expect(service.search({ name: 'westminster', subtypes: ['locality'] }).map(r => r.id)).toEqual(['div-westminster-co']);
-        expect(service.search({ name: 'westminster', country: 'GB' }).map(r => r.id)).toEqual(['div-westminster']);
+        expect(service.search({ name: 'westminster', subtypes: ['locality'] }).results.map(r => r.id)).toEqual(['div-westminster-co']);
+        expect(service.search({ name: 'westminster', country: 'GB' }).results.map(r => r.id)).toEqual(['div-westminster']);
     });
 
     it('filters by bbox intersection and excludes rows with no bbox', () => {
         // London-ish box
-        const results = service.search({ bbox: [-1, 51, 1, 52] });
+        const { results } = service.search({ bbox: [-1, 51, 1, 52] });
         expect(results.map(r => r.id)).toEqual(['div-westminster']);
     });
 
     it('respects the limit', () => {
-        expect(service.search({ name: 'westminster', limit: 1 }).length).toBe(1);
+        expect(service.search({ name: 'westminster', limit: 1 }).results.length).toBe(1);
+    });
+
+    it('supports pagination', () => {
+        const result = service.search({ name: 'westminster', limit: 1, page: 1 });
+        expect(result.totalCount).toBe(2);
+        expect(result.results.map(r => r.id)).toEqual(['div-westminster-co']);
     });
 
     it('returns full metadata but no geometry', () => {
-        const [result] = service.search({ name: 'city of westminster' });
+        const { results } = service.search({ name: 'city of westminster' });
+        const [result] = results;
         expect(result).toMatchObject({
             id: 'div-westminster',
             type: 'division_area',
@@ -69,7 +76,7 @@ describe('DivisionsSearchIndexService', () => {
         expect(svc.isReady()).toBe(false);
         await svc.loadIfStale();
         expect(svc.isReady()).toBe(true);
-        expect(svc.search({ name: 'paris' }).length).toBe(1);
+        expect(svc.search({ name: 'paris' }).results.length).toBe(1);
 
         await svc.loadIfStale();
         expect((gcs.downloadObject as jest.Mock).mock.calls.length).toBe(1);

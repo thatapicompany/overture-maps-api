@@ -25,19 +25,19 @@ export class BuildingsService {
       private readonly cloudStorageCache: CloudStorageCacheService,
     ) {}
 
-    async getBuildings(query: GetBuildingsQuery): Promise<Building[]> {
-        const {  lat, lng, radius,limit } = query;
+    async getBuildings(query: GetBuildingsQuery): Promise<{ results: Building[], totalCount: number }> {
+        const { lat, lng, radius, limit, page = 0 } = query;
   
         // Check if cached results exist in File Cache. Key on data-affecting params
         // only (not presentation/format) so equivalent requests share one entry.
-        const cacheKey = buildCacheKey('get-buildings', { lat, lng, radius, limit });
-        const cachedResult = await this.cloudStorageCache.getJSON(cacheKey);
+        const cacheKey = buildCacheKey('get-buildings', { lat, lng, radius, limit, page });
+        const cachedResult = await this.cloudStorageCache.getJSON(cacheKey) as { results: Building[], totalCount: number } | null;
         if (cachedResult) {
           return cachedResult;
         }
       
-        const results = await this.bigQueryService.getBuildingsNearby( lat, lng, radius,limit);
-        await this.cloudStorageCache.storeJSON (results,cacheKey);
-        return results;//
+        const results = await this.bigQueryService.getBuildingsNearby(lat, lng, radius, limit, page);
+        await this.cloudStorageCache.storeJSON(results, cacheKey);
+        return results;
       }
 }

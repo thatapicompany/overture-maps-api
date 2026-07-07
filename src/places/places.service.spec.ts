@@ -14,6 +14,7 @@ const placesKey = (q: GetPlacesDto) =>
     lat: q.lat, lng: q.lng, radius: q.radius, country: q.country,
     min_confidence: q.min_confidence, brand_wikidata: q.brand_wikidata,
     brand_name: q.brand_name, categories: q.categories, limit: q.limit,
+    source: q.source, page: q.page ?? 0,
   });
 
 describe('PlacesService', () => {
@@ -28,8 +29,8 @@ describe('PlacesService', () => {
              coordinates: [
               -1.1516016,
               43.8711004,
-            ],
-         type: "Point"
+             ],
+          type: "Point"
        },
       bbox: {
         xmin: -1.1516017913818359,
@@ -167,7 +168,8 @@ describe('PlacesService', () => {
   });
 
   it('should return places from cache if available', async () => {
-    mockCacheGet.mockResolvedValueOnce(mockPlaceResponseDto);
+    const cachedResponse = { results: mockPlaceResponseDto, totalCount: 1 };
+    mockCacheGet.mockResolvedValueOnce(cachedResponse);
 
     const query: GetPlacesDto = {
       lat: 43.8711004,
@@ -185,12 +187,13 @@ describe('PlacesService', () => {
 
     expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
     expect(mockBigQueryGetPlacesNearby).not.toHaveBeenCalled();
-    expect(result).toEqual(mockPlaceResponseDto);
+    expect(result).toEqual(cachedResponse);
   });
 
   it('should query BigQuery and cache results if cache is empty', async () => {
     mockCacheGet.mockResolvedValueOnce(null);
-    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(mockBigQueryGetPlacesNearbyResponse);
+    const dbResponse = { results: mockBigQueryGetPlacesNearbyResponse, totalCount: 1 };
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(dbResponse);
     mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
@@ -217,32 +220,19 @@ describe('PlacesService', () => {
       query.country,
       query.categories,
       query.min_confidence,
-      query.limit
+      query.limit,
+      undefined,
+      0
     );
     
-    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), mockBigQueryGetPlacesNearbyResponse, CACHE_TTL_SECONDS);
-    expect(result).toEqual(mockPlaceResponseDto);
+    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), dbResponse, CACHE_TTL_SECONDS);
+    expect(result).toEqual({ results: mockPlaceResponseDto, totalCount: 1 });
   });
 
-  it('should filter places by source dataset if source is provided', async () => {
+  it('should query BigQuery with source parameter if source is provided', async () => {
     mockCacheGet.mockResolvedValueOnce(null);
-    // Add two places, only one matches the source filter
-    const response = [
-      {
-        ...mockBigQueryGetPlacesNearbyResponse[0],
-        sources: [
-          { property: '', dataset: 'meta', record_id: '1', update_time: '2024-08-02T00:00:00.000Z', confidence: null },
-        ],
-      },
-      {
-        ...mockBigQueryGetPlacesNearbyResponse[0],
-        id: 'other',
-        sources: [
-          { property: '', dataset: 'other', record_id: '2', update_time: '2024-08-02T00:00:00.000Z', confidence: null },
-        ],
-      },
-    ];
-    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(response);
+    const dbResponse = { results: mockBigQueryGetPlacesNearbyResponse, totalCount: 1 };
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(dbResponse);
     mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
@@ -259,8 +249,22 @@ describe('PlacesService', () => {
     };
 
     const result = await service.getPlaces(query);
-    expect(result.length).toBe(1);
-    expect(result[0].sources[0].dataset).toBe('meta');
+
+    expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
+    expect(mockBigQueryGetPlacesNearby).toHaveBeenCalledWith(
+      query.lat,
+      query.lng,
+      query.radius,
+      query.brand_wikidata,
+      query.brand_name,
+      query.country,
+      query.categories,
+      query.min_confidence,
+      query.limit,
+      'meta',
+      0
+    );
+    expect(result).toEqual({ results: mockPlaceResponseDto, totalCount: 1 });
   });
 
 });

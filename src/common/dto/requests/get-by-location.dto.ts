@@ -56,6 +56,18 @@ export class GetByLocationDto {
   @Max(25000, { message: 'Limit must be less than 25000, if you need a larger export then directly query the API otherwise the response will be too large' })
   limit?: number = 25000;
 
+  @ApiPropertyOptional({
+    description: 'Page number for pagination (0-indexed), defaulting to 0 if not provided.',
+    example: 0,
+    minimum: 0,
+    default: 0,
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  @IsNumber()
+  @Min(0)
+  page?: number = 0;
+
 
   @ApiPropertyOptional({
     description: 'Response format, defaulting to JSON. Options are "json", "csv", or "geojson".',

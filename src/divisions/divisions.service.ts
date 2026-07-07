@@ -16,8 +16,8 @@ export class DivisionsService {
         private readonly searchIndex: DivisionsSearchIndexService,
     ) { }
 
-    async getDivisions(query: GetDivisionsQuery): Promise<DivisionArea[]> {
-        const { lat, lng, radius, limit, country, name, subtype, bbox } = query;
+    async getDivisions(query: GetDivisionsQuery): Promise<{ results: DivisionArea[], totalCount: number }> {
+        const { lat, lng, radius, limit, country, name, subtype, bbox, page = 0 } = query;
         const includeGeometry = query.resolveIncludeGeometry();
 
         const hasPoint = lat !== undefined && lng !== undefined
@@ -28,7 +28,7 @@ export class DivisionsService {
         // BigQuery for exact distance filtering/ordering, and anything needing
         // geometry has to go there too.
         if (!includeGeometry && !hasPoint && this.searchIndex.isReady()) {
-            return this.searchIndex.search({ name, country, subtypes: subtype, bbox, limit });
+            return this.searchIndex.search({ name, country, subtypes: subtype, bbox, limit, page });
         }
 
         const cacheKey = buildCacheKey('get-divisions', {
@@ -36,12 +36,14 @@ export class DivisionsService {
             // joined so buildCacheKey's array sort can't conflate different boxes
             bbox: bbox?.join(','),
             include_geometry: includeGeometry,
+            page,
         });
 
-        let results: DivisionArea[] | undefined = await this.cacheService.get<DivisionArea[]>(cacheKey);
+        let cached: { results: DivisionArea[], totalCount: number } | undefined = 
+            await this.cacheService.get<{ results: DivisionArea[], totalCount: number }>(cacheKey);
 
-        if (!results) {
-            results = await this.bigQueryService.getDivisions({
+        if (!cached) {
+            const data = await this.bigQueryService.getDivisions({
                 latitude: lat,
                 longitude: lng,
                 radius,
@@ -51,10 +53,12 @@ export class DivisionsService {
                 subtypes: subtype,
                 bbox,
                 includeGeometry,
+                page,
             });
-            await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
+            cached = data;
+            await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
-        return results;
+        return cached;
     }
 
     async getDivisionById(id: string): Promise<DivisionArea | null> {

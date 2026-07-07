@@ -73,7 +73,7 @@ describe('AppController (e2e)', () => {
   it('/addresses (GET)', async () => {
     const mockData = readMockFile('get-addresses-nearby.json');
     const { parseAddressRow } = require('../src/bigquery/row-parsers/bq-address-row.parser');
-    mockBigQueryService.getAddressesNearby.mockResolvedValue(mockData.map(parseAddressRow));
+    mockBigQueryService.getAddressesNearby.mockResolvedValue({ results: mockData.map(parseAddressRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/addresses?lat=40.7128&lng=-74.0060')
@@ -88,7 +88,7 @@ describe('AppController (e2e)', () => {
   it('/base (GET)', async () => {
     const mockData = readMockFile('get-base-nearby.json');
     const { parseBaseRow } = require('../src/bigquery/row-parsers/bq-base-row.parser');
-    mockBigQueryService.getBaseNearby.mockResolvedValue(mockData.map(parseBaseRow));
+    mockBigQueryService.getBaseNearby.mockResolvedValue({ results: mockData.map(parseBaseRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/base?lat=40.7128&lng=-74.0060')
@@ -103,7 +103,7 @@ describe('AppController (e2e)', () => {
   it('/buildings (GET)', async () => {
     const mockData = [readMockFile('get-buildings-nearby.json')];
     const { parseBuildingRow } = require('../src/bigquery/row-parsers/bq-building-row.parser');
-    mockBigQueryService.getBuildingsNearby.mockResolvedValue(mockData.map(parseBuildingRow));
+    mockBigQueryService.getBuildingsNearby.mockResolvedValue({ results: mockData.map(parseBuildingRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/buildings?lat=-33.8915&lng=151.276')
@@ -118,7 +118,7 @@ describe('AppController (e2e)', () => {
   it('/transportation (GET)', async () => {
     const mockData = readMockFile('get-transportation-nearby.json');
     const { parseTransportationRow } = require('../src/bigquery/row-parsers/bq-transportation-row.parser');
-    mockBigQueryService.getTransportationNearby.mockResolvedValue(mockData.map(parseTransportationRow));
+    mockBigQueryService.getTransportationNearby.mockResolvedValue({ results: mockData.map(parseTransportationRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/transportation?lat=40.7128&lng=-74.0060')
@@ -133,7 +133,7 @@ describe('AppController (e2e)', () => {
   it('/divisions (GET)', async () => {
     const mockData = readMockFile('get-divisions-nearby.json');
     const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
-    mockBigQueryService.getDivisions.mockResolvedValue(mockData.map(parseDivisionRow));
+    mockBigQueryService.getDivisions.mockResolvedValue({ results: mockData.map(parseDivisionRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/divisions?lat=40.7128&lng=-74.0060')
@@ -159,7 +159,7 @@ describe('AppController (e2e)', () => {
   it('/divisions (GET) by name, subtype and bbox without lat/lng', async () => {
     const mockData = readMockFile('get-divisions-nearby.json');
     const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
-    mockBigQueryService.getDivisions.mockResolvedValue(mockData.map(parseDivisionRow));
+    mockBigQueryService.getDivisions.mockResolvedValue({ results: mockData.map(parseDivisionRow), totalCount: mockData.length });
 
     const response = await request(app.getHttpServer())
       .get('/divisions?name=san francisco&subtype=county,locality&bbox=-123,37,-122,38')
@@ -177,6 +177,22 @@ describe('AppController (e2e)', () => {
         includeGeometry: false,
       }),
     );
+  });
+
+  it('/divisions (GET) returns pagination headers', async () => {
+    const mockData = readMockFile('get-divisions-nearby.json');
+    const { parseDivisionRow } = require('../src/bigquery/row-parsers/bq-division-row.parser');
+    mockBigQueryService.getDivisions.mockResolvedValue({ results: mockData.map(parseDivisionRow), totalCount: 15 });
+
+    const response = await request(app.getHttpServer())
+      .get('/divisions?name=san francisco&limit=5&page=2')
+      .set('x-api-key', 'DEMO-API-KEY')
+      .expect(200);
+
+    expect(response.headers['x-total-count']).toBe('15');
+    expect(response.headers['x-page']).toBe('2');
+    expect(response.headers['x-limit']).toBe('5');
+    expect(response.headers['x-offset']).toBe('10');
   });
 
   it('/divisions (GET) rejects a request with no narrowing filter', async () => {

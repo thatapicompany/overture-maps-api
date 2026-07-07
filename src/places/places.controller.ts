@@ -49,7 +49,7 @@ export class PlacesController {
 
     
       // If no cache, query BigQuery with wikidata and country support
-    const  results = await this.placesService.getPlaces(query);
+    const { results, totalCount } = await this.placesService.getPlaces(query);
     const dtoResults = results.map((place: any) =>toPlaceDto(place,query));
 
     let finalResults = dtoResults;
@@ -72,10 +72,12 @@ export class PlacesController {
       this.logger.warn(`Enrichment failed: ${err.message}`);
     }
 
-    if(query.format ===  Format.GEOJSON) {
-      return wrapAsGeoJSON  (finalResults)
-    }
-    return finalResults
+    return {
+      results: finalResults,
+      totalCount,
+      page: query.page ?? 0,
+      limit: query.limit ?? 25000,
+    };
   }
 
   @Get('buildings')
@@ -95,11 +97,16 @@ export class PlacesController {
     // test if query.match_nearest_building is true
     this.logger.log(`Query: ${JSON.stringify(query)} ${query.match_nearest_building===true}`);
     
-    const placesWithBuildings = await this.placesService.getPlacesWithNearestBuilding(query);
+    const { results, totalCount } = await this.placesService.getPlacesWithNearestBuilding(query);
   
     // Map results to DTOs and wrap in GeoJSON if requested
-    const dtoResults = placesWithBuildings.map((place) => toPlaceWithBuildingDto(place, query));
-    return query.format === Format.GEOJSON ? wrapAsGeoJSON(dtoResults) : dtoResults;
+    const dtoResults = results.map((place) => toPlaceWithBuildingDto(place, query));
+    return {
+      results: dtoResults,
+      totalCount,
+      page: query.page ?? 0,
+      limit: query.limit ?? 25000,
+    };
   }
   
   

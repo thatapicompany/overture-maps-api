@@ -14,7 +14,7 @@ describe('PlacesController enrichment merge', () => {
       confidence: 1,
       addresses: [],
     };
-    const placesService = { getPlaces: jest.fn().mockResolvedValue([samplePlace]) } as unknown as PlacesService;
+    const placesService = { getPlaces: jest.fn().mockResolvedValue({ results: [samplePlace], totalCount: 1 }) } as unknown as PlacesService;
     const controller = new PlacesController(placesService, {} as BuildingsService);
     controller['enrichmentAdapter'] = {
       fetchEnrichmentByIds: async () => ({ '1': { foo: 'bar' } }),
@@ -22,6 +22,6 @@ describe('PlacesController enrichment merge', () => {
     };
     const query: any = { lat: 0, lng: 0, enrichment_fields: ['foo'] };
     const result: any = await controller.getPlaces(query, {} as any);
-    expect(result[0].enrichment.fields.foo).toBe('bar');
+    expect(result.results[0].enrichment.fields.foo).toBe('bar');
   });
 });
