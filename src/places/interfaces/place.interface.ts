@@ -9,6 +9,9 @@ export interface Place {
     sources: Source[];
     names: Names;
     categories: Categories;
+    basic_category?: string;
+    taxonomy?: Taxonomy;
+    operating_status?: string;
     confidence: number;
     websites?: string[];
     socials?: string[];
@@ -36,6 +39,7 @@ export interface PlaceWithBuilding extends Place {
     record_id: string;
     update_time: string;
     confidence?: number;
+    license?: string;
   }
   
   export interface Names {
@@ -47,6 +51,14 @@ export interface PlaceWithBuilding extends Place {
   export interface Categories {
     primary: string;
     alternate?: string[];
+  }
+
+  // Overture places taxonomy (schema v1.15+). Replaces `categories` upstream
+  // from the September 2026 release; both are exposed here for compatibility.
+  export interface Taxonomy {
+    primary?: string;
+    hierarchy?: string[];
+    alternates?: string[];
   }
   
   export interface Brand {

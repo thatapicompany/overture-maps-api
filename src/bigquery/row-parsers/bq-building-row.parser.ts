@@ -20,6 +20,7 @@ export const  parseBuildingRow = (row: any): Building => {
         record_id: source.element.record_id,
         update_time: source.element.update_time,
         confidence: source.element.confidence ? parseFloat(source.element.confidence) : null,
+        license: source.element.license ?? undefined,
       })),
 
       subtype: row.subtype,
@@ -42,8 +43,9 @@ export const  parseBuildingRow = (row: any): Building => {
       roof_color: row.roof_color,
       roof_height: row.roof_height,
       ext_distance: parseFloat(row.ext_distance),
-      theme: row.theme,
-      type: row.type,
+      // The BigQuery mirror has no theme/type columns; these are constants for this table.
+      theme: 'buildings',
+      type: 'building',
 
 
     }

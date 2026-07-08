@@ -16,6 +16,12 @@ export interface DivisionArea {
     type: string;
     subtype: string;
     class?: string;
+    /** Position of the division in its country's hierarchy, e.g. 0, 1, 2 (Overture schema v1.16+). */
+    admin_level?: number;
+    is_land?: boolean;
+    is_territorial?: boolean;
+    /** ID of the `division` feature this area belongs to. */
+    division_id?: string;
     primary_name?: string;
     names?: DivisionNames;
     country?: string;
