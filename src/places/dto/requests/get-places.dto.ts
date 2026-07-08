@@ -82,13 +82,30 @@ export class GetPlacesDto extends GetByLocationDto {
   min_confidence?: number = 0.5;
 
   @ApiPropertyOptional({
-    description: 'Array of category names, provided as a comma-separated string.',
+    description: 'Array of category names, provided as a comma-separated string. Matches the legacy Overture categories vocabulary and the newer taxonomy/basic_category vocabulary.',
     example: 'food,retail',
     type: String
   })
   @IsOptional()
   @Transform((params) => String(params.value).split(',').map(String))
   categories?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Array of Overture taxonomy categories, provided as a comma-separated string. Matches the primary category or any ancestor in the taxonomy hierarchy, so e.g. "food_and_drink" matches every descendant category.',
+    example: 'food_and_drink',
+    type: String
+  })
+  @IsOptional()
+  @Transform((params) => String(params.value).split(',').map((s) => s.trim()).filter(Boolean))
+  taxonomy?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Filter by operating status, e.g. "open" or "permanently_closed". Places without signals have a null operating status and are excluded when this filter is used.',
+    example: 'open',
+  })
+  @IsOptional()
+  @IsString()
+  operating_status?: string;
 
   @ApiPropertyOptional({
     description: 'Comma-separated list of enrichment fields to include.',

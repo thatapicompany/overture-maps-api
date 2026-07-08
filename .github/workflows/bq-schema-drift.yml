@@ -1,0 +1,40 @@
+name: Check Overture BigQuery Schema Drift
+
+# The API reads Google's bigquery-public-data.overture_maps mirror with no
+# pinned Overture release, so upstream schema changes arrive silently.
+# Overture releases monthly (mid-month); this weekly check fails loudly when
+# the mirror's columns differ from etl/bq-schema-snapshot.json — most
+# importantly the September 2026 removal of the places `categories` column.
+# Metadata-only (tables.get): no BigQuery query cost.
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+  schedule:
+    - cron: '0 5 * * 4' # Thursdays 05:00 UTC
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: npm install
+        run: npm ci
+
+      - name: create credentials file
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}' > gcp-credentials.json
+
+      - name: Check for schema drift
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ./gcp-credentials.json
+          BIGQUERY_PROJECT_ID: ${{ secrets.BIGQUERY_PROJECT_ID }}
+        run: npm run etl:check-bq-schema-drift

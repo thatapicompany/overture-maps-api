@@ -23,6 +23,7 @@ export const parseBaseRow = (row: any): BaseFeature => {
             property: source.element.property,
             dataset: source.element.dataset,
             record_id: source.element.record_id,
+            license: source.element.license ?? undefined,
         })) : [],
         theme: 'base',
         type: row.subtype === 'water' || row.subtype === 'wetland' ? 'water' : 'land',

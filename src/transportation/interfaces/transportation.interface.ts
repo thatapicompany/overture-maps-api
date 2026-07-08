@@ -7,6 +7,8 @@ export interface TransportationSegment {
     version: number;
     update_time?: string;
     sources: any[];
+    theme?: string;
+    type?: string;
     subtype?: string;
     class?: string;
     subclass?: string;

@@ -47,6 +47,16 @@ export class GetDivisionsQuery extends GetByLocationDto {
     subtype?: string[];
 
     @ApiPropertyOptional({
+        description: 'Filter by admin_level — the division\'s position in its country\'s hierarchy (0 = country). Provided as a comma-separated list (e.g. "1,2").',
+        example: '2',
+        type: String,
+    })
+    @IsOptional()
+    @Transform(({ value }) => String(value).split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !Number.isNaN(n)))
+    @IsNumber({}, { each: true, message: 'admin_level must be a comma-separated list of integers' })
+    admin_level?: number[];
+
+    @ApiPropertyOptional({
         description: 'Bounding box filter as "xmin,ymin,xmax,ymax" (lng/lat order). Returns divisions whose bounding box intersects it.',
         example: '-74.3,40.5,-73.7,40.9',
         type: String,

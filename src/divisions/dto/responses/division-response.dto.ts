@@ -28,6 +28,14 @@ export class DivisionPropertiesDto {
     country?: string;
     @ApiPropertyOptional({ description: 'ISO 3166-2 region code', example: 'GB-WSM' })
     region?: string;
+    @ApiPropertyOptional({ description: 'Position of the division in its country\'s hierarchy, e.g. 0 (country), 1, 2.', example: 2 })
+    admin_level?: number;
+    @ApiPropertyOptional({ description: 'Whether the area represents land (vs maritime).', example: true })
+    is_land?: boolean;
+    @ApiPropertyOptional({ description: 'Whether the area includes territorial waters.', example: false })
+    is_territorial?: boolean;
+    @ApiPropertyOptional({ description: 'ID of the division feature this area belongs to.' })
+    division_id?: string;
 }
 
 export class DivisionDto {

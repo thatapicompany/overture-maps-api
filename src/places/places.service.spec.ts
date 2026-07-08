@@ -217,7 +217,10 @@ describe('PlacesService', () => {
       query.country,
       query.categories,
       query.min_confidence,
-      query.limit
+      query.limit,
+      undefined, // source (applied post-query)
+      undefined, // operating_status
+      undefined  // taxonomy
     );
     
     expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), mockBigQueryGetPlacesNearbyResponse, CACHE_TTL_SECONDS);
