@@ -17,7 +17,7 @@ export class DivisionsService {
     ) { }
 
     async getDivisions(query: GetDivisionsQuery): Promise<DivisionArea[]> {
-        const { lat, lng, radius, limit, country, name, subtype, bbox } = query;
+        const { lat, lng, radius, limit, country, name, subtype, admin_level, bbox } = query;
         const includeGeometry = query.resolveIncludeGeometry();
 
         const hasPoint = lat !== undefined && lng !== undefined
@@ -26,13 +26,16 @@ export class DivisionsService {
         // Metadata-only searches are served from the in-memory index when it is
         // loaded: milliseconds and no BigQuery scan. Point queries stay on
         // BigQuery for exact distance filtering/ordering, and anything needing
-        // geometry has to go there too.
-        if (!includeGeometry && !hasPoint && this.searchIndex.isReady()) {
-            return this.searchIndex.search({ name, country, subtypes: subtype, bbox, limit });
+        // geometry has to go there too. admin_level filters also need BigQuery
+        // until the index artifact has been rebuilt with admin_level data.
+        const indexCanServe = this.searchIndex.isReady()
+            && (!admin_level || admin_level.length === 0 || this.searchIndex.hasAdminLevels());
+        if (!includeGeometry && !hasPoint && indexCanServe) {
+            return this.searchIndex.search({ name, country, subtypes: subtype, adminLevels: admin_level, bbox, limit });
         }
 
         const cacheKey = buildCacheKey('get-divisions', {
-            lat, lng, radius, limit, country, name, subtype,
+            lat, lng, radius, limit, country, name, subtype, admin_level,
             // joined so buildCacheKey's array sort can't conflate different boxes
             bbox: bbox?.join(','),
             include_geometry: includeGeometry,
@@ -49,6 +52,7 @@ export class DivisionsService {
                 country,
                 name,
                 subtypes: subtype,
+                adminLevels: admin_level,
                 bbox,
                 includeGeometry,
             });

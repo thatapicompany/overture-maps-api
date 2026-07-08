@@ -25,6 +25,9 @@ export class SourceDto {
 
   @ApiProperty({ description: 'Unique identifier for the record in the dataset.', example: 'osm12345' })
   record_id: string;
+
+  @ApiPropertyOptional({ description: 'License of the source data.', example: 'CDLA-Permissive-2.0' })
+  license?: string;
 }
 
 export class PlaceNamesDto {
@@ -55,10 +58,30 @@ export class AddressDto {
 }
 
 
+export class TaxonomyDto {
+  @ApiPropertyOptional({ description: 'Primary taxonomy category of the place.', example: 'accountant' })
+  primary?: string;
+
+  @ApiPropertyOptional({ description: 'Full taxonomy hierarchy path from the top-level category to the primary category.', type: [String], example: ['services_and_business', 'financial_service', 'accountant'] })
+  hierarchy?: string[];
+
+  @ApiPropertyOptional({ description: 'Alternate taxonomy categories for the place.', type: [String] })
+  alternates?: string[];
+}
+
 export class PlacePropertiesDto {
 
   @ApiProperty({ description: 'Primary category of the place.', type: () => CategoryDto })
   categories: CategoryDto;
+
+  @ApiPropertyOptional({ description: 'Basic category of the place from the Overture taxonomy (schema v1.15+).', example: 'financial_service' })
+  basic_category?: string;
+
+  @ApiPropertyOptional({ description: 'Overture places taxonomy classification (schema v1.15+). Replaces `categories` upstream from September 2026; both are provided here.', type: () => TaxonomyDto })
+  taxonomy?: TaxonomyDto;
+
+  @ApiPropertyOptional({ description: 'Operating status of the place, e.g. "open" or "permanently_closed". Null when no signals are present.', example: 'open' })
+  operating_status?: string;
 
   @ApiPropertyOptional({ description: 'Confidence score of the place.', example: 0.8 })
   confidence?: number;

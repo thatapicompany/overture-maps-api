@@ -30,6 +30,11 @@ const MAX_LIMIT = 100000;
 // replace this with your own dataset if you have optimised ot to only include the country you are interested in
 const SOURCE_DATASET = "bigquery-public-data.overture_maps"
 
+// How long to trust a cached place-table column list. Overture releases monthly
+// and Google re-mirrors shortly after, so a few hours is plenty to pick up the
+// September 2026 `categories` column removal without a redeploy.
+const PLACE_COLUMNS_TTL_MS = 6 * 60 * 60 * 1000;
+
 @Injectable()
 export class BigQueryService {
   private bigQueryClient: BigQuery;
@@ -47,6 +52,59 @@ export class BigQueryService {
     }
 
     this.bigQueryClient = new BigQuery(config);
+  }
+
+  private placeColumnsCache: { columns: Set<string>; fetchedAt: number } | null = null;
+
+  /**
+   * Column names of the source `place` table, from table metadata (a free API
+   * call, no query cost). Lets query builders adapt to upstream schema changes
+   * — most immediately the September 2026 removal of `categories` — instead of
+   * throwing SQL errors when a column disappears. On metadata failure the last
+   * known set is reused, falling back to the pre-taxonomy schema.
+   */
+  async getPlaceColumns(): Promise<Set<string>> {
+    const now = Date.now();
+    if (this.placeColumnsCache && now - this.placeColumnsCache.fetchedAt < PLACE_COLUMNS_TTL_MS) {
+      return this.placeColumnsCache.columns;
+    }
+    try {
+      const [projectId, datasetId] = SOURCE_DATASET.split('.');
+      const [metadata] = await this.bigQueryClient
+        .dataset(datasetId, { projectId })
+        .table('place')
+        .getMetadata();
+      const columns = new Set<string>(metadata.schema.fields.map((f: any) => f.name));
+      this.placeColumnsCache = { columns, fetchedAt: now };
+      return columns;
+    } catch (error) {
+      this.logger.warn(`Could not fetch place table metadata: ${error.message}`);
+      if (this.placeColumnsCache) return this.placeColumnsCache.columns;
+      // Assume the long-standing schema (categories present) if we've never seen metadata.
+      return new Set(['categories']);
+    }
+  }
+
+  /**
+   * SQL for the `categories` query filter. Matches the legacy `categories`
+   * column (while it still exists upstream) and the v1.15+ `taxonomy` /
+   * `basic_category` vocabulary, so client filter values from either
+   * generation keep working before, during and after the September 2026
+   * upstream removal of `categories`.
+   */
+  private categoryFilterSql(hasCategoriesColumn: boolean, prefix = ''): string {
+    const legacy = `${prefix}categories.primary IN UNNEST(@categories)`;
+    const taxonomy = `${prefix}taxonomy.primary IN UNNEST(@categories) OR ${prefix}basic_category IN UNNEST(@categories)`;
+    return hasCategoriesColumn ? `(${legacy} OR ${taxonomy})` : `(${taxonomy})`;
+  }
+
+  /**
+   * SQL for the `taxonomy` query filter: matches the primary taxonomy category
+   * or any ancestor in the hierarchy, so e.g. `food_and_drink` matches every
+   * descendant category.
+   */
+  private taxonomyFilterSql(prefix = ''): string {
+    return `(${prefix}taxonomy.primary IN UNNEST(@taxonomy) OR EXISTS(SELECT 1 FROM UNNEST(${prefix}taxonomy.hierarchy.list) AS th WHERE th.element IN UNNEST(@taxonomy)))`;
   }
 
 
@@ -68,7 +126,8 @@ export class BigQueryService {
     `;
 
     const params: any = {};
-    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata, params });
+    const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
+    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata, hasCategoriesColumn, params });
     if (whereClauses.length > 0) {
       query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
@@ -133,14 +192,18 @@ export class BigQueryService {
     radius: number = 1000
   ): Promise<{ primary: string; counts: { places: number } }[]> {
 
-
+    // Prefer the legacy `categories` vocabulary while the column exists so the
+    // response is unchanged for existing clients; once Overture removes it
+    // (September 2026), serve the same response shape from `taxonomy`.
+    const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
+    const categoryColumn = hasCategoriesColumn ? 'categories.primary' : 'taxonomy.primary';
 
     let query = `-- Overture Maps API: Get categories
-      SELECT DISTINCT categories.primary AS category_primary,
+      SELECT DISTINCT ${categoryColumn} AS category_primary,
       count(1) as count_places,
       count(distinct brand.names.primary) as count_brands
       FROM \`${SOURCE_DATASET}.place\`
-      WHERE categories.primary IS NOT NULL
+      WHERE ${categoryColumn} IS NOT NULL
     `;
 
     const params: any = {};
@@ -174,12 +237,15 @@ export class BigQueryService {
     categories?: string[],
     min_confidence?: number,
     limit?: number,
-    match_nearest_building: boolean = true
+    match_nearest_building: boolean = true,
+    operating_status?: string,
+    taxonomy?: string[]
   ): Promise<PlaceWithBuilding[]> {
 
     // Build the query
     let queryParts: string[] = [];
     const params: any = {};
+    const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
 
     queryParts.push(`
     -- Overture Maps API: Get Places with Buildings
@@ -213,8 +279,18 @@ export class BigQueryService {
     }
 
     if (categories && categories.length > 0) {
-      whereClauses.push(`p.categories.primary IN UNNEST(@categories)`);
+      whereClauses.push(this.categoryFilterSql(hasCategoriesColumn, 'p.'));
       params.categories = categories;
+    }
+
+    if (taxonomy && taxonomy.length > 0) {
+      whereClauses.push(this.taxonomyFilterSql('p.'));
+      params.taxonomy = taxonomy;
+    }
+
+    if (operating_status) {
+      whereClauses.push(`p.operating_status = @operating_status`);
+      params.operating_status = operating_status;
     }
 
     if (min_confidence !== undefined) {
@@ -321,11 +397,14 @@ export class BigQueryService {
     categories?: string[],
     min_confidence?: number,
     limit?: number,
-    source?: string
+    source?: string,
+    operating_status?: string,
+    taxonomy?: string[]
   ): Promise<Place[]> {
 
     let queryParts: string[] = [];
     const params: any = {};
+    const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
 
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
@@ -362,8 +441,18 @@ export class BigQueryService {
     }
 
     if (categories && categories.length > 0) {
-      whereClauses.push(`categories.primary IN UNNEST(@categories)`);
+      whereClauses.push(this.categoryFilterSql(hasCategoriesColumn));
       params.categories = categories;
+    }
+
+    if (taxonomy && taxonomy.length > 0) {
+      whereClauses.push(this.taxonomyFilterSql());
+      params.taxonomy = taxonomy;
+    }
+
+    if (operating_status) {
+      whereClauses.push(`operating_status = @operating_status`);
+      params.operating_status = operating_status;
     }
 
     if (min_confidence) {
@@ -640,12 +729,13 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     country?: string;
     name?: string;
     subtypes?: string[];
+    adminLevels?: number[];
     bbox?: number[]; // [xmin, ymin, xmax, ymax]
     limit?: number;
     includeGeometry?: boolean;
   }): Promise<DivisionArea[]> {
 
-    const { latitude, longitude, radius = 1000, country, name, subtypes, bbox, limit, includeGeometry = true } = options;
+    const { latitude, longitude, radius = 1000, country, name, subtypes, adminLevels, bbox, limit, includeGeometry = true } = options;
 
     const hasPoint = latitude !== undefined && longitude !== undefined
       && !Number.isNaN(latitude) && !Number.isNaN(longitude);
@@ -677,6 +767,10 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     if (subtypes && subtypes.length > 0) {
       whereClauses.push(`s.subtype IN UNNEST(@subtypes)`);
       params.subtypes = subtypes;
+    }
+    if (adminLevels && adminLevels.length > 0) {
+      whereClauses.push(`s.admin_level IN UNNEST(@admin_levels)`);
+      params.admin_levels = adminLevels;
     }
     if (bbox && bbox.length === 4) {
       // Intersection test against the precomputed bbox columns — far cheaper
@@ -742,6 +836,7 @@ LIMIT 1;`;
     categories,
     min_confidence,
     require_wikidata,
+    hasCategoriesColumn = true,
     params
   }: {
     country?: string;
@@ -753,6 +848,7 @@ LIMIT 1;`;
     categories?: string[];
     min_confidence?: number;
     require_wikidata?: boolean;
+    hasCategoriesColumn?: boolean;
     params: any;
   }): string[] {
     const whereClauses: string[] = [];
@@ -776,7 +872,7 @@ LIMIT 1;`;
       params.brand_name = brand_name;
     }
     if (categories && categories.length > 0) {
-      whereClauses.push(`categories.primary IN UNNEST(@categories)`);
+      whereClauses.push(this.categoryFilterSql(hasCategoriesColumn));
       params.categories = categories;
     }
     if (min_confidence !== undefined) {

@@ -33,6 +33,10 @@ SELECT
   region,
   subtype,
   class,
+  admin_level,
+  is_land,
+  is_territorial,
+  division_id,
   [bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax] AS bbox
 FROM \`bigquery-public-data.overture_maps.division_area\`
 `;
@@ -60,6 +64,10 @@ async function main() {
         if (row.region) slim.region = row.region;
         if (row.subtype) slim.subtype = row.subtype;
         if (row.class) slim.class = row.class;
+        if (row.admin_level !== null && row.admin_level !== undefined) slim.admin_level = row.admin_level;
+        if (row.is_land !== null && row.is_land !== undefined) slim.is_land = row.is_land;
+        if (row.is_territorial !== null && row.is_territorial !== undefined) slim.is_territorial = row.is_territorial;
+        if (row.division_id) slim.division_id = row.division_id;
         if (row.bbox && row.bbox[0] !== null) slim.bbox = row.bbox;
         lines.push(JSON.stringify(slim));
         if (lines.length % 100000 === 0) console.log(`  ${lines.length} rows...`);

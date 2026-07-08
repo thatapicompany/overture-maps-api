@@ -12,11 +12,12 @@ export const parseAddressRow = (row: any): Address => {
             ymax: parseFloat(row.bbox.ymax),
         } : undefined,
         version: row.version,
-        update_time: row.update_time,
         sources: row.sources?.list ? row.sources.list.map((source: any) => ({
             property: source.element.property,
             dataset: source.element.dataset,
             record_id: source.element.record_id,
+            update_time: source.element.update_time ?? undefined,
+            license: source.element.license ?? undefined,
         })) : [],
         country: row.country,
         postcode: row.postcode,
