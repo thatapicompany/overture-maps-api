@@ -21,8 +21,10 @@ export const parseTransportationRow = (row: any): TransportationSegment => {
             ymax: parseFloat(row.bbox.ymax),
         } : undefined,
         version: row.version,
-        update_time: row.update_time,
         sources: unpackList(row.sources) || [],
+        // The BigQuery mirror has no theme/type columns; these are constants for this table.
+        theme: 'transportation',
+        type: 'segment',
         subtype: row.subtype,
         class: row.class,
         subclass: row.subclass,

@@ -1,0 +1,2681 @@
+{
+  "place": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "categories",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "alternate",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confidence",
+      "type": "FLOAT"
+    },
+    {
+      "name": "websites",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "emails",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "socials",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "phones",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "brand",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "wikidata",
+          "type": "STRING"
+        },
+        {
+          "name": "names",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "primary",
+              "type": "STRING"
+            },
+            {
+              "name": "common",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "key_value",
+                  "type": "RECORD",
+                  "mode": "REPEATED",
+                  "fields": [
+                    {
+                      "name": "key",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "rules",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "list",
+                  "type": "RECORD",
+                  "mode": "REPEATED",
+                  "fields": [
+                    {
+                      "name": "element",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "variant",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "language",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "perspectives",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "mode",
+                              "type": "STRING"
+                            },
+                            {
+                              "name": "countries",
+                              "type": "RECORD",
+                              "fields": [
+                                {
+                                  "name": "list",
+                                  "type": "RECORD",
+                                  "mode": "REPEATED",
+                                  "fields": [
+                                    {
+                                      "name": "element",
+                                      "type": "STRING"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "name": "value",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "between",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "FLOAT"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "name": "side",
+                          "type": "STRING"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "addresses",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "freeform",
+                  "type": "STRING"
+                },
+                {
+                  "name": "locality",
+                  "type": "STRING"
+                },
+                {
+                  "name": "postcode",
+                  "type": "STRING"
+                },
+                {
+                  "name": "region",
+                  "type": "STRING"
+                },
+                {
+                  "name": "country",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "names",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "common",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "key_value",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "key",
+                  "type": "STRING"
+                },
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rules",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "variant",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "language",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "perspectives",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "mode",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "countries",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "between",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "FLOAT"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "side",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "operating_status",
+      "type": "STRING"
+    },
+    {
+      "name": "basic_category",
+      "type": "STRING"
+    },
+    {
+      "name": "taxonomy",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "hierarchy",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "alternates",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "building": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "names",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "common",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "key_value",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "key",
+                  "type": "STRING"
+                },
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rules",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "variant",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "language",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "perspectives",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "mode",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "countries",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "between",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "FLOAT"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "side",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "level",
+      "type": "INTEGER"
+    },
+    {
+      "name": "height",
+      "type": "FLOAT"
+    },
+    {
+      "name": "min_height",
+      "type": "FLOAT"
+    },
+    {
+      "name": "is_underground",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "num_floors",
+      "type": "INTEGER"
+    },
+    {
+      "name": "num_floors_underground",
+      "type": "INTEGER"
+    },
+    {
+      "name": "min_floor",
+      "type": "INTEGER"
+    },
+    {
+      "name": "subtype",
+      "type": "STRING"
+    },
+    {
+      "name": "class",
+      "type": "STRING"
+    },
+    {
+      "name": "facade_color",
+      "type": "STRING"
+    },
+    {
+      "name": "facade_material",
+      "type": "STRING"
+    },
+    {
+      "name": "roof_material",
+      "type": "STRING"
+    },
+    {
+      "name": "roof_shape",
+      "type": "STRING"
+    },
+    {
+      "name": "roof_direction",
+      "type": "FLOAT"
+    },
+    {
+      "name": "roof_orientation",
+      "type": "STRING"
+    },
+    {
+      "name": "roof_color",
+      "type": "STRING"
+    },
+    {
+      "name": "roof_height",
+      "type": "FLOAT"
+    },
+    {
+      "name": "has_parts",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "address": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "street",
+      "type": "STRING"
+    },
+    {
+      "name": "number",
+      "type": "STRING"
+    },
+    {
+      "name": "unit",
+      "type": "STRING"
+    },
+    {
+      "name": "postcode",
+      "type": "STRING"
+    },
+    {
+      "name": "postal_city",
+      "type": "STRING"
+    },
+    {
+      "name": "address_levels",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "country",
+      "type": "STRING"
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "land_use": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "names",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "common",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "key_value",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "key",
+                  "type": "STRING"
+                },
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rules",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "variant",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "language",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "perspectives",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "mode",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "countries",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "between",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "FLOAT"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "side",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "level",
+      "type": "INTEGER"
+    },
+    {
+      "name": "wikidata",
+      "type": "STRING"
+    },
+    {
+      "name": "source_tags",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "key_value",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "key",
+              "type": "STRING"
+            },
+            {
+              "name": "value",
+              "type": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "subtype",
+      "type": "STRING"
+    },
+    {
+      "name": "class",
+      "type": "STRING"
+    },
+    {
+      "name": "elevation",
+      "type": "INTEGER"
+    },
+    {
+      "name": "surface",
+      "type": "STRING"
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "land_cover": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "subtype",
+      "type": "STRING"
+    },
+    {
+      "name": "cartography",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "prominence",
+          "type": "INTEGER"
+        },
+        {
+          "name": "min_zoom",
+          "type": "INTEGER"
+        },
+        {
+          "name": "max_zoom",
+          "type": "INTEGER"
+        },
+        {
+          "name": "sort_key",
+          "type": "INTEGER"
+        }
+      ]
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "segment": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "names",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "common",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "key_value",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "key",
+                  "type": "STRING"
+                },
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rules",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "variant",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "language",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "perspectives",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "mode",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "countries",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "between",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "FLOAT"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "side",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "subtype",
+      "type": "STRING"
+    },
+    {
+      "name": "class",
+      "type": "STRING"
+    },
+    {
+      "name": "subclass",
+      "type": "STRING"
+    },
+    {
+      "name": "subclass_rules",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "value",
+                  "type": "STRING"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "connectors",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "connector_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "at",
+                  "type": "FLOAT"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "road_surface",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "value",
+                  "type": "STRING"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "road_flags",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "values",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "STRING"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rail_flags",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "values",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "STRING"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "width_rules",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "value",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "level_rules",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "value",
+                  "type": "INTEGER"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "access_restrictions",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "access_type",
+                  "type": "STRING"
+                },
+                {
+                  "name": "when",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "during",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "heading",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "using",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "recognized",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "mode",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "vehicle",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "RECORD",
+                              "fields": [
+                                {
+                                  "name": "dimension",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "comparison",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "value",
+                                  "type": "FLOAT"
+                                },
+                                {
+                                  "name": "unit",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "speed_limits",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "min_speed",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "type": "INTEGER"
+                    },
+                    {
+                      "name": "unit",
+                      "type": "STRING"
+                    }
+                  ]
+                },
+                {
+                  "name": "max_speed",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "type": "INTEGER"
+                    },
+                    {
+                      "name": "unit",
+                      "type": "STRING"
+                    }
+                  ]
+                },
+                {
+                  "name": "is_max_speed_variable",
+                  "type": "BOOLEAN"
+                },
+                {
+                  "name": "when",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "during",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "heading",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "using",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "recognized",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "mode",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "vehicle",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "RECORD",
+                              "fields": [
+                                {
+                                  "name": "dimension",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "comparison",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "value",
+                                  "type": "FLOAT"
+                                },
+                                {
+                                  "name": "unit",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prohibited_transitions",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "sequence",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "connector_id",
+                              "type": "STRING"
+                            },
+                            {
+                              "name": "segment_id",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "final_heading",
+                  "type": "STRING"
+                },
+                {
+                  "name": "when",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "heading",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "during",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "using",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "recognized",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "mode",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "vehicle",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "RECORD",
+                              "fields": [
+                                {
+                                  "name": "dimension",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "comparison",
+                                  "type": "STRING"
+                                },
+                                {
+                                  "name": "value",
+                                  "type": "FLOAT"
+                                },
+                                {
+                                  "name": "unit",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "routes",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "name",
+                  "type": "STRING"
+                },
+                {
+                  "name": "network",
+                  "type": "STRING"
+                },
+                {
+                  "name": "ref",
+                  "type": "STRING"
+                },
+                {
+                  "name": "symbol",
+                  "type": "STRING"
+                },
+                {
+                  "name": "wikidata",
+                  "type": "STRING"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "destinations",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "labels",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "value",
+                              "type": "STRING"
+                            },
+                            {
+                              "name": "type",
+                              "type": "STRING"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "symbols",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "STRING"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "from_connector_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "to_segment_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "to_connector_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "when",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "heading",
+                      "type": "STRING"
+                    }
+                  ]
+                },
+                {
+                  "name": "final_heading",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ],
+  "division_area": [
+    {
+      "name": "id",
+      "type": "STRING"
+    },
+    {
+      "name": "country",
+      "type": "STRING"
+    },
+    {
+      "name": "sources",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "list",
+          "type": "RECORD",
+          "mode": "REPEATED",
+          "fields": [
+            {
+              "name": "element",
+              "type": "RECORD",
+              "fields": [
+                {
+                  "name": "property",
+                  "type": "STRING"
+                },
+                {
+                  "name": "dataset",
+                  "type": "STRING"
+                },
+                {
+                  "name": "license",
+                  "type": "STRING"
+                },
+                {
+                  "name": "record_id",
+                  "type": "STRING"
+                },
+                {
+                  "name": "update_time",
+                  "type": "STRING"
+                },
+                {
+                  "name": "confidence",
+                  "type": "FLOAT"
+                },
+                {
+                  "name": "between",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "list",
+                      "type": "RECORD",
+                      "mode": "REPEATED",
+                      "fields": [
+                        {
+                          "name": "element",
+                          "type": "FLOAT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "subtype",
+      "type": "STRING"
+    },
+    {
+      "name": "admin_level",
+      "type": "INTEGER"
+    },
+    {
+      "name": "class",
+      "type": "STRING"
+    },
+    {
+      "name": "names",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "primary",
+          "type": "STRING"
+        },
+        {
+          "name": "common",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "key_value",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "key",
+                  "type": "STRING"
+                },
+                {
+                  "name": "value",
+                  "type": "STRING"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rules",
+          "type": "RECORD",
+          "fields": [
+            {
+              "name": "list",
+              "type": "RECORD",
+              "mode": "REPEATED",
+              "fields": [
+                {
+                  "name": "element",
+                  "type": "RECORD",
+                  "fields": [
+                    {
+                      "name": "variant",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "language",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "perspectives",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "mode",
+                          "type": "STRING"
+                        },
+                        {
+                          "name": "countries",
+                          "type": "RECORD",
+                          "fields": [
+                            {
+                              "name": "list",
+                              "type": "RECORD",
+                              "mode": "REPEATED",
+                              "fields": [
+                                {
+                                  "name": "element",
+                                  "type": "STRING"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "value",
+                      "type": "STRING"
+                    },
+                    {
+                      "name": "between",
+                      "type": "RECORD",
+                      "fields": [
+                        {
+                          "name": "list",
+                          "type": "RECORD",
+                          "mode": "REPEATED",
+                          "fields": [
+                            {
+                              "name": "element",
+                              "type": "FLOAT"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "name": "side",
+                      "type": "STRING"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "is_land",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "is_territorial",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "region",
+      "type": "STRING"
+    },
+    {
+      "name": "division_id",
+      "type": "STRING"
+    },
+    {
+      "name": "version",
+      "type": "INTEGER"
+    },
+    {
+      "name": "bbox",
+      "type": "RECORD",
+      "fields": [
+        {
+          "name": "xmin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "xmax",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymin",
+          "type": "FLOAT"
+        },
+        {
+          "name": "ymax",
+          "type": "FLOAT"
+        }
+      ]
+    },
+    {
+      "name": "geometry",
+      "type": "GEOGRAPHY"
+    }
+  ]
+}
