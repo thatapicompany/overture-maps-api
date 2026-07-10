@@ -21,7 +21,8 @@
     "test:live": "bash -c 'if [ -f .env.test ]; then export $(grep -v \"^#\" .env.test | xargs); fi; export DEMO_API_KEY=$TEST_API_KEY; NODE_ENV=test npx jest --config ./test/jest-e2e.json test/post-release-live.e2e-spec.ts'",
     "test:post-release-live": "bash -c 'export TEST_API_KEY=$TEST_API_KEY; npx jest --config ./test/jest-e2e.json test/post-release-live.e2e-spec.ts'",
     "etl:divisions-search-index": "ts-node etl/build-divisions-search-index.ts",
-    "etl:check-bq-schema-drift": "ts-node etl/check-bq-schema-drift.ts"
+    "etl:check-bq-schema-drift": "ts-node etl/check-bq-schema-drift.ts",
+    "etl:brands-enrichment": "ts-node etl/build-brands-enrichment.ts"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.1",

@@ -7,6 +7,7 @@ import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../cache/cache.service';
 import { buildCacheKey, CACHE_TTL_SECONDS } from '../cache/cache-key.util';
+import { BrandsEnrichmentService } from './brands-enrichment.service';
 
 // Mirrors the data-affecting params the service keys on (excludes presentation params).
 const placesKey = (q: GetPlacesDto) =>
@@ -149,6 +150,10 @@ describe('PlacesService', () => {
         {
           provide: CacheService,
           useValue: { get: mockCacheGet, set: mockCacheSet, del: jest.fn() },
+        },
+        {
+          provide: BrandsEnrichmentService,
+          useValue: { isReady: () => false, get: () => undefined },
         },
         {
           provide: Logger,
