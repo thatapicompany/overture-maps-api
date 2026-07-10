@@ -190,12 +190,15 @@ describe('PlacesService', () => {
 
     expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
     expect(mockBigQueryGetPlacesNearby).not.toHaveBeenCalled();
-    expect(result).toEqual(mockPlaceResponseDto);
+    // Pre-pagination cache entries (plain arrays) are wrapped transparently
+    expect(result.results).toEqual(mockPlaceResponseDto);
+    expect(result.totalCount).toBe(mockPlaceResponseDto.length);
   });
 
   it('should query BigQuery and cache results if cache is empty', async () => {
     mockCacheGet.mockResolvedValueOnce(null);
-    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(mockBigQueryGetPlacesNearbyResponse);
+    const paginatedResponse = { results: mockBigQueryGetPlacesNearbyResponse, totalCount: mockBigQueryGetPlacesNearbyResponse.length };
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(paginatedResponse);
     mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
@@ -225,11 +228,13 @@ describe('PlacesService', () => {
       query.limit,
       undefined, // source (applied post-query)
       undefined, // operating_status
-      undefined  // taxonomy
+      undefined, // taxonomy
+      0          // page
     );
-    
-    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), mockBigQueryGetPlacesNearbyResponse, CACHE_TTL_SECONDS);
-    expect(result).toEqual(mockPlaceResponseDto);
+
+    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);
+    expect(result.results).toEqual(mockPlaceResponseDto);
+    expect(result.totalCount).toBe(1);
   });
 
   it('should filter places by source dataset if source is provided', async () => {
@@ -250,7 +255,7 @@ describe('PlacesService', () => {
         ],
       },
     ];
-    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(response);
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce({ results: response, totalCount: response.length });
     mockCacheSet.mockResolvedValueOnce(undefined);
 
     const query: GetPlacesDto = {
@@ -267,8 +272,10 @@ describe('PlacesService', () => {
     };
 
     const result = await service.getPlaces(query);
-    expect(result.length).toBe(1);
-    expect(result[0].sources[0].dataset).toBe('meta');
+    expect(result.results.length).toBe(1);
+    expect(result.results[0].sources[0].dataset).toBe('meta');
+    // Source is a post-query filter: totalCount stays the query-wide total
+    expect(result.totalCount).toBe(2);
   });
 
 });

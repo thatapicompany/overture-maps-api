@@ -27,15 +27,13 @@ export class DivisionsController {
     @CountHeader()
     async getDivisions(@Query() query: GetDivisionsQuery): Promise<DivisionDto[] | any> {
 
-        const divisions = await this.divisionsService.getDivisions(query);
+        const { results, totalCount } = await this.divisionsService.getDivisions(query);
 
-        const dtoResults = divisions.map((division: any) => toDivisionDto(division, query));
+        const dtoResults = results.map((division: any) => toDivisionDto(division, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        // The PaginationInterceptor unwraps this envelope: clients receive the
+        // same array/GeoJSON body as always, with Pagination-* headers added.
+        return { results: dtoResults, totalCount, page: query.page ?? 0, limit: query.limit };
     }
 
     @Get(':id')

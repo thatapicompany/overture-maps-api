@@ -27,15 +27,13 @@ export class BaseController {
     @CountHeader()
     async getBaseFeatures(@Query() query: GetBaseQuery): Promise<BaseDto[] | any> {
 
-        const baseFeatures = await this.baseService.getBaseFeatures(query);
+        const { results, totalCount } = await this.baseService.getBaseFeatures(query);
 
-        const dtoResults = baseFeatures.map((feature: any) => toBaseDto(feature, query));
+        const dtoResults = results.map((feature: any) => toBaseDto(feature, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        // The PaginationInterceptor unwraps this envelope: clients receive the
+        // same array/GeoJSON body as always, with Pagination-* headers added.
+        return { results: dtoResults, totalCount, page: query.page ?? 0, limit: query.limit };
     }
 
 }
