@@ -107,6 +107,30 @@ export class BigQueryService {
     return `(${prefix}taxonomy.primary IN UNNEST(@taxonomy) OR EXISTS(SELECT 1 FROM UNNEST(${prefix}taxonomy.hierarchy.list) AS th WHERE th.element IN UNNEST(@taxonomy)))`;
   }
 
+  /**
+   * Appends LIMIT/OFFSET for pagination. Used together with a
+   * `COUNT(*) OVER() AS total_count` window aggregate in the SELECT list so a
+   * single query returns both the requested page and the total number of
+   * matching rows (no separate COUNT query, no extra scan).
+   */
+  private applyPagination(queryParts: string[], params: any, limit?: number, page = 0): void {
+    if (!limit) return;
+    queryParts.push(`LIMIT @limit`);
+    params.limit = this.applyMaxLimit(limit);
+    if (page > 0) {
+      queryParts.push(`OFFSET @offset`);
+      params.offset = page * this.applyMaxLimit(limit);
+    }
+  }
+
+  /** Total matching rows from the window aggregate; falls back to page size. */
+  private extractTotalCount(rows: any[]): number {
+    if (rows.length > 0 && rows[0].total_count !== undefined && rows[0].total_count !== null) {
+      return Number(rows[0].total_count);
+    }
+    return rows.length;
+  }
+
 
   // New method to get brands based on country or lat/lng/radius
   async getBrandsNearby(
@@ -239,8 +263,9 @@ export class BigQueryService {
     limit?: number,
     match_nearest_building: boolean = true,
     operating_status?: string,
-    taxonomy?: string[]
-  ): Promise<PlaceWithBuilding[]> {
+    taxonomy?: string[],
+    page: number = 0
+  ): Promise<{ results: PlaceWithBuilding[]; totalCount: number }> {
 
     // Build the query
     let queryParts: string[] = [];
@@ -338,7 +363,7 @@ export class BigQueryService {
     
       -- Step 4: Select only the nearest building for each place
       SELECT
-        * except(distance_rank)
+        * EXCEPT(distance_rank), COUNT(*) OVER() AS total_count
       FROM
         place_with_nearest_building
       WHERE
@@ -351,7 +376,8 @@ export class BigQueryService {
         p.*,
         b.id as building_id,
         b.geometry AS building_geometry,
-        0 as distance_to_nearest_building
+        0 as distance_to_nearest_building,
+        COUNT(*) OVER() AS total_count
       FROM
         \`bigquery-public-data.overture_maps.place\` AS p
       JOIN
@@ -367,11 +393,11 @@ export class BigQueryService {
     }
 
 
-    // Limit results if specified
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    // Always deterministic: stable, disjoint pages regardless of which page
+    // a client requests first.
+    queryParts.push(`ORDER BY distance_to_nearest_building, id`);
+
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
@@ -380,7 +406,10 @@ export class BigQueryService {
     const { rows } = await this.runQuery(query, params);
 
     // Map results to the response type
-    return rows.map((row: any) => parsePlaceWithBuildingRow(row));
+    return {
+      results: rows.map((row: any) => parsePlaceWithBuildingRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
 
@@ -399,8 +428,9 @@ export class BigQueryService {
     limit?: number,
     source?: string,
     operating_status?: string,
-    taxonomy?: string[]
-  ): Promise<Place[]> {
+    taxonomy?: string[],
+    page: number = 0
+  ): Promise<{ results: Place[]; totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = {};
@@ -408,7 +438,7 @@ export class BigQueryService {
 
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
-    queryParts.push(`SELECT *`);
+    queryParts.push(`SELECT *, COUNT(*) OVER() AS total_count`);
 
     if (latitude && longitude) {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance`);
@@ -471,16 +501,19 @@ export class BigQueryService {
       queryParts.push(`WHERE ${whereClauses.join(' AND ')}`);
     }
 
-    // Order by distance if latitude and longitude are provided
+    // Order by distance if latitude and longitude are provided; the id
+    // tiebreaker (and the id-only ordering for country queries) is applied
+    // only when paginating, so pages are deterministic without changing
+    // existing unpaginated behaviour.
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, id`);
+    } else {
+      queryParts.push(`ORDER BY id`);
     }
 
-    // Limit results if no filters are provided
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
@@ -488,7 +521,10 @@ export class BigQueryService {
     this.logger.debug(`Running query: ${query}`);
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parsePlaceRow(row));
+    return {
+      results: rows.map((row: any) => parsePlaceRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
 
@@ -497,8 +533,9 @@ export class BigQueryService {
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<Building[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: Building[]; totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -509,28 +546,31 @@ export class BigQueryService {
     -- from its free results cache. ST_Buffer is inlined; the 'geometry' clustering
     -- is still pruned and the result set is unchanged.
 SELECT
-  *
+  *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.building\` AS s
 WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, id`);
+    } else {
+      queryParts.push(`ORDER BY id`);
     }
 
-    // Limit results if no filters are provided
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseBuildingRow(row));
+    return {
+      results: rows.map((row: any) => parseBuildingRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
   applyMaxLimit(limit: number): number {
@@ -607,8 +647,9 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<Address[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: Address[]; totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -617,36 +658,40 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       `-- Overture Maps API: Get Addresses Nearby
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
-  *
+  *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.address\` AS s
 WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, id`);
+    } else {
+      queryParts.push(`ORDER BY id`);
     }
 
-    // Limit results if no filters are provided
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseAddressRow(row));
+    return {
+      results: rows.map((row: any) => parseAddressRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
   async getBaseNearby(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<BaseFeature[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: BaseFeature[]; totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -660,36 +705,40 @@ WITH combined_base AS (
   SELECT id, geometry, bbox, version, sources, subtype, CAST(NULL as string) as class FROM \`bigquery-public-data.overture_maps.land_cover\`
 )
 SELECT
-  *
+  *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   combined_base AS s
 WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, id`);
+    } else {
+      queryParts.push(`ORDER BY id`);
     }
 
-    // Limit results if no filters are provided
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseBaseRow(row));
+    return {
+      results: rows.map((row: any) => parseBaseRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
   async getTransportationNearby(
     latitude: number,
     longitude: number,
     radius: number = 1000,
-    limit?: number
-  ): Promise<TransportationSegment[]> {
+    limit?: number,
+    page: number = 0
+  ): Promise<{ results: TransportationSegment[]; totalCount: number }> {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
@@ -698,28 +747,31 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
       `-- Overture Maps API: Get Transportation Segments Nearby
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
 SELECT
-  *
+  *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
   \`bigquery-public-data.overture_maps.segment\` AS s
 WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (latitude && longitude) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, id`);
+    } else {
+      queryParts.push(`ORDER BY id`);
     }
 
-    // Limit results if no filters are provided
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseTransportationRow(row));
+    return {
+      results: rows.map((row: any) => parseTransportationRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
   async getDivisions(options: {
@@ -732,10 +784,11 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     adminLevels?: number[];
     bbox?: number[]; // [xmin, ymin, xmax, ymax]
     limit?: number;
+    page?: number;
     includeGeometry?: boolean;
-  }): Promise<DivisionArea[]> {
+  }): Promise<{ results: DivisionArea[]; totalCount: number }> {
 
-    const { latitude, longitude, radius = 1000, country, name, subtypes, adminLevels, bbox, limit, includeGeometry = true } = options;
+    const { latitude, longitude, radius = 1000, country, name, subtypes, adminLevels, bbox, limit, page = 0, includeGeometry = true } = options;
 
     const hasPoint = latitude !== undefined && longitude !== undefined
       && !Number.isNaN(latitude) && !Number.isNaN(longitude);
@@ -791,27 +844,30 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
     -- Excluding geometry skips the by-far-largest column, so search-style queries scan ~99% less.
 SELECT
-  ${includeGeometry ? '*' : '* EXCEPT (geometry)'}
+  ${includeGeometry ? '*' : '* EXCEPT (geometry)'}, COUNT(*) OVER() AS total_count
  ${hasPoint ? ',ST_Distance(s.geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance' : ''}
 FROM
   \`bigquery-public-data.overture_maps.division_area\` AS s
 WHERE ${whereClauses.join('\n  AND ')}`);
 
-    // Order by distance if latitude and longitude are provided
+    // Always deterministic: the id tiebreaker guarantees stable, disjoint
+    // pages regardless of which page a client requests first.
     if (hasPoint) {
-      queryParts.push(`ORDER BY ext_distance`);
+      queryParts.push(`ORDER BY ext_distance, s.id`);
+    } else {
+      queryParts.push(`ORDER BY s.id`);
     }
 
-    if (limit) {
-      queryParts.push(`LIMIT @limit`);
-      params.limit = this.applyMaxLimit(limit);
-    }
+    this.applyPagination(queryParts, params, limit, page);
 
     // Finalize the query
     const query = queryParts.join(' ') + ';';
 
     const { rows } = await this.runQuery(query, params);
-    return rows.map((row: any) => parseDivisionRow(row));
+    return {
+      results: rows.map((row: any) => parseDivisionRow(row)),
+      totalCount: this.extractTotalCount(rows),
+    };
   }
 
   async getDivisionById(id: string): Promise<DivisionArea | null> {
