@@ -25,19 +25,23 @@ export class BuildingsService {
       private readonly cloudStorageCache: CloudStorageCacheService,
     ) {}
 
-    async getBuildings(query: GetBuildingsQuery): Promise<Building[]> {
-        const {  lat, lng, radius,limit } = query;
-  
+    async getBuildings(query: GetBuildingsQuery): Promise<{ results: Building[]; totalCount: number }> {
+        const {  lat, lng, radius,limit, page = 0 } = query;
+
         // Check if cached results exist in File Cache. Key on data-affecting params
         // only (not presentation/format) so equivalent requests share one entry.
-        const cacheKey = buildCacheKey('get-buildings', { lat, lng, radius, limit });
-        const cachedResult = await this.cloudStorageCache.getJSON(cacheKey);
-        if (cachedResult) {
-          return cachedResult;
+        const cacheKey = buildCacheKey('get-buildings', { lat, lng, radius, limit, page: page > 0 ? page : undefined });
+        let cached: any = await this.cloudStorageCache.getJSON(cacheKey);
+        // Entries cached before pagination shipped are plain arrays; wrap them.
+        if (Array.isArray(cached)) {
+          cached = { results: cached, totalCount: cached.length };
         }
-      
-        const results = await this.bigQueryService.getBuildingsNearby( lat, lng, radius,limit);
-        await this.cloudStorageCache.storeJSON (results,cacheKey);
-        return results;//
+        if (cached?.results) {
+          return cached;
+        }
+
+        const paginated = await this.bigQueryService.getBuildingsNearby( lat, lng, radius,limit, page);
+        await this.cloudStorageCache.storeJSON (paginated,cacheKey);
+        return paginated;
       }
 }

@@ -68,7 +68,34 @@ describe('BigQueryService', () => {
       service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
       const result = await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'US', ['food'], 0.5, 5);
       expect(service.runQuery).toHaveBeenCalled();
-      expect(result[0].id).toBe('1');
+      expect(result.results[0].id).toBe('1');
+      expect(result.totalCount).toBe(1);
+    });
+
+    it('adds OFFSET and a deterministic id tiebreaker when paginating', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [{ ...validRow, total_count: 42 }], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      const result = await service.getPlacesNearby(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 10, undefined, undefined, undefined, 2);
+      const sql = spy.mock.calls[0][0];
+      const params = spy.mock.calls[0][1];
+      expect(sql).toContain('COUNT(*) OVER() AS total_count');
+      expect(sql).toContain('ORDER BY ext_distance, id');
+      expect(sql).toContain('OFFSET @offset');
+      expect(params.offset).toBe(20);
+      expect(result.totalCount).toBe(42);
+    });
+
+    it('does not add OFFSET on page 0, but ordering is always deterministic', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 10);
+      const sql = spy.mock.calls[0][0];
+      // Deterministic ordering on every page (incl. 0) is what makes pages
+      // stable and disjoint regardless of which page a client requests first.
+      expect(sql).toContain('ORDER BY ext_distance, id');
+      expect(sql).not.toContain('OFFSET');
     });
 
     it('should include source filter in SQL if provided', async () => {

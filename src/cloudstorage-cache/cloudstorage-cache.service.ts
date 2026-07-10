@@ -15,11 +15,11 @@ export class CloudStorageCacheService {
     
   logger = new Logger('CloudStorageCacheService');
 
-  async getJSON (cacheKey: string): Promise<any[]|null> {
+  async getJSON (cacheKey: string): Promise<any|null> {
     return this.gcsService.getJSON(cacheKey);
   }
-  
-  async storeJSON(data: any[], cacheKey: string): Promise<boolean> {
+
+  async storeJSON(data: any, cacheKey: string): Promise<boolean> {
     return this.gcsService.storeJSON(data, cacheKey);
   }
 }
