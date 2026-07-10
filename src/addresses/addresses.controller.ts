@@ -27,15 +27,13 @@ export class AddressesController {
     @CountHeader()
     async getAddresses(@Query() query: GetAddressesQuery): Promise<AddressDto[] | any> {
 
-        const addresses = await this.addressesService.getAddresses(query);
+        const { results, totalCount } = await this.addressesService.getAddresses(query);
 
-        const dtoResults = addresses.map((address: any) => toAddressDto(address, query));
+        const dtoResults = results.map((address: any) => toAddressDto(address, query));
 
-        if (query.format === Format.GEOJSON) {
-            return wrapAsGeoJSON(dtoResults)
-        } else {
-            return dtoResults
-        }
+        // The PaginationInterceptor unwraps this envelope: clients receive the
+        // same array/GeoJSON body as always, with Pagination-* headers added.
+        return { results: dtoResults, totalCount, page: query.page ?? 0, limit: query.limit };
     }
 
 }
