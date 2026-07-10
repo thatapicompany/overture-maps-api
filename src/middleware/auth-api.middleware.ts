@@ -13,7 +13,9 @@ const TheAuthAPI = require('theauthapi');
 
 // Only enabled when explicitly configured. No literal fallback so an unset env
 // var can never leave a publicly-known demo credential valid in production.
-const DEMO_API_KEY = process.env.DEMO_API_KEY;
+// Read per-request so tests (and runtime config changes) take effect without
+// a module reload.
+const getDemoApiKey = (): string | undefined => process.env.DEMO_API_KEY;
 
 // Avoid writing raw API keys to logs.
 function maskKey(key?: string): string {
@@ -66,6 +68,23 @@ export class AuthAPIMiddleware implements NestMiddleware {
       return;
     }
 
+    // Demo key first: it's a constant-string compare, saves a TheAuthAPI
+    // round-trip, and must run before the explicit rejection below —
+    // TheAuthAPI doesn't know the demo key, so checking it afterwards means
+    // it can never match (this exact ordering bug shipped in Jun 2026).
+    // Only enabled when DEMO_API_KEY is explicitly configured.
+    const demoApiKey = getDemoApiKey();
+    if (demoApiKey && apiKeyString === demoApiKey) {
+      const demoUser: User = {
+        isDemoAccount: true,
+        accountId: 'demo-account-id',
+        userId: 'demo-user-id'
+      };
+      req['user'] = req.res.locals['user'] = demoUser;
+      next();
+      return;
+    }
+
     try {
 
       // if theAuthAPI.com is integrated, check the key
@@ -97,18 +116,6 @@ export class AuthAPIMiddleware implements NestMiddleware {
         res.status(403).send(error.message || 'Origin domain is not allowed for this API key');
         return;
       }
-    }
-
-    //if demo key, set user to demo user
-    if (DEMO_API_KEY && apiKeyString === DEMO_API_KEY) {
-      const demoUser: User = {
-        isDemoAccount: true,
-        accountId: 'demo-account-id',
-        userId: 'demo-user-id'
-      };
-      req['user'] = req.res.locals['user'] = demoUser;
-      next();
-      return;
     }
 
     //if we got this far and they passed a key we should tell the user their key doesn't work and to check for a spelling mistake

@@ -36,6 +36,8 @@ export class DivisionPropertiesDto {
     is_territorial?: boolean;
     @ApiPropertyOptional({ description: 'ID of the division feature this area belongs to.' })
     division_id?: string;
+    @ApiPropertyOptional({ description: 'Set when this record\'s own geometry is missing upstream and the boundary was served from a sibling area of the same division; the value is the sibling\'s class, e.g. "maritime" (land plus territorial waters).', example: 'maritime' })
+    ext_geometry_source?: string;
 }
 
 export class DivisionDto {

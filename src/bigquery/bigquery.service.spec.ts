@@ -91,6 +91,73 @@ describe('BigQueryService', () => {
     }
   }
 
+  describe('getDivisionById maritime geometry fallback (OvertureMaps/data#540)', () => {
+    const landRowWithoutGeometry = {
+      id: 'ru-land-id',
+      geometry: null,
+      bbox: null,
+      version: 1,
+      sources: { list: [] },
+      subtype: 'country',
+      class: 'land',
+      admin_level: 0,
+      is_land: true,
+      is_territorial: false,
+      division_id: 'ru-division-id',
+      names: { primary: 'Россия' },
+      country: 'RU',
+    };
+    const maritimeSibling = {
+      ...landRowWithoutGeometry,
+      id: 'ru-maritime-id',
+      geometry: { value: 'MULTIPOLYGON(((0 0, 1 0, 1 1, 0 0)))' },
+      bbox: { xmin: '0', xmax: '1', ymin: '0', ymax: '1' },
+      class: 'maritime',
+      is_land: false,
+      is_territorial: true,
+    };
+
+    it('serves the maritime sibling geometry when the land record has NULL geometry', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [landRowWithoutGeometry], statistics: {} })
+        .mockResolvedValueOnce({ rows: [maritimeSibling], statistics: {} });
+
+      const result = await service.getDivisionById('ru-land-id');
+
+      expect(service.runQuery).toHaveBeenCalledTimes(2);
+      expect((service.runQuery as jest.Mock).mock.calls[1][1]).toEqual({ division_id: 'ru-division-id', id: 'ru-land-id' });
+      expect(result?.geometry).toBeDefined();
+      expect(result?.ext_geometry_source).toBe('maritime');
+      // Identity fields stay from the requested record
+      expect(result?.id).toBe('ru-land-id');
+      expect(result?.class).toBe('land');
+      expect(result?.bbox).toBeDefined();
+    });
+
+    it('does not run the fallback when geometry is present', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValueOnce({ rows: [maritimeSibling], statistics: {} });
+
+      const result = await service.getDivisionById('ru-maritime-id');
+
+      expect(service.runQuery).toHaveBeenCalledTimes(1);
+      expect(result?.ext_geometry_source).toBeUndefined();
+    });
+
+    it('returns the record unflagged when no sibling with geometry exists', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [landRowWithoutGeometry], statistics: {} })
+        .mockResolvedValueOnce({ rows: [], statistics: {} });
+
+      const result = await service.getDivisionById('ru-land-id');
+
+      expect(result?.geometry).toBeUndefined();
+      expect(result?.ext_geometry_source).toBeUndefined();
+    });
+  });
+
   describe('runQuery', () => {
     it('should throw and log error if query fails', async () => {
       const service = new TestableBigQueryService();
