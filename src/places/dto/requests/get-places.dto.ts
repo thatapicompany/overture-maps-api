@@ -108,8 +108,8 @@ export class GetPlacesDto extends GetByLocationDto {
   operating_status?: string;
 
   @ApiPropertyOptional({
-    description: 'Comma-separated list of enrichment fields to include.',
-    example: 'wikidata,extra_info',
+    description: 'Comma-separated list of enrichment fields to include. Use "brand" for Wikidata-sourced brand details (logo, website, industry, parent) on branded places.',
+    example: 'brand',
     type: String,
   })
   @IsOptional()
