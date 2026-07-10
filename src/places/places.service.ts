@@ -20,16 +20,36 @@ import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../cache/cache.service';
 import { buildCacheKey, CACHE_TTL_SECONDS } from '../cache/cache-key.util';
 import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildings';
+import { BrandsEnrichmentService } from './brands-enrichment.service';
 
 @Injectable()
 export class PlacesService {
     logger = new Logger('PlacesService');
-    
+
     constructor(
         private readonly configService: ConfigService,
         private readonly bigQueryService: BigQueryService,
         private readonly cacheService: CacheService,
+        private readonly brandsEnrichment: BrandsEnrichmentService,
     ) {}
+
+    /**
+     * Decorates a BrandDto with Wikidata-sourced ext_ fields when the
+     * enrichment artifact is loaded. Applied after the cache layer so
+     * enrichment availability never splits or invalidates cached results.
+     */
+    private toBrandDtoWithEnrichment(brand: any): BrandDto {
+        const dto = new BrandDto(brand);
+        const enrichment = this.brandsEnrichment.get(brand?.wikidata);
+        if (enrichment) {
+            dto.ext_logo_url = enrichment.logo_url;
+            dto.ext_website = enrichment.website;
+            dto.ext_industry = enrichment.industry;
+            dto.ext_parent = enrichment.parent;
+            dto.ext_wikidata_label = enrichment.label;
+        }
+        return dto;
+    }
     async getPlaces(query: GetPlacesDto):Promise<Place[]> {
 
         const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, source, operating_status, taxonomy } = query;
@@ -69,12 +89,12 @@ export class PlacesService {
         const cacheKey = buildCacheKey('get-places-brands', { country, lat, lng, radius, categories });
         const cachedResult = await this.cacheService.get<any[]>(cacheKey);
         if (cachedResult) {
-          return cachedResult.map((brand: any) => new BrandDto(brand));
+          return cachedResult.map((brand: any) => this.toBrandDtoWithEnrichment(brand));
         }
 
         const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
         await this.cacheService.set(cacheKey, results, CACHE_TTL_SECONDS);
-        return results.map((brand: any) => new BrandDto(brand));
+        return results.map((brand: any) => this.toBrandDtoWithEnrichment(brand));
       }
 
     async getCountries():Promise<CountryResponseDto[]> {

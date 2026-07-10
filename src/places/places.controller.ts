@@ -22,6 +22,7 @@ import { GetPlacesWithBuildingsDto } from './dto/requests/get-places-with-buildi
 import { CountHeader } from '../decorators/count-header.decorator';
 import { loadEnrichmentAdapter } from '../data-adapters/loadEnrichmentAdapter';
 import { EnrichmentAdapter } from '../data-adapters/EnrichmentAdapter';
+import { BrandsEnrichmentService } from './brands-enrichment.service';
 
 @ApiTags('Places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -33,7 +34,8 @@ export class PlacesController {
   
   constructor(
     private placesService: PlacesService,
-    private buildingsService: BuildingsService
+    private buildingsService: BuildingsService,
+    private brandsEnrichment: BrandsEnrichmentService,
 
   ) {}
 
@@ -53,8 +55,27 @@ export class PlacesController {
     const dtoResults = results.map((place: any) =>toPlaceDto(place,query));
 
     let finalResults = dtoResults;
+
+    // `brand` is served from the in-memory Wikidata artifact, not the hosted
+    // enrichment adapter, so peel it off before the adapter call.
+    const requestedFields = query.enrichment_fields ?? [];
+    if (requestedFields.includes('brand') && this.brandsEnrichment.isReady()) {
+      finalResults = finalResults.map((p) => {
+        const enrichment = this.brandsEnrichment.get((p.properties as any)?.brand?.wikidata);
+        if (!enrichment) return p;
+        p.properties.ext_brand = {
+          label: enrichment.label,
+          logo_url: enrichment.logo_url,
+          website: enrichment.website,
+          industry: enrichment.industry,
+          parent: enrichment.parent,
+        };
+        return p;
+      });
+    }
+
     try {
-      const fields = query.enrichment_fields;
+      const fields = requestedFields.filter((f) => f !== 'brand');
       if (fields && fields.length) {
         const ids = dtoResults.map((p) => p.id);
         const enrichment = await this.enrichmentAdapter.fetchEnrichmentByIds(ids, { fields });

@@ -1,0 +1,40 @@
+name: Rebuild Brands Enrichment Artifact
+
+# Rebuilds the Wikidata brand-enrichment artifact in GCS (see
+# etl/build-brands-enrichment.ts). Runs monthly after Overture's mid-month
+# release so newly added brand QIDs are picked up; re-runs are idempotent and
+# cheap (~3k-row BigQuery scan + ~21 SPARQL queries). The API refreshes its
+# in-memory copy within a day of the artifact changing.
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+  schedule:
+    - cron: '0 3 25 * *' # 25th of each month, 03:00 UTC
+
+jobs:
+  build-artifact:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: npm install
+        run: npm ci
+
+      - name: create credentials file
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}' > gcp-credentials.json
+
+      - name: Build and upload brands enrichment artifact
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ./gcp-credentials.json
+          BIGQUERY_PROJECT_ID: ${{ secrets.BIGQUERY_PROJECT_ID }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+        run: npm run etl:brands-enrichment

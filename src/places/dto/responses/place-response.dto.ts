@@ -145,6 +145,17 @@ export class PlacePropertiesDto {
     distance:number
   }
 
+  @ApiPropertyOptional({
+    description: 'Wikidata-sourced brand details (CC0). Present when enrichment_fields includes "brand" and the place has a brand with a Wikidata QID.',
+  })
+  ext_brand?: {
+    label?: string;
+    logo_url?: string;
+    website?: string;
+    industry?: string;
+    parent?: string;
+  }
+
   ext_place_geometry?:Point;
 
   constructor(data={}) {
