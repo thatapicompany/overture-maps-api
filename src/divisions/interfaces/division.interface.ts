@@ -27,4 +27,11 @@ export interface DivisionArea {
     country?: string;
     region?: string;
     ext_distance?: number;
+    /**
+     * Present when the record's own geometry is NULL upstream and the boundary
+     * was taken from a sibling area of the same division — the value is the
+     * sibling's class, e.g. "maritime" (land + territorial waters).
+     * See github.com/OvertureMaps/data/issues/540.
+     */
+    ext_geometry_source?: string;
 }

@@ -824,7 +824,36 @@ WHERE s.id = @id
 LIMIT 1;`;
 
     const { rows } = await this.runQuery(query, { id });
-    return rows.length ? parseDivisionRow(rows[0]) : null;
+    if (!rows.length) return null;
+
+    const division = parseDivisionRow(rows[0]);
+
+    // Upstream data gap (github.com/OvertureMaps/data/issues/540): a handful
+    // of country-level land records have NULL geometry in the BigQuery mirror
+    // (e.g. Russia, Australia) while their maritime sibling (land + territorial
+    // waters, same division_id) is intact. Fall back to the sibling's geometry
+    // so clients always get a boundary, flagged via ext_geometry_source.
+    if (!division.geometry && rows[0].division_id) {
+      const fallbackQuery = `-- Overture Maps API: Get Division Area geometry fallback (sibling area)
+SELECT
+  *
+FROM
+  \`bigquery-public-data.overture_maps.division_area\` AS s
+WHERE s.division_id = @division_id
+  AND s.id != @id
+  AND s.geometry IS NOT NULL
+ORDER BY s.is_land DESC
+LIMIT 1;`;
+      const { rows: fallbackRows } = await this.runQuery(fallbackQuery, { division_id: rows[0].division_id, id });
+      if (fallbackRows.length) {
+        const sibling = parseDivisionRow(fallbackRows[0]);
+        division.geometry = sibling.geometry;
+        division.bbox = division.bbox ?? sibling.bbox;
+        division.ext_geometry_source = sibling.class ?? 'sibling_area';
+      }
+    }
+
+    return division;
   }
   private buildWhereClauses({
     country,
