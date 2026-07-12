@@ -1,0 +1,83 @@
+# Production Cloud Build config for the overture-maps-api-prod Cloud Run service.
+#
+# Replaces the trigger's inline YAML so the pipeline is version-controlled.
+# To use: Cloud Build > Triggers > edit the prod trigger > Configuration >
+# "Cloud Build configuration file" > Location: Repository >
+# path: deploy/cloudbuild-prod.yaml. The trigger's existing substitution
+# variables (_AR_HOSTNAME, _AR_PROJECT_ID, _AR_REPOSITORY, _DEPLOY_REGION,
+# _PLATFORM, _SERVICE_NAME) are used as-is.
+#
+# The key difference from the inline config: a TEST GATE runs before anything
+# is built or deployed. Failing unit or e2e tests abort the build, so a broken
+# merge to main can never reach production. A post-deploy smoke check then
+# fails the build loudly if the live service is unhealthy after rollout.
+#
+# Note: `gcloud run services update` deploys a new revision and only shifts
+# traffic once the container passes its startup probe, and it preserves the
+# service's existing env vars (it updates, not replaces).
+
+steps:
+  # ---- Gate: tests must pass before anything is built ----
+  - name: 'node:22'
+    id: Test
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        npm ci --no-audit --no-fund
+        npm test
+        # e2e runs with BigQuery/caches mocked; NODE_ENV=test disables the
+        # GCS-backed index/enrichment loaders, so no credentials are needed.
+        NODE_ENV=test npx jest --config ./test/jest-e2e.json test/app.e2e-spec.ts
+
+  # ---- Build & push the image ----
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Build
+    args:
+      - build
+      - '-t'
+      - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$COMMIT_SHA'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Push
+    args:
+      - push
+      - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$COMMIT_SHA'
+
+  # ---- Deploy to Cloud Run ----
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - '$_SERVICE_NAME'
+      - '--platform=$_PLATFORM'
+      - '--image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$COMMIT_SHA'
+      - '--region=$_DEPLOY_REGION'
+      - '--quiet'
+
+  # ---- Post-deploy smoke check against the live service ----
+  - name: 'gcr.io/cloud-builders/curl'
+    id: Smoke
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        sleep 10
+        # Root endpoint must respond and identify the service
+        curl -fsS --max-time 20 https://api.overturemapsapi.com/ | grep -q "OvertureMaps.org"
+        echo "SMOKE_OK"
+
+images:
+  - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$COMMIT_SHA'
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
