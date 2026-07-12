@@ -99,3 +99,105 @@ describe('AuthAPIMiddleware demo key handling', () => {
     expect(req.user).toEqual(expect.objectContaining({ accountId: 'acc-1', isDemoAccount: false }));
   });
 });
+
+describe('AuthAPIMiddleware upstream error handling', () => {
+  const makeReqRes = (apiKey?: string) => {
+    const locals: any = {};
+    const res: any = {
+      locals,
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn().mockReturnThis(),
+    };
+    const req: any = {
+      get: (name: string) => (name === 'X-Api-Key' ? apiKey : undefined),
+      query: {},
+      headers: {},
+      res,
+    };
+    req.res.locals = locals;
+    return { req, res };
+  };
+
+  // Mirrors TheAuthAPI SDK's ApiResponseError
+  const apiResponseError = (statusCode: number, message: string) => {
+    const error: any = new Error(`(${statusCode}): ${message}`);
+    error.name = 'ApiResponseError';
+    error.statusCode = statusCode;
+    error.message = message;
+    return error;
+  };
+
+  const middlewareThrowing = (error: any) => {
+    const middleware = new AuthAPIMiddleware();
+    (middleware as any).theAuthAPI = {
+      apiKeys: { authenticateKey: jest.fn().mockRejectedValue(error) },
+    };
+    return middleware;
+  };
+
+  it('returns 429 when the key is rate limited, NOT a misleading 401', async () => {
+    const middleware = middlewareThrowing(
+      apiResponseError(429, 'Rate limit exceeded'),
+    );
+    const { req, res } = makeReqRes('live_real_key');
+    const next = jest.fn();
+
+    await middleware.use(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.send).toHaveBeenCalledWith('Rate limit exceeded');
+  });
+
+  it('returns 429 when the monthly quota is exceeded', async () => {
+    const middleware = middlewareThrowing(
+      apiResponseError(429, 'Monthly request quota exceeded'),
+    );
+    const { req, res } = makeReqRes('live_real_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.send).toHaveBeenCalledWith('Monthly request quota exceeded');
+  });
+
+  it('still returns 403 for a disallowed origin domain', async () => {
+    const middleware = middlewareThrowing(
+      apiResponseError(403, 'Origin domain is not allowed for this API key'),
+    );
+    const { req, res } = makeReqRes('live_real_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('returns 503 when TheAuthAPI is erroring, rather than blaming the key', async () => {
+    const middleware = middlewareThrowing(
+      apiResponseError(500, 'Internal Server Error'),
+    );
+    const { req, res } = makeReqRes('live_real_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  it('returns 503 when TheAuthAPI is unreachable (no status on the error)', async () => {
+    const middleware = middlewareThrowing(new Error('connect ECONNREFUSED'));
+    const { req, res } = makeReqRes('live_real_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  it('still returns 401 for a genuinely unknown key (404 upstream)', async () => {
+    const middleware = middlewareThrowing(apiResponseError(404, 'Not Found'));
+    const { req, res } = makeReqRes('live_wrong_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+});
