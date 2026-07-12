@@ -149,6 +149,20 @@ describe('AuthAPIMiddleware upstream error handling', () => {
     expect(res.send).toHaveBeenCalledWith('Rate limit exceeded');
   });
 
+  it('strips the SDK status prefix from the message it passes on', async () => {
+    // The real SDK message looks like "(429): Too many requests"
+    const error: any = new Error('(429): Too many requests');
+    error.statusCode = 429;
+    error.message = '(429): Too many requests';
+    const middleware = middlewareThrowing(error);
+    const { req, res } = makeReqRes('live_real_key');
+
+    await middleware.use(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.send).toHaveBeenCalledWith('Too many requests');
+  });
+
   it('returns 429 when the monthly quota is exceeded', async () => {
     const middleware = middlewareThrowing(
       apiResponseError(429, 'Monthly request quota exceeded'),
