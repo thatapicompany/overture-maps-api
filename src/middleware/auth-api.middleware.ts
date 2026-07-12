@@ -126,9 +126,7 @@ export class AuthAPIMiddleware implements NestMiddleware {
       // The key is valid but over its rate limit or monthly quota. Telling
       // the caller their key is misspelled here is actively misleading.
       if (status === 429) {
-        res
-          .status(429)
-          .send(error.message || 'Rate limit exceeded - too many requests for this API key');
+        res.status(429).send(cleanUpstreamMessage(error.message, 'Too many requests - rate limit exceeded for this API key'));
         return;
       }
 
@@ -152,4 +150,11 @@ export class AuthAPIMiddleware implements NestMiddleware {
 // error, depending on where it was thrown.
 function getUpstreamStatus(error: any): number | undefined {
   return error?.statusCode ?? error?.status ?? error?.response?.status;
+}
+
+// TheAuthAPI's SDK prefixes its messages with the status, e.g.
+// "(429): Too many requests". Strip that so callers get a clean sentence.
+function cleanUpstreamMessage(message: string | undefined, fallback: string): string {
+  const stripped = message?.replace(/^\(\d{3}\):\s*/, '').trim();
+  return stripped || fallback;
 }
