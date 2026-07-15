@@ -63,9 +63,13 @@ export const parsePlaceRow = (row: any): Place => {
         taxonomy: parseTaxonomy(row.taxonomy),
         operating_status: row.operating_status ?? undefined,
         confidence: parseFloat(row.confidence),
-        websites: row.websites?.split ? row.websites.split(',') : [],
+        // websites, socials, emails and phones are all Overture array<string>
+        // columns, which BigQuery returns as { list: [{ element }] }. They must
+        // all be read the same way — websites/emails previously used .split(),
+        // which is undefined on the list object, so every value was dropped.
+        websites: row.websites?.list ? row.websites.list.map((w: any) => w.element) : [],
         socials: row.socials?.list ? row.socials.list.map((social: any) => social.element) : [],
-        emails: row.emails?.split ? row.emails.split(',') : [],
+        emails: row.emails?.list ? row.emails.list.map((e: any) => e.element) : [],
         phones: row.phones?.list ? row.phones.list.map((phone: any) => phone.element) : [],
         brand: row.brand ? {
           names: {

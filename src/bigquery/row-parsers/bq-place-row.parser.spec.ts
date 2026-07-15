@@ -82,4 +82,30 @@ describe('parsePlaceRow', () => {
     expect(place.taxonomy?.alternates).toEqual([]);
     expect(place.operating_status).toBeUndefined();
   });
+
+  it('parses contact arrays (websites, socials, emails, phones) from the BigQuery list shape', () => {
+    const row = baseRow();
+    // All four are Overture array<string> columns -> { list: [{ element }] }
+    (row as any).websites = { list: [{ element: 'https://dealer.example' }] };
+    (row as any).socials = { list: [{ element: 'https://facebook.com/dealer' }] };
+    (row as any).emails = { list: [{ element: 'sales@dealer.example' }] };
+    (row as any).phones = { list: [{ element: '+441234567890' }] };
+
+    const place = parsePlaceRow(row);
+
+    // Regression guard: websites/emails were previously read with .split() and
+    // silently dropped on every response
+    expect(place.websites).toEqual(['https://dealer.example']);
+    expect(place.emails).toEqual(['sales@dealer.example']);
+    expect(place.socials).toEqual(['https://facebook.com/dealer']);
+    expect(place.phones).toEqual(['+441234567890']);
+  });
+
+  it('returns empty arrays for missing contact columns', () => {
+    const place = parsePlaceRow(baseRow());
+    expect(place.websites).toEqual([]);
+    expect(place.emails).toEqual([]);
+    expect(place.phones).toEqual([]);
+    expect(place.socials).toEqual([]);
+  });
 });
