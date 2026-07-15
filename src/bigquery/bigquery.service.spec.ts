@@ -108,6 +108,32 @@ describe('BigQueryService', () => {
       expect(sql).toContain('EXISTS (SELECT 1 FROM UNNEST(sources) AS s WHERE s.dataset = @source)');
       expect(params.source).toBe('meta');
     });
+
+    it('filters to places with a website when has_contact=[website]', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'GB', undefined, 0.5, 5, undefined, undefined, undefined, 0, ['website']);
+      const sql = spy.mock.calls[0][0];
+      expect(sql).toContain('(ARRAY_LENGTH(websites.list) > 0)');
+    });
+
+    it('uses OR semantics across multiple has_contact fields', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'GB', undefined, 0.5, 5, undefined, undefined, undefined, 0, ['website', 'social']);
+      const sql = spy.mock.calls[0][0];
+      expect(sql).toContain('(ARRAY_LENGTH(websites.list) > 0 OR ARRAY_LENGTH(socials.list) > 0)');
+    });
+
+    it('adds no contact clause when has_contact is empty or omitted', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'GB', undefined, 0.5, 5, undefined, undefined, undefined, 0, []);
+      expect(spy.mock.calls[0][0]).not.toContain('ARRAY_LENGTH');
+    });
   });
 
   // Helper to expose bigQueryClient for testing
