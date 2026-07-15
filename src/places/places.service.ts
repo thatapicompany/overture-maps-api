@@ -52,11 +52,11 @@ export class PlacesService {
     }
     async getPlaces(query: GetPlacesDto):Promise<{ results: Place[]; totalCount: number }> {
 
-        const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, page = 0, source, operating_status, taxonomy } = query;
+        const { lat, lng, radius,  country, min_confidence, brand_wikidata,brand_name,categories,limit, page = 0, source, operating_status, taxonomy, has_contact } = query;
         // Key on data-affecting params only. `source` is applied as a post-query
         // filter below, so it must not split the cache. Page 0 keeps the
         // pre-pagination key so warm cache entries stay useful.
-        const cacheKey = buildCacheKey('get-places', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, operating_status, taxonomy, page: page > 0 ? page : undefined });
+        const cacheKey = buildCacheKey('get-places', { lat, lng, radius, country, min_confidence, brand_wikidata, brand_name, categories, limit, operating_status, taxonomy, has_contact, page: page > 0 ? page : undefined });
         let cached = await this.cacheService.get<any>(cacheKey);
         // Entries cached before pagination shipped are plain arrays; wrap them
         // so they stay valid until their TTL expires.
@@ -64,7 +64,7 @@ export class PlacesService {
           cached = { results: cached, totalCount: cached.length };
         }
         if (!cached?.results) {
-          cached = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, undefined, operating_status, taxonomy, page);
+          cached = await this.bigQueryService.getPlacesNearby(lat, lng, radius, brand_wikidata, brand_name, country, categories, min_confidence, limit, undefined, operating_status, taxonomy, page, has_contact);
           await this.cacheService.set(cacheKey, cached, CACHE_TTL_SECONDS);
         }
         // Filter by source if provided (post-query filter: totalCount stays the

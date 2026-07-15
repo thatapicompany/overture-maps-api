@@ -117,6 +117,18 @@ export class GetPlacesDto extends GetByLocationDto {
   enrichment_fields?: string[];
 
   @ApiPropertyOptional({
+    description:
+      'Return only places that already have at least one of the listed contact fields. Comma-separated, matched with OR: e.g. "website" returns places with a website; "website,social" returns places with a website OR a social link. Useful for filtering to businesses you can verify. Allowed values: website, phone, email, social.',
+    example: 'website,social',
+    type: String,
+  })
+  @IsOptional()
+  @Transform((params) => String(params.value).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))
+  @IsArray()
+  @IsIn(['website', 'phone', 'email', 'social'], { each: true })
+  has_contact?: string[];
+
+  @ApiPropertyOptional({
     description: 'Response format, defaulting to JSON. Options are "json", "csv", or "geojson".',
     example: 'json',
     default: 'json',
