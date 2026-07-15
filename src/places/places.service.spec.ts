@@ -229,7 +229,8 @@ describe('PlacesService', () => {
       undefined, // source (applied post-query)
       undefined, // operating_status
       undefined, // taxonomy
-      0          // page
+      0,         // page
+      undefined  // has_contact
     );
 
     expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);

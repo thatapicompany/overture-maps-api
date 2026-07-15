@@ -107,6 +107,30 @@ export class BigQueryService {
     return `(${prefix}taxonomy.primary IN UNNEST(@taxonomy) OR EXISTS(SELECT 1 FROM UNNEST(${prefix}taxonomy.hierarchy.list) AS th WHERE th.element IN UNNEST(@taxonomy)))`;
   }
 
+  // Maps a public has_contact value to its Overture array column. Contact
+  // columns are Parquet-style repeated fields (STRUCT<list ARRAY<..>>), so
+  // presence is ARRAY_LENGTH(col.list) > 0. NULL columns yield NULL (excluded).
+  private static readonly CONTACT_COLUMNS: Record<string, string> = {
+    website: 'websites',
+    phone: 'phones',
+    email: 'emails',
+    social: 'socials',
+  };
+
+  /**
+   * "At least one of the requested contact fields is present" — OR semantics,
+   * so has_contact=website,social matches places with a website OR a social.
+   * Values are DTO-validated against CONTACT_COLUMNS keys; unknown values are
+   * ignored defensively.
+   */
+  private contactPresenceSql(fields: string[], prefix = ''): string | null {
+    const clauses = fields
+      .map((f) => BigQueryService.CONTACT_COLUMNS[f])
+      .filter(Boolean)
+      .map((col) => `ARRAY_LENGTH(${prefix}${col}.list) > 0`);
+    return clauses.length ? `(${clauses.join(' OR ')})` : null;
+  }
+
   /**
    * Appends LIMIT/OFFSET for pagination. Used together with a
    * `COUNT(*) OVER() AS total_count` window aggregate in the SELECT list so a
@@ -429,7 +453,8 @@ export class BigQueryService {
     source?: string,
     operating_status?: string,
     taxonomy?: string[],
-    page: number = 0
+    page: number = 0,
+    has_contact?: string[]
   ): Promise<{ results: Place[]; totalCount: number }> {
 
     let queryParts: string[] = [];
@@ -494,6 +519,11 @@ export class BigQueryService {
       // Filter for at least one sources element with matching dataset
       whereClauses.push(`EXISTS (SELECT 1 FROM UNNEST(sources) AS s WHERE s.dataset = @source)`);
       params.source = source;
+    }
+
+    if (has_contact && has_contact.length > 0) {
+      const contactSql = this.contactPresenceSql(has_contact);
+      if (contactSql) whereClauses.push(contactSql);
     }
 
     // Combine where clauses
