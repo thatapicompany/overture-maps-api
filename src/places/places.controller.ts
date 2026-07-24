@@ -49,7 +49,26 @@ export class PlacesController {
   @ValidateLatLngUser()
   async getPlaces(@Query() query: GetPlacesDto, @AuthedUser() user: User) {
 
-    
+    // Cost guardrails (see etl/bigquery-cost-controls.md). Every /places call
+    // scans the place table, so block the two patterns that scan it needlessly:
+    // (1) demo traffic — capped to a small radius/limit; (2) whole-country
+    // dumps with no narrowing filter, which return (and scan for) everything.
+    const hasLatLng = Number.isFinite(query.lat) && Number.isFinite(query.lng);
+    if (user?.isDemoAccount) {
+      query.radius = Math.min(query.radius ?? 1000, 2000);
+      query.limit = Math.min(query.limit ?? 25, 25);
+    }
+    if (
+      query.country && !hasLatLng &&
+      !query.categories?.length && !query.taxonomy?.length &&
+      !query.brand_name && !query.brand_wikidata
+    ) {
+      throw new HttpException(
+        'A country-level query must include a narrowing filter (categories, taxonomy, brand_name or brand_wikidata), or be queried by lat/lng/radius. Unfiltered whole-country requests are not supported.',
+        400,
+      );
+    }
+
       // If no cache, query BigQuery with wikidata and country support
     const { results, totalCount } = await this.placesService.getPlaces(query);
     const dtoResults = results.map((place: any) =>toPlaceDto(place,query));
