@@ -30,6 +30,13 @@ const MAX_LIMIT = 100000;
 // replace this with your own dataset if you have optimised ot to only include the country you are interested in
 const SOURCE_DATASET = "bigquery-public-data.overture_maps"
 
+// The place table the API queries. Defaults to the raw public table, but in
+// production set PLACE_TABLE to an in-project mirror clustered by geometry
+// (see etl/build-places-mirror.sql) so radius queries prune spatially instead
+// of scanning the whole ~45GB table on every request. Same schema, so no query
+// changes are needed — only the table name.
+const PLACE_TABLE = process.env.PLACE_TABLE || `${SOURCE_DATASET}.place`;
+
 // How long to trust a cached place-table column list. Overture releases monthly
 // and Google re-mirrors shortly after, so a few hours is plenty to pick up the
 // September 2026 `categories` column removal without a redeploy.
@@ -170,7 +177,7 @@ export class BigQueryService {
 
     let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand , count(id) as count_places
-      FROM \`${SOURCE_DATASET}.place\`
+      FROM \`${PLACE_TABLE}\`
     `;
 
     const params: any = {};
@@ -217,7 +224,7 @@ export class BigQueryService {
   async getPlaceCountsByCountry(): Promise<{ country: string; counts: { places: number, brands: number } }[]> {
     const query = `-- Overture Maps API: Get place counts by country
       SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
-      FROM \`${SOURCE_DATASET}.place\`
+      FROM \`${PLACE_TABLE}\`
       GROUP BY country
       ORDER BY count_places DESC;
     `;
@@ -250,7 +257,7 @@ export class BigQueryService {
       SELECT DISTINCT ${categoryColumn} AS category_primary,
       count(1) as count_places,
       count(distinct brand.names.primary) as count_brands
-      FROM \`${SOURCE_DATASET}.place\`
+      FROM \`${PLACE_TABLE}\`
       WHERE ${categoryColumn} IS NOT NULL
     `;
 
@@ -372,7 +379,7 @@ export class BigQueryService {
           ST_Distance(p.geometry, b.building_geometry) AS distance_to_nearest_building,
           ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY ST_Distance(p.geometry, b.building_geometry)) AS distance_rank
         FROM
-          \`bigquery-public-data.overture_maps.place\` AS p
+          \`${PLACE_TABLE}\` AS p
         JOIN
           nearby_buildings AS b
         ON
@@ -403,7 +410,7 @@ export class BigQueryService {
         0 as distance_to_nearest_building,
         COUNT(*) OVER() AS total_count
       FROM
-        \`bigquery-public-data.overture_maps.place\` AS p
+        \`${PLACE_TABLE}\` AS p
       JOIN
         \`bigquery-public-data.overture_maps.building\` AS b
       ON
@@ -471,7 +478,7 @@ export class BigQueryService {
       params.longitude = longitude;
     }
 
-    queryParts.push(`FROM \`${SOURCE_DATASET}.place\``);
+    queryParts.push(`FROM \`${PLACE_TABLE}\``);
 
     // Conditional filters
     let whereClauses: string[] = [];

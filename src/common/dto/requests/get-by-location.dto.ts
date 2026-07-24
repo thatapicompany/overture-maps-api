@@ -44,17 +44,17 @@ export class GetByLocationDto {
   radius?: number = 1000;
 
   @ApiPropertyOptional({
-    description: 'Limit on the number of results returned, defaulting to 1000 if not provided.',
+    description: 'Limit on the number of results returned, defaulting to 100 if not provided. Use `page` to paginate for more.',
     example: 10,
     minimum: 1,
-    default: 1000,
+    default: 100,
   })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
   @Min(1)
-  @Max(25000, { message: 'Limit must be less than 25000, if you need a larger export then directly query the API otherwise the response will be too large' })
-  limit?: number = 25000;
+  @Max(25000, { message: 'Limit must be less than 25000, if you need a larger export then paginate with the page parameter otherwise the response will be too large' })
+  limit?: number = 100;
 
   @ApiPropertyOptional({
     description: 'Page number for pagination (0-indexed), used together with `limit` as the page size. Responses include Pagination-Count (total matching results), Pagination-Page and Pagination-Limit headers. Defaults to 0.',
