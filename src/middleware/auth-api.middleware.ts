@@ -112,8 +112,30 @@ export class AuthAPIMiddleware implements NestMiddleware {
       }
     } catch (error: any) {
       Logger.error('APIKeyMiddleware Error:', error, ` key: ${maskKey(apiKeyString)}`);
-      if (error && (error.statusCode === 403 || error.status === 403 || error.response?.status === 403)) {
+
+      // TheAuthAPI's SDK throws ApiResponseError carrying the upstream HTTP
+      // status. Surface the ones that mean something specific to the caller
+      // rather than collapsing them all into "check your spelling".
+      const status = getUpstreamStatus(error);
+
+      if (status === 403) {
         res.status(403).send(error.message || 'Origin domain is not allowed for this API key');
+        return;
+      }
+
+      // The key is valid but over its rate limit or monthly quota. Telling
+      // the caller their key is misspelled here is actively misleading.
+      if (status === 429) {
+        res.status(429).send(cleanUpstreamMessage(error.message, 'Too many requests - rate limit exceeded for this API key'));
+        return;
+      }
+
+      // TheAuthAPI is unreachable or erroring: this is our problem, not a bad
+      // key. A 401 would send customers hunting for a typo during an outage.
+      if (status === undefined || status >= 500) {
+        res
+          .status(503)
+          .send('Unable to verify your API key right now - please retry shortly');
         return;
       }
     }
@@ -122,4 +144,17 @@ export class AuthAPIMiddleware implements NestMiddleware {
     res.status(401).send('Unauthorized - check the spelling of your API Key');
     return;
   }
+}
+
+// The status may arrive as ApiResponseError.statusCode, or on an axios-shaped
+// error, depending on where it was thrown.
+function getUpstreamStatus(error: any): number | undefined {
+  return error?.statusCode ?? error?.status ?? error?.response?.status;
+}
+
+// TheAuthAPI's SDK prefixes its messages with the status, e.g.
+// "(429): Too many requests". Strip that so callers get a clean sentence.
+function cleanUpstreamMessage(message: string | undefined, fallback: string): string {
+  const stripped = message?.replace(/^\(\d{3}\):\s*/, '').trim();
+  return stripped || fallback;
 }
