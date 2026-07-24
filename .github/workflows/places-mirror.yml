@@ -1,0 +1,39 @@
+name: Rebuild Places Mirror (clustered)
+
+# Rebuilds the geometry-clustered mirror of the Overture place table
+# (etl/build-places-mirror.sql) so /places radius queries prune spatially
+# instead of scanning ~45GB each. Runs monthly after Overture's release.
+# Idempotent (CREATE OR REPLACE). Point the API at it with
+# PLACE_TABLE=overture-maps-api.overture.place once the first build succeeds.
+#
+# The service account in GOOGLE_APPLICATION_CREDENTIALS needs BigQuery
+# dataset create + table write in overture-maps-api and read on
+# bigquery-public-data.overture_maps.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 25 * *' # 25th of each month, 04:00 UTC (after Overture release)
+
+jobs:
+  build-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Rebuild clustered place mirror
+        run: |
+          bq query \
+            --project_id="${{ secrets.BIGQUERY_PROJECT_ID }}" \
+            --location=US \
+            --use_legacy_sql=false \
+            < etl/build-places-mirror.sql
