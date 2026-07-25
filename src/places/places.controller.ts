@@ -55,6 +55,16 @@ export class PlacesController {
     // dumps with no narrowing filter, which return (and scan for) everything.
     const hasLatLng = Number.isFinite(query.lat) && Number.isFinite(query.lng);
     if (user?.isDemoAccount) {
+      // The mirror is clustered by geometry, so only lat/lng radius queries
+      // prune. A demo country-level query still scans the whole ~45GB table —
+      // this is exactly how the demo key ran up ~US$118 in country dumps. The
+      // demo key is for trying nearby search, so restrict it to lat/lng only.
+      if (!hasLatLng) {
+        throw new HttpException(
+          'The demo key supports lat/lng radius queries only. Get a free API key at overturemapsapi.com for country-level queries.',
+          400,
+        );
+      }
       query.radius = Math.min(query.radius ?? 1000, 2000);
       query.limit = Math.min(query.limit ?? 25, 25);
     }
