@@ -73,6 +73,15 @@ export class GetPlacesDto extends GetByLocationDto {
   brand_name?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Filter by the place\'s own name — an additional filter on top of lat/lng/radius (or country) search, not a standalone text search. Case-insensitive exact match against names.primary or any localized value in names.common.',
+    example: 'Central Park',
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({
     description: 'Minimum confidence score for the places to be returned, defaulting to 0.5 if not provided.',
     example: 0.5,
     default: 0.5,

@@ -71,10 +71,10 @@ export class PlacesController {
     if (
       query.country && !hasLatLng &&
       !query.categories?.length && !query.taxonomy?.length &&
-      !query.brand_name && !query.brand_wikidata
+      !query.brand_name && !query.brand_wikidata && !query.name
     ) {
       throw new HttpException(
-        'A country-level query must include a narrowing filter (categories, taxonomy, brand_name or brand_wikidata), or be queried by lat/lng/radius. Unfiltered whole-country requests are not supported.',
+        'A country-level query must include a narrowing filter (categories, taxonomy, brand_name, brand_wikidata or name), or be queried by lat/lng/radius. Unfiltered whole-country requests are not supported.',
         400,
       );
     }

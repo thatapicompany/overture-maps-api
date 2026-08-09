@@ -14,4 +14,11 @@ describe('GetPlacesDto', () => {
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
+
+  it('should accept an optional name filter alongside lat/lng', async () => {
+    const dto = plainToInstance(GetPlacesDto, { lat: 10, lng: 20, name: 'Central Park' });
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+    expect(dto.name).toBe('Central Park');
+  });
 });
