@@ -15,6 +15,7 @@ const placesKey = (q: GetPlacesDto) =>
     lat: q.lat, lng: q.lng, radius: q.radius, country: q.country,
     min_confidence: q.min_confidence, brand_wikidata: q.brand_wikidata,
     brand_name: q.brand_name, categories: q.categories, limit: q.limit,
+    name: q.name,
   });
 
 describe('PlacesService', () => {
@@ -230,12 +231,50 @@ describe('PlacesService', () => {
       undefined, // operating_status
       undefined, // taxonomy
       0,         // page
-      undefined  // has_contact
+      undefined, // has_contact
+      undefined  // name
     );
 
     expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);
     expect(result.results).toEqual(mockPlaceResponseDto);
     expect(result.totalCount).toBe(1);
+  });
+
+  it('passes the name filter through to BigQuery and includes it in the cache key', async () => {
+    mockCacheGet.mockResolvedValueOnce(null);
+    const paginatedResponse = { results: mockBigQueryGetPlacesNearbyResponse, totalCount: mockBigQueryGetPlacesNearbyResponse.length };
+    mockBigQueryGetPlacesNearby.mockResolvedValueOnce(paginatedResponse);
+    mockCacheSet.mockResolvedValueOnce(undefined);
+
+    const query: GetPlacesDto = {
+      lat: 43.8711004,
+      lng: -1.1516016,
+      radius: 1000,
+      name: 'Intermarché',
+      limit: 10,
+    };
+
+    await service.getPlaces(query);
+
+    expect(mockCacheGet).toHaveBeenCalledWith(placesKey(query));
+    expect(mockBigQueryGetPlacesNearby).toHaveBeenCalledWith(
+      query.lat,
+      query.lng,
+      query.radius,
+      undefined, // brand_wikidata
+      undefined, // brand_name
+      undefined, // country
+      undefined, // categories
+      undefined, // min_confidence
+      query.limit,
+      undefined, // source (applied post-query)
+      undefined, // operating_status
+      undefined, // taxonomy
+      0,         // page
+      undefined, // has_contact
+      'Intermarché'
+    );
+    expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);
   });
 
   it('should filter places by source dataset if source is provided', async () => {

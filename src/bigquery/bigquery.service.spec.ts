@@ -134,6 +134,44 @@ describe('BigQueryService', () => {
       await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'GB', undefined, 0.5, 5, undefined, undefined, undefined, 0, []);
       expect(spy.mock.calls[0][0]).not.toContain('ARRAY_LENGTH');
     });
+
+    it('adds a case-insensitive name clause against names.primary and names.common when name is provided', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 5, undefined, undefined, undefined, 0, undefined, 'Central Park');
+      const sql = spy.mock.calls[0][0];
+      const params = spy.mock.calls[0][1];
+      // names.common is a MAP (STRUCT<key_value ARRAY<STRUCT<key,value>>>), not the
+      // {list:[{element}]} shape used by other repeated fields — must unnest .key_value.
+      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(sql).toContain('UNNEST(names.common.key_value)');
+      expect(sql).toContain('LOWER(common_name.value) = LOWER(@name)');
+      expect(params.name).toBe('Central Park');
+    });
+
+    it('adds no name clause when name is omitted', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, 'US', ['food'], 0.5, 5);
+      expect(spy.mock.calls[0][0]).not.toContain('names.primary');
+      expect(spy.mock.calls[0][1].name).toBeUndefined();
+    });
+
+    it('combines the name filter with other filters (radius + brand_name + name)', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, 'Starbucks', undefined, undefined, undefined, 5, undefined, undefined, undefined, 0, undefined, 'Starbucks Reserve');
+      const sql = spy.mock.calls[0][0];
+      const params = spy.mock.calls[0][1];
+      expect(sql).toContain('ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)');
+      expect(sql).toContain('brand.names.primary = @brand_name');
+      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(params.brand_name).toBe('Starbucks');
+      expect(params.name).toBe('Starbucks Reserve');
+    });
   });
 
   // Helper to expose bigQueryClient for testing
