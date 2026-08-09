@@ -461,7 +461,8 @@ export class BigQueryService {
     operating_status?: string,
     taxonomy?: string[],
     page: number = 0,
-    has_contact?: string[]
+    has_contact?: string[],
+    name?: string
   ): Promise<{ results: Place[]; totalCount: number }> {
 
     let queryParts: string[] = [];
@@ -495,6 +496,19 @@ export class BigQueryService {
     if (brand_name) {
       whereClauses.push(`brand.names.primary = @brand_name`);
       params.brand_name = brand_name;
+    }
+
+    if (name) {
+      // Additive filter on the place's own name, not a standalone text search
+      // — always paired with the radius/country predicate above. Matches
+      // names.primary or any localized value in names.common. Unlike the
+      // other repeated fields (websites, addresses, etc.) which use Overture's
+      // Parquet {list:[{element}]} shape, names.common is a MAP<string,string>
+      // and comes through BigQuery as STRUCT<key_value ARRAY<STRUCT<key,value>>>,
+      // so it's unnested via .key_value rather than .list. UNNEST of a NULL
+      // array (places with no common names) yields zero rows, not an error.
+      whereClauses.push(`(LOWER(names.primary) = LOWER(@name) OR EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE LOWER(common_name.value) = LOWER(@name)))`);
+      params.name = name;
     }
 
     if (country) {
