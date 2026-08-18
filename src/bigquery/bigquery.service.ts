@@ -37,6 +37,14 @@ const SOURCE_DATASET = "bigquery-public-data.overture_maps"
 // changes are needed — only the table name.
 const PLACE_TABLE = process.env.PLACE_TABLE || `${SOURCE_DATASET}.place`;
 
+// The building table queried by getPlacesWithNearestBuilding() and
+// getBuildingsNearby(). Same reasoning as PLACE_TABLE: the raw public table
+// isn't clustered, so the nearest-building join and the plain radius scan
+// both pay for a large scan on the buildings side even after the place side
+// was fixed (see etl/build-buildings-mirror.sql). Set to an in-project mirror
+// clustered by geometry once built.
+const BUILDING_TABLE = process.env.BUILDING_TABLE || `${SOURCE_DATASET}.building`;
+
 // How long to trust a cached place-table column list. Overture releases monthly
 // and Google re-mirrors shortly after, so a few hours is plenty to pick up the
 // September 2026 `categories` column removal without a redeploy.
@@ -364,7 +372,7 @@ export class BigQueryService {
           geometry AS building_geometry,
           ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS building_distance
         FROM
-          \`bigquery-public-data.overture_maps.building\`
+          \`${BUILDING_TABLE}\`
         WHERE
           ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
           AND ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)
@@ -412,7 +420,7 @@ export class BigQueryService {
       FROM
         \`${PLACE_TABLE}\` AS p
       JOIN
-        \`bigquery-public-data.overture_maps.building\` AS b
+        \`${BUILDING_TABLE}\` AS b
       ON
         ST_WITHIN(p.geometry, b.geometry)
       WHERE
@@ -600,7 +608,7 @@ SELECT
   *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
-  \`bigquery-public-data.overture_maps.building\` AS s
+  \`${BUILDING_TABLE}\` AS s
 WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
