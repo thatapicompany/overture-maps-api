@@ -84,6 +84,39 @@ turn it on:
   `taxonomy`, `brand_name` or `brand_wikidata`); unfiltered whole-country dumps
   return 400 (`places.controller`). Stops the "7 TiB for 5k results" pattern.
 
+### 6. Cluster the building table (`/places/buildings`, `/buildings`)
+
+Fix #1 clustered the *place* table, but `getPlacesWithNearestBuilding()` and
+`getBuildingsNearby()` also read `bigquery-public-data.overture_maps.building`,
+which was never mirrored. The nearest-building join was flagged in code as
+costing **~$2.25/query** (vs a ~$0.02 target) and, unlike `/places`, cost and
+latency get materially worse as radius grows — a 2–5 km nearest-building
+request can time out against the unclustered source.
+
+**In code (this branch):** the API now reads `BUILDING_TABLE`
+(`src/bigquery/bigquery.service.ts`), defaulting to the public table, used by
+both `getPlacesWithNearestBuilding()` (both the `match_nearest_building=true`
+and `=false` paths) and `getBuildingsNearby()`. `etl/build-buildings-mirror.sql`
++ `.github/workflows/buildings-mirror.yml` build a geometry-clustered mirror
+`overture-maps-api.overture.building`, same pattern as the place mirror.
+
+As an immediate stopgap independent of the mirror, `/places/buildings` now
+caps `radius` at **2000 m** (vs 25000 m on `/places`) — see
+`GetPlacesWithBuildingsDto` — since the buildings side doesn't prune until the
+mirror is live.
+
+**To deploy:**
+1. Trigger the `Rebuild Buildings Mirror` workflow once (or run
+   `bq query --location=US --use_legacy_sql=false < etl/build-buildings-mirror.sql`).
+2. Set `BUILDING_TABLE=overture-maps-api.overture.building` on the Cloud Run
+   service and deploy. Re-measure cost/latency at 2–10 km radius before
+   raising the 2000 m cap back up.
+3. The workflow rebuilds it monthly, offset 30 min after the places mirror.
+
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
-the per-user ceiling. 2 is already done.
+the per-user ceiling. 2 is already done. 6 does for `/places/buildings` and
+`/buildings` what 1 did for `/places` — until it's deployed, those two
+endpoints are the main remaining per-request cost risk, including for paid
+tiers where the plan's own margin could otherwise be wiped out by one
+large-radius buildings request.
