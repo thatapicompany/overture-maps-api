@@ -174,6 +174,53 @@ describe('BigQueryService', () => {
     });
   });
 
+  describe('getPlacesWithNearestBuilding / getBuildingsNearby (BUILDING_TABLE)', () => {
+    const validRow = {
+      id: '1',
+      geometry: { value: 'POINT(20 10)' },
+      bbox: { xmin: '0', xmax: '1', ymin: '0', ymax: '1' },
+      version: 'v1',
+      sources: { list: [] },
+      names: {},
+      categories: {},
+      confidence: 1,
+      addresses: [],
+      building_id: 'b1',
+      building_geometry: { value: 'POLYGON((0 0,1 0,1 1,0 1,0 0))' },
+      distance_to_nearest_building: 0,
+    };
+
+    it('queries the default public building table when BUILDING_TABLE is unset (match_nearest_building=true)', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesWithNearestBuilding(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 5, true);
+      const sql = spy.mock.calls[0][0];
+      // Both the buildings CTE and the place-side JOIN should reference the
+      // same BUILDING_TABLE-derived name; falls back to the public dataset
+      // table when the env var isn't set (as in this test process).
+      expect(sql).toContain('bigquery-public-data.overture_maps.building');
+    });
+
+    it('queries the default public building table when BUILDING_TABLE is unset (match_nearest_building=false)', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesWithNearestBuilding(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 5, false);
+      const sql = spy.mock.calls[0][0];
+      expect(sql).toContain('bigquery-public-data.overture_maps.building');
+    });
+
+    it('getBuildingsNearby queries the default public building table when BUILDING_TABLE is unset', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getBuildingsNearby(10, 20, 500, 5);
+      const sql = spy.mock.calls[0][0];
+      expect(sql).toContain('bigquery-public-data.overture_maps.building');
+    });
+  });
+
   // Helper to expose bigQueryClient for testing
   class TestableBigQueryService extends BigQueryService {
     setBigQueryClient(client: any) {
