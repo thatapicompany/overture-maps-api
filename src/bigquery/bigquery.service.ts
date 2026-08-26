@@ -758,10 +758,38 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     queryParts.push(
       `-- Overture Maps API: Get Base Features Nearby (Land Use + Land Cover)
     -- Single statement (no DECLARE) so BigQuery can cache identical repeat queries.
+    -- land_use's sources.list.element has extra fields (provider/resource/version)
+    -- that land_cover's doesn't, so a bare "sources" UNION ALL fails with
+    -- "incompatible types" the moment the two tables' schemas drift apart (this
+    -- broke live on 2026-08-25). Rebuild sources to the same fixed shape on both
+    -- sides so the union only ever depends on the fields we actually read in
+    -- bq-base-row.parser.ts, not on whatever else Overture adds upstream.
 WITH combined_base AS (
-  SELECT id, geometry, bbox, version, sources, subtype, class FROM \`bigquery-public-data.overture_maps.land_use\`
+  SELECT id, geometry, bbox, version,
+    STRUCT(ARRAY(
+      SELECT AS STRUCT STRUCT(
+        entry.element.property AS property,
+        entry.element.dataset AS dataset,
+        entry.element.record_id AS record_id,
+        entry.element.license AS license
+      ) AS element
+      FROM UNNEST(sources.list) AS entry
+    ) AS list) AS sources,
+    subtype, class
+  FROM \`bigquery-public-data.overture_maps.land_use\`
   UNION ALL
-  SELECT id, geometry, bbox, version, sources, subtype, CAST(NULL as string) as class FROM \`bigquery-public-data.overture_maps.land_cover\`
+  SELECT id, geometry, bbox, version,
+    STRUCT(ARRAY(
+      SELECT AS STRUCT STRUCT(
+        entry.element.property AS property,
+        entry.element.dataset AS dataset,
+        entry.element.record_id AS record_id,
+        entry.element.license AS license
+      ) AS element
+      FROM UNNEST(sources.list) AS entry
+    ) AS list) AS sources,
+    subtype, CAST(NULL as string) as class
+  FROM \`bigquery-public-data.overture_maps.land_cover\`
 )
 SELECT
   *, COUNT(*) OVER() AS total_count
