@@ -296,6 +296,63 @@ describe('BigQueryService', () => {
     });
   });
 
+  describe('getBaseNearby (land_use + land_cover UNION ALL, live 500 on 2026-08-25)', () => {
+    const validBaseRow = {
+      id: '1',
+      geometry: { value: 'POLYGON((0 0, 1 0, 1 1, 0 0))' },
+      bbox: { xmin: '0', xmax: '1', ymin: '0', ymax: '1' },
+      version: 1,
+      sources: {
+        list: [
+          { element: { property: '', dataset: 'OpenStreetMap', record_id: 'w1', license: 'ODbL-1.0' } },
+        ],
+      },
+      subtype: 'park',
+      class: 'park',
+    };
+
+    it('rebuilds sources into a fixed shape on both sides of the UNION instead of selecting it verbatim', async () => {
+      // Root cause: land_use's sources.list.element has extra fields
+      // (provider/resource/version) that land_cover's doesn't. A bare
+      // "SELECT ... sources ..." on both sides made the UNION ALL fail with
+      // "incompatible types" the moment those two schemas drifted apart -
+      // that's what broke /base in prod. Rebuilding sources to only the
+      // fields bq-base-row.parser.ts reads makes the union immune to
+      // whatever else Overture adds upstream to either table.
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validBaseRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getBaseNearby(10, 20, 500, 5);
+      const sql = spy.mock.calls[0][0];
+
+      // Old, broken pattern must not reappear
+      expect(sql).not.toMatch(/SELECT id, geometry, bbox, version, sources,/);
+
+      // Both branches of the UNION rebuild sources the same way
+      const rebuildOccurrences = sql.match(/STRUCT\(ARRAY\(/g) ?? [];
+      expect(rebuildOccurrences.length).toBe(2);
+      expect(sql).toContain('FROM UNNEST(sources.list) AS entry');
+      expect(sql).toContain('entry.element.property AS property');
+      expect(sql).toContain('bigquery-public-data.overture_maps.land_use');
+      expect(sql).toContain('bigquery-public-data.overture_maps.land_cover');
+    });
+
+    it('parses results end to end with the rebuilt sources shape', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [{ ...validBaseRow, total_count: 1 }], statistics: {} });
+
+      const result = await service.getBaseNearby(10, 20, 500, 5);
+
+      expect(result.totalCount).toBe(1);
+      expect(result.results[0].sources[0]).toEqual({
+        property: '',
+        dataset: 'OpenStreetMap',
+        record_id: 'w1',
+        license: 'ODbL-1.0',
+      });
+    });
+  });
+
   describe('runQuery', () => {
     it('should throw and log error if query fails', async () => {
       const service = new TestableBigQueryService();
