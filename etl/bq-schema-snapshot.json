@@ -425,6 +425,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
@@ -683,6 +695,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
@@ -994,6 +1018,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
@@ -2402,6 +2438,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
@@ -2502,6 +2550,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
