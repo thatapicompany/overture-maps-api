@@ -201,15 +201,18 @@ needed; can be done today.
    fix, country mirror and id-clustered division_area mirror built in
    BigQuery, routing, workflows. Still to do from the original PR A:
    `maximumBytesBilled` at 16 GiB with the 400 mapping and usage row fields.
-3. PR B: `QuotaGuard` with Firestore and in-memory stores, headers, soft
-   logging, 429 with `Retry-After`, limits from the Firestore plan lookup,
-   `ThrottlerGuard` re-keyed.
+3. Monthly cap built 11 Oct 2026 on `feat/monthly-request-cap`
+   (`src/quota/`, runbook section 9): Free warns at 100 and is refused from
+   200; paid plans are refused at their own soft limit (Premium 2,000, Growth
+   6,000, Scale 20,000); enforced on deploy with the month seeded from
+   BigQuery. Still to do: re-key `ThrottlerGuard` per account.
    Unit tests with a fake clock across minute and month boundaries. E2E with
    BigQuery mocked, replaying the 5 and 6 Oct parameter sets from
    `usage.api_requests`: the 109 name scans 403 at request one, the
    buildings sweep 429s at request 101.
-4. Dated notice to the 27 over-cap Free accounts, then flip monthly
-   enforcement on. (The `tiers.json` job is no longer needed.)
+4. Enforcement on deploy was chosen over a notice period (11 Oct 2026).
+   At that date 7 Free accounts were already past 200 for October: Suntria,
+   CWYC, Joey, PawPrints Dispatch, TobiaScivoletto, Cost Seg Smart, tasneem.
 5. Country mirror: done in step 2. Measured; the backstop stays at 16 GiB.
 6. Observability: scheduled query producing per-account daily requests and
    bytes into `usage.account_daily_usage`; log-based alert on any account
@@ -225,6 +228,9 @@ needed; can be done today.
 - Paid plan is read live from the portal's Firestore, not an env list or a
   scheduled export; uncertain lookups allow (11 Oct 2026).
 - Quota counters live in Firestore; there is no Redis (11 Oct 2026).
+- Monthly cap: allowance and refusal point from Stripe metadata
+  (`monthly_requests`, `soft_limit_requests`); paid plans are capped at their
+  soft limit too; enforce on deploy (11 Oct 2026).
 
 ## Open
 

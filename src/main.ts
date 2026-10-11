@@ -8,6 +8,9 @@ const helmet = require('helmet');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Run onModuleDestroy on Cloud Run's SIGTERM so batched usage counters (and
+  // the BigQuery usage sink) flush before the instance stops.
+  app.enableShutdownHooks();
   app.use(helmet());
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
@@ -24,7 +27,7 @@ async function bootstrap() {
     "optionsSuccessStatus": 204,
     "credentials": false,
     "allowedHeaders": 'Content-Type, Authorization, Accept, Observe, x-api-key',
-    "exposedHeaders": "Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version"
+    "exposedHeaders": "Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version, X-Quota-Plan, X-Quota-Limit, X-Quota-Hard-Limit, X-Quota-Used, X-Quota-Remaining, X-Quota-Reset, X-Quota-Warning, Retry-After"
   }
 
   app.enableCors(corsOptions);
