@@ -85,7 +85,37 @@ describe('UsageCounterStore', () => {
     expect(backend.read).toHaveBeenCalledTimes(1); // backed off
   });
 
-  it('keeps increments that failed to flush and retries them', async () => {
+  it('never retries an increment that timed out after landing (the production double count)', async () => {
+    const prev = process.env.QUOTA_WRITE_TIMEOUT_MS;
+    const prevStore = process.env.QUOTA_STORE_TIMEOUT_MS;
+    process.env.QUOTA_WRITE_TIMEOUT_MS = '20';
+    process.env.QUOTA_STORE_TIMEOUT_MS = '20';
+    try {
+      const store = new UsageCounterStore();
+      (store as any).logger = { log: jest.fn(), error: jest.fn() };
+      const backend = memoryBackend();
+      store.configure(backend, jest.fn().mockResolvedValue(3));
+      await store.current('acct', OCT);
+      // The write lands immediately but the acknowledgement is slower than the timeout.
+      (backend.increment as jest.Mock).mockImplementation(async (k: string, n: number) => {
+        backend.docs.set(k, (backend.docs.get(k) ?? 0) + n);
+        await new Promise((r) => setTimeout(r, 100));
+      });
+      for (let i = 0; i < 2; i++) {
+        store.record('acct', OCT);
+        await store.flush();
+      }
+      await store.flush();
+      await new Promise((r) => setTimeout(r, 150));
+      expect(backend.docs.get('acct_2026-10')).toBe(5); // 3 seeded + 2, not 7 or 8
+      expect(backend.increment).toHaveBeenCalledTimes(2);
+    } finally {
+      if (prev === undefined) delete process.env.QUOTA_WRITE_TIMEOUT_MS; else process.env.QUOTA_WRITE_TIMEOUT_MS = prev;
+      if (prevStore === undefined) delete process.env.QUOTA_STORE_TIMEOUT_MS; else process.env.QUOTA_STORE_TIMEOUT_MS = prevStore;
+    }
+  });
+
+  it('does not retry a failed increment either, and re-syncs from Firestore on the next read', async () => {
     const store = new UsageCounterStore();
     (store as any).logger = { log: jest.fn(), error: jest.fn() };
     const backend = memoryBackend();
@@ -94,9 +124,25 @@ describe('UsageCounterStore', () => {
     store.record('acct', OCT);
     (backend.increment as jest.Mock).mockRejectedValueOnce(new Error('UNAVAILABLE'));
     await store.flush();
-    expect(await store.current('acct', OCT)).toBe(1);
     await store.flush();
-    expect(backend.docs.get('acct_2026-10')).toBe(1);
+    expect(backend.increment).toHaveBeenCalledTimes(1);
+    await store.current('acct', OCT); // forced refresh
+    await new Promise((r) => setImmediate(r));
+    expect(await store.current('acct', OCT)).toBe(0); // the write did not land, and nothing pretends it did
+  });
+
+  it('flushSoon starts a flush only when something is pending', async () => {
+    const store = new UsageCounterStore();
+    const backend = memoryBackend();
+    store.configure(backend, jest.fn().mockResolvedValue(0));
+    await store.current('acct', OCT);
+    store.flushSoon();
+    await new Promise((r) => setImmediate(r));
+    expect(backend.increment).not.toHaveBeenCalled();
+    store.record('acct', OCT);
+    store.flushSoon();
+    await new Promise((r) => setImmediate(r));
+    expect(backend.increment).toHaveBeenCalledWith('acct_2026-10', 1);
   });
 
   it('starts a new count each UTC month', async () => {
