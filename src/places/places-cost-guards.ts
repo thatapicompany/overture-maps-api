@@ -1,10 +1,8 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { User } from '../decorators/authed-user.decorator';
-import { paidTierSourceConfigured } from '../middleware/account-tier';
+import { PlanStatus } from '../tiers/plan-lookup.service';
 
 const logger = new Logger('PlacesCostGuards');
-let warnedUnconfigured = false;
-
 // Country-level /places queries (a `country` filter with no lat/lng) read a
 // whole country's slice of the place table however narrow the other filters
 // are: with the country mirror that is low single-digit GiB for a small
@@ -33,24 +31,32 @@ export function isCountryLevel(query: CountryLevelQuery): boolean {
   return !!query.country && !hasLatLng(query);
 }
 
+export interface PlanSource {
+  getPlanStatus(accountId: string): Promise<PlanStatus>;
+}
+
 /**
- * Throws 403 when a non-paid account makes a country-level query. Demo
- * accounts are rejected earlier with their own message; this covers Free.
+ * Throws 403 when a Free account makes a country-level query. Demo accounts
+ * are rejected earlier with their own message.
  *
- * Fails OPEN when no paid-tier source is configured (PAID_ACCOUNT_IDS unset):
- * we cannot tell paid from Free, and blocking a paying customer is worse than
- * the bounded cost of letting a Free query through. Logged as an error once
- * per instance so a deploy that forgot the env var is visible.
+ * Order: (1) not country-level, allow; (2) `user.isPaidAccount` (the
+ * PAID_ACCOUNT_IDS override or TheAuthAPI key metadata), allow with no lookup;
+ * (3) live plan from Firestore via `plans`: paid allows, free is a 403, and
+ * `unknown` ALLOWS. Unknown covers a missing org doc, an unrecognised status,
+ * a Firestore error and a timeout; none of those may lock out a paying
+ * customer.
  */
-export function assertCountryLevelAllowed(query: CountryLevelQuery, user?: User): void {
+export async function checkCountryLevelAllowed(query: CountryLevelQuery, user: User | undefined, plans: PlanSource): Promise<void> {
   if (!isCountryLevel(query)) return;
   if (user?.isPaidAccount) return;
-  if (!paidTierSourceConfigured()) {
-    if (!warnedUnconfigured) {
-      warnedUnconfigured = true;
-      logger.error('PAID_ACCOUNT_IDS is not set: country-level /places is NOT restricted to paid plans. Set it on the Cloud Run service.');
-    }
-    return;
+  if (!user?.accountId) {
+    throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
   }
-  throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
+  const status = await plans.getPlanStatus(user.accountId);
+  if (status === 'free') {
+    throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
+  }
+  if (status === 'unknown') {
+    logger.warn(`Country-level query allowed for account ${user.accountId}: plan unknown (fail open).`);
+  }
 }
