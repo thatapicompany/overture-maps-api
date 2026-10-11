@@ -48,6 +48,15 @@ const placeTable = (): string => process.env.PLACE_TABLE || `${SOURCE_DATASET}.p
 // call so tests and runtime config changes take effect without a reload.
 const placeCountryTable = (): string | undefined => process.env.PLACE_COUNTRY_TABLE || undefined;
 
+// The public division_area table is clustered by geometry, so a lookup by `id`
+// (GET /divisions/:id) scanned all ~9.7GB of it: ~9 GiB billed per call,
+// 1.6 TiB in the 30 days to 11 Oct 2026. DIVISION_AREA_TABLE points at an
+// in-project mirror clustered by id (etl/build-division-area-mirror.sql), so
+// the lookup prunes to a block or two. Same schema, so no query change. When
+// unset, lookups read the public table exactly as before.
+const PUBLIC_DIVISION_AREA_TABLE = `${SOURCE_DATASET}.division_area`;
+const divisionAreaTable = (): string => process.env.DIVISION_AREA_TABLE || PUBLIC_DIVISION_AREA_TABLE;
+
 // The building table queried by getPlacesWithNearestBuilding() and
 // getBuildingsNearby(). Same reasoning as PLACE_TABLE: the raw public table
 // isn't clustered, so the nearest-building join and the plain radius scan
@@ -979,15 +988,25 @@ WHERE ${whereClauses.join('\n  AND ')}`);
   }
 
   async getDivisionById(id: string): Promise<DivisionArea | null> {
-    const query = `-- Overture Maps API: Get Division Area by ID
+    const byIdQuery = (table: string) => `-- Overture Maps API: Get Division Area by ID
 SELECT
   *
 FROM
-  \`bigquery-public-data.overture_maps.division_area\` AS s
+  \`${table}\` AS s
 WHERE s.id = @id
 LIMIT 1;`;
 
-    const { rows } = await this.runQuery(query, { id });
+    const table = divisionAreaTable();
+    let { rows } = await this.runQuery(byIdQuery(table), { id });
+
+    // The mirror is rebuilt monthly, so for up to a few weeks after an Overture
+    // release it can lag the public table. An id the public table has (e.g. one
+    // returned by /divisions search) must never 404 because of that lag: on a
+    // miss, look it up in the public table. Costs the old ~9 GiB only for ids
+    // the mirror lacks, which are new or genuinely unknown.
+    if (!rows.length && table !== PUBLIC_DIVISION_AREA_TABLE) {
+      ({ rows } = await this.runQuery(byIdQuery(PUBLIC_DIVISION_AREA_TABLE), { id }));
+    }
     if (!rows.length) return null;
 
     const division = parseDivisionRow(rows[0]);

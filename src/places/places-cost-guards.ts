@@ -1,5 +1,9 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { User } from '../decorators/authed-user.decorator';
+import { paidTierSourceConfigured } from '../middleware/account-tier';
+
+const logger = new Logger('PlacesCostGuards');
+let warnedUnconfigured = false;
 
 // Country-level /places queries (a `country` filter with no lat/lng) read a
 // whole country's slice of the place table however narrow the other filters
@@ -32,10 +36,21 @@ export function isCountryLevel(query: CountryLevelQuery): boolean {
 /**
  * Throws 403 when a non-paid account makes a country-level query. Demo
  * accounts are rejected earlier with their own message; this covers Free.
- * Pure and framework-light so it can be unit tested without a Nest module.
+ *
+ * Fails OPEN when no paid-tier source is configured (PAID_ACCOUNT_IDS unset):
+ * we cannot tell paid from Free, and blocking a paying customer is worse than
+ * the bounded cost of letting a Free query through. Logged as an error once
+ * per instance so a deploy that forgot the env var is visible.
  */
 export function assertCountryLevelAllowed(query: CountryLevelQuery, user?: User): void {
   if (!isCountryLevel(query)) return;
   if (user?.isPaidAccount) return;
+  if (!paidTierSourceConfigured()) {
+    if (!warnedUnconfigured) {
+      warnedUnconfigured = true;
+      logger.error('PAID_ACCOUNT_IDS is not set: country-level /places is NOT restricted to paid plans. Set it on the Cloud Run service.');
+    }
+    return;
+  }
   throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
 }

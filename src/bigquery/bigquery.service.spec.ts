@@ -229,6 +229,65 @@ describe('BigQueryService', () => {
     }
   }
 
+  describe('getDivisionById reads the id-clustered mirror (DIVISION_AREA_TABLE)', () => {
+    // Public division_area is clustered by geometry, so a by-id lookup scanned
+    // ~9 GiB. The mirror is clustered by id. Behaviour must be identical for
+    // callers: same row, and never a 404 for an id the public table has.
+    const row = {
+      id: 'div-1', geometry: { value: 'MULTIPOLYGON(((0 0, 1 0, 1 1, 0 0)))' },
+      bbox: { xmin: '0', xmax: '1', ymin: '0', ymax: '1' }, version: 1, sources: { list: [] },
+      subtype: 'county', class: 'land', admin_level: 2, is_land: true, is_territorial: false,
+      division_id: 'd-1', names: { primary: 'Somewhere' }, country: 'US',
+    };
+    const prev = process.env.DIVISION_AREA_TABLE;
+    afterEach(() => {
+      if (prev === undefined) delete process.env.DIVISION_AREA_TABLE; else process.env.DIVISION_AREA_TABLE = prev;
+    });
+
+    it('queries the public table exactly as before when DIVISION_AREA_TABLE is unset', async () => {
+      delete process.env.DIVISION_AREA_TABLE;
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [row], statistics: {} });
+      const result = await service.getDivisionById('div-1');
+      expect(service.runQuery).toHaveBeenCalledTimes(1);
+      expect((service.runQuery as jest.Mock).mock.calls[0][0]).toContain('`bigquery-public-data.overture_maps.division_area`');
+      expect(result?.id).toBe('div-1');
+    });
+
+    it('reads the mirror and does not touch the public table on a hit', async () => {
+      process.env.DIVISION_AREA_TABLE = 'proj.overture.division_area';
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [row], statistics: {} });
+      const result = await service.getDivisionById('div-1');
+      expect(service.runQuery).toHaveBeenCalledTimes(1);
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('`proj.overture.division_area`');
+      expect(sql).toContain('WHERE s.id = @id');
+      expect(result?.id).toBe('div-1');
+    });
+
+    it('falls back to the public table when the mirror lacks the id, so a lagging mirror never causes a 404', async () => {
+      process.env.DIVISION_AREA_TABLE = 'proj.overture.division_area';
+      const service = new BigQueryService();
+      service.runQuery = jest.fn()
+        .mockResolvedValueOnce({ rows: [], statistics: {} })
+        .mockResolvedValueOnce({ rows: [row], statistics: {} });
+      const result = await service.getDivisionById('div-1');
+      const calls = (service.runQuery as jest.Mock).mock.calls.map((c) => c[0] as string);
+      expect(calls[0]).toContain('`proj.overture.division_area`');
+      expect(calls[1]).toContain('`bigquery-public-data.overture_maps.division_area`');
+      expect(result?.id).toBe('div-1');
+    });
+
+    it('returns null only when neither the mirror nor the public table has the id', async () => {
+      process.env.DIVISION_AREA_TABLE = 'proj.overture.division_area';
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [], statistics: {} });
+      expect(await service.getDivisionById('nope')).toBeNull();
+      expect(service.runQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('getDivisionById maritime geometry fallback (OvertureMaps/data#540)', () => {
     const landRowWithoutGeometry = {
       id: 'ru-land-id',
