@@ -57,8 +57,11 @@ What exists today and why it did not help:
 ### 1. Request counts, enforced in the API
 
 A `QuotaGuard` registered as a global guard after `ThrottlerGuard`. Two
-counters per account in Redis (`INCR` + `EXPIRE` in a `MULTI`), with an
-in-process `Map` behind the same interface when `REDIS_URL` is unset:
+counters per account in Firestore (atomic `FieldValue.increment`, in the
+`overture-api` project the plan lookup already reads), with an in-process
+`Map` behind the same interface for tests. There is no Redis: confirmed 11 Oct
+2026 that no Memorystore API is enabled, the service has no VPC path, and none
+of its 50 revisions ever set `REDIS_URL`.
 
 - `quota:{accountId}:min:{epochMinute}` for the per-minute limit.
 - `quota:{accountId}:month:{YYYY-MM}` for the monthly allowance.
@@ -85,13 +88,12 @@ Soft and hard:
   of next month UTC) and a body naming the allowance and the upgrade URL.
   No BigQuery job is created.
 
-Tier resolution: a `tiers.json` (`accountId -> plan`) written to the
-existing GCS bucket by a small job in `overture-maps-outreach` that pages
-Twenty's companies for `appName=OVERTURE_MAPS_API` (about 470 records, 8
-calls, inside Twenty's 100/min). The API loads it at boot and every 15
-minutes, like the brands and divisions artifacts, and treats an unknown
-account as Free. A new signup is Free until the next refresh, which is the
-safe default.
+Tier resolution (built 11 Oct 2026, `tiers/plan-lookup.service.ts`): read
+live from the portal's Firestore, `organizations/{accountId}`. `planId` is the
+Stripe price; paid = not a Free price and status active/trialing/past_due.
+Cached 60s per account, so an upgrade takes effect within a minute. Unknown
+(no doc, error, timeout) allows paid-only features. `PAID_ACCOUNT_IDS` is an
+override only. The quota guard reads the same lookup for per-tier limits.
 
 Enforcing the monthly cap for the first time will 429 the 27 Free accounts
 currently over it. The outreach job already emails upgrade candidates;
@@ -195,18 +197,19 @@ needed; can be done today.
 1. Today, no deploy: project quotas and billing budget. Optionally email
    Tobia and Kyle; both hit a wall they could not see.
 2. Done 11 Oct 2026 on `feat/places-country-mirror`: country-level
-   paid-only gate, `cost_usd` rate fix, country mirror built in BigQuery,
-   routing, workflow. Still to do from the original PR A:
+   paid-only gate with the plan read live from Firestore, `cost_usd` rate
+   fix, country mirror and id-clustered division_area mirror built in
+   BigQuery, routing, workflows. Still to do from the original PR A:
    `maximumBytesBilled` at 16 GiB with the 400 mapping and usage row fields.
-3. PR B: `QuotaGuard` with Redis and in-memory stores, headers, soft logging,
-   429 with `Retry-After`, `tiers.json` loader, `ThrottlerGuard` re-keyed.
+3. PR B: `QuotaGuard` with Firestore and in-memory stores, headers, soft
+   logging, 429 with `Retry-After`, limits from the Firestore plan lookup,
+   `ThrottlerGuard` re-keyed.
    Unit tests with a fake clock across minute and month boundaries. E2E with
    BigQuery mocked, replaying the 5 and 6 Oct parameter sets from
    `usage.api_requests`: the 109 name scans 403 at request one, the
    buildings sweep 429s at request 101.
-4. Job: `tiers.json` writer in `overture-maps-outreach` on Cloud Scheduler,
-   every 15 minutes. Dated notice to the 27 over-cap Free accounts, then flip
-   monthly enforcement on.
+4. Dated notice to the 27 over-cap Free accounts, then flip monthly
+   enforcement on. (The `tiers.json` job is no longer needed.)
 5. Country mirror: done in step 2. Measured; the backstop stays at 16 GiB.
 6. Observability: scheduled query producing per-account daily requests and
    bytes into `usage.account_daily_usage`; log-based alert on any account
@@ -219,6 +222,9 @@ needed; can be done today.
 - Country-level queries without lat/lng are paid tiers only (10 Oct 2026).
 - Country-level queries read `overture.place_by_country`, clustered by
   country (built 11 Oct 2026).
+- Paid plan is read live from the portal's Firestore, not an env list or a
+  scheduled export; uncertain lookups allow (11 Oct 2026).
+- Quota counters live in Firestore; there is no Redis (11 Oct 2026).
 
 ## Open
 

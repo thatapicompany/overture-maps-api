@@ -134,9 +134,10 @@ September's spend, and caused the 14 Sep (7.1 TiB) and 5 Oct (4.85 TiB,
   Covers `/places`, `/places/brands`, `/places/categories`, `/places/countries`.
   Unset `PLACE_COUNTRY_TABLE` means the old behaviour.
 - Country-level `/places` is **paid plans only**: Free gets a 403 before any
-  BigQuery job (`places/places-cost-guards.ts`). Paid is resolved from
-  `PAID_ACCOUNT_IDS` or `isPaidAccount: true` in the key's TheAuthAPI metadata
-  (`middleware/account-tier.ts`), never from a TheAuthAPI call.
+  BigQuery job (`places/places-cost-guards.ts`). Paid is resolved live from the
+  portal's Firestore (`tiers/plan-lookup.service.ts`), with `PAID_ACCOUNT_IDS` or
+  `isPaidAccount: true` in TheAuthAPI key metadata as an override
+  (`middleware/account-tier.ts`). Never from a TheAuthAPI call.
 - `cost_usd` now prices at US$6.25 per TiB (was US$5 per decimal TB, ~12% low).
 
 **Measured 11 Oct 2026** on the built mirror (73.6M rows, 47.5 GB), real runs
@@ -158,14 +159,17 @@ column, so `SELECT *` stays.
 1. Build the mirror once (workflow dispatch, or
    `bq query --location=US --use_legacy_sql=false < etl/build-places-country-mirror.sql`).
 2. On the Cloud Run service set
-   `PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country` and
-   `PAID_ACCOUNT_IDS=<paid org ids>`. The gate **fails open** when
-   `PAID_ACCOUNT_IDS` is unset (logs an error, restricts nothing), so a missed
-   env var costs money but never locks out a paying customer. IwannaFind
-   (`88756c26-b11b-476f-9aeb-4e817b1daf92`) ran 325 country-level queries in July
-   and must be in the list. Until tiers.json replaces it, **add the org id to
-   `PAID_ACCOUNT_IDS` whenever an account upgrades**, or their country-level
-   queries 403.
+   `PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country`. Paid is
+   resolved **live from the portal's Firestore** (`overture-api`,
+   `organizations/{accountId}`: `planId` is the Stripe price, paid = not a Free
+   price and status active/trialing/past_due), cached 60s per account, so an
+   upgrade takes effect within a minute with no deploy or env change. The
+   runtime service account needs `roles/datastore.viewer` on `overture-api`.
+   Anything uncertain (no doc, unrecognised status, Firestore error or timeout)
+   **allows**, so a lookup problem can cost money but never locks out a paying
+   customer; watch the logs for `Plan lookup failed`. `PAID_ACCOUNT_IDS` is now
+   only an override for accounts Stripe does not model. IwannaFind ran 325
+   country-level queries in July and resolves as paid.
 
    Verified 11 Oct 2026: IwannaFind's real country-level parameter sets (GB
    categories, BM taxonomy + has_contact) and the 5 Oct name query return the

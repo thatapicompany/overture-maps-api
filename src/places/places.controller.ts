@@ -13,7 +13,8 @@ import { CountryResponseDto, toCountryResponseDto } from './dto/responses/countr
 import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/category-response.dto';
 import { AuthedUser, User } from '../decorators/authed-user.decorator';
 import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
-import { assertCountryLevelAllowed, hasLatLng as hasLatLngQuery } from './places-cost-guards';
+import { checkCountryLevelAllowed, hasLatLng as hasLatLngQuery } from './places-cost-guards';
+import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { PlacesService } from './places.service';
 import { findNearestPolygon, isPointInPolygon, isPointInPolygonWithoutTurf, wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
@@ -37,7 +38,7 @@ export class PlacesController {
     private placesService: PlacesService,
     private buildingsService: BuildingsService,
     private brandsEnrichment: BrandsEnrichmentService,
-
+    private planLookup: PlanLookupService,
   ) {}
 
   private enrichmentAdapter: EnrichmentAdapter = loadEnrichmentAdapter();
@@ -70,11 +71,11 @@ export class PlacesController {
       query.radius = Math.min(query.radius ?? 1000, 2000);
       query.limit = Math.min(query.limit ?? 25, 25);
     }
-    // (3) country-level queries on a Free plan: paid tiers only (403). Even on
-    // the country-clustered mirror a whole-country slice is the most expensive
-    // shape the API serves, and it is how one key walks a country out of the
-    // API a page at a time.
-    assertCountryLevelAllowed(query, user);
+    // (3) country-level queries on a Free plan: paid tiers only (403), plan
+    // read live from the portal's Firestore. Even on the country-clustered
+    // mirror a whole-country slice is the most expensive shape the API serves,
+    // and it is how one key walks a country out of the API a page at a time.
+    await checkCountryLevelAllowed(query, user, this.planLookup);
     if (
       query.country && !hasLatLng &&
       !query.categories?.length && !query.taxonomy?.length &&

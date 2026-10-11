@@ -15,7 +15,9 @@ describe('PlacesController enrichment merge', () => {
       addresses: [],
     };
     const placesService = { getPlaces: jest.fn().mockResolvedValue({ results: [samplePlace], totalCount: 1 }) } as unknown as PlacesService;
-    const controller = new PlacesController(placesService, {} as BuildingsService, { isReady: () => false, get: () => undefined } as any);
+    // Radius query: the paid-plan lookup must never be consulted.
+    const planLookup = { getPlanStatus: jest.fn(() => { throw new Error('plan lookup must not run for radius queries'); }) } as any;
+    const controller = new PlacesController(placesService, {} as BuildingsService, { isReady: () => false, get: () => undefined } as any, planLookup);
     controller['enrichmentAdapter'] = {
       fetchEnrichmentByIds: async () => ({ '1': { foo: 'bar' } }),
       supportedFields: async () => [],
@@ -26,5 +28,6 @@ describe('PlacesController enrichment merge', () => {
     // unwraps it before the client sees the response.
     expect(envelope.totalCount).toBe(1);
     expect(envelope.results[0].enrichment.fields.foo).toBe('bar');
+    expect(planLookup.getPlanStatus).not.toHaveBeenCalled();
   });
 });

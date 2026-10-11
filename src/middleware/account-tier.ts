@@ -1,26 +1,13 @@
-// Which accounts are on a paid plan, resolved without a call to TheAuthAPI.
+// Static paid-account OVERRIDE, resolved without a call to TheAuthAPI.
 //
-// Interim source: the PAID_ACCOUNT_IDS env var, a comma-separated list of
-// account ids (Twenty `orgId` / TheAuthAPI `customAccountId`). The planned
-// replacement is a tiers.json artifact in GCS written from Twenty's
-// subscriptionPlan (docs/cost-budget-rate-limiting.md); this module is the
-// one place that swap happens. Unknown accounts are Free, which is the safe
-// default: a new signup gets Free behaviour until the tier source says
-// otherwise.
+// The live source of truth is the portal's Firestore (tiers/plan-lookup.service.ts),
+// which sees an upgrade within a minute. This override is for accounts Stripe
+// does not model (enterprise deals, comped access) or an emergency: list
+// account ids in PAID_ACCOUNT_IDS, or set `isPaidAccount: true` in the key's
+// TheAuthAPI metadata, and the account is treated as paid with no lookup.
 //
 // Read per call so tests and runtime config changes take effect without a
 // module reload.
-
-/**
- * True when a paid-tier source is configured at all. Gates that restrict
- * features to paid plans must fail OPEN when this is false: a missing or
- * mistyped env var on deploy must never lock a paying customer out. The cost
- * of failing open is bounded by the per-job and project BigQuery backstops;
- * the cost of failing closed is a paying customer's integration breaking.
- */
-export function paidTierSourceConfigured(): boolean {
-  return paidAccountIds().size > 0;
-}
 
 function paidAccountIds(): Set<string> {
   return new Set(
