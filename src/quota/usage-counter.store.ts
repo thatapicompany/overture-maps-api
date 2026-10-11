@@ -27,6 +27,15 @@ import { firestoreFieldValue, portalFirestore } from '../tiers/portal-firestore'
 //
 // Every failure (Firestore, BigQuery, timeout) makes the count unavailable,
 // and the guard treats unavailable as allow.
+//
+// Increments are never retried. A write that errors or times out may still
+// have been applied, and retrying it double counts: on Cloud Run with
+// request-based CPU, background flushes ran slowly, hit the timeout after the
+// write had landed, and were retried, inflating counts 2-3x in the first
+// minutes of production (11 Oct 2026). Dropping an uncertain increment can
+// only under-count, which errs towards allowing; the next read re-syncs.
+// Flushes are also started from the request path (flushSoon), while the
+// instance has CPU, not only from the background timer.
 
 export interface CounterBackend {
   read(key: string): Promise<number | null>;
@@ -96,6 +105,22 @@ export class UsageCounterStore implements OnModuleDestroy {
     return st.remote + st.flushedSinceRead + st.pending;
   }
 
+  /**
+   * Start a flush now if anything is pending. Called at the start of each
+   * request: on Cloud Run with request-based billing an instance only has CPU
+   * while a request is in flight, so this is when a flush actually runs.
+   * Non-blocking; never delays the request.
+   */
+  flushSoon(): void {
+    if (this.flushing) return;
+    for (const st of this.state.values()) {
+      if (st.pending > 0) {
+        void this.flush();
+        return;
+      }
+    }
+  }
+
   /** Count one successful request. Flushed to Firestore within ~2s. */
   record(accountId: string, now: Date = new Date()): void {
     this.stateFor(`${accountId}_${monthKey(now)}`).pending += 1;
@@ -114,11 +139,14 @@ export class UsageCounterStore implements OnModuleDestroy {
           const n = st.pending;
           st.pending = 0;
           try {
-            await this.withTimeout(this.getBackend().increment(key, n));
+            await this.withTimeout(this.getBackend().increment(key, n), envInt('QUOTA_WRITE_TIMEOUT_MS', 10_000));
             st.flushedSinceRead += n;
           } catch (err: any) {
-            st.pending += n; // retry on the next flush
-            this.logger.error(`Usage counter flush failed for ${key} (+${n}): ${err?.message ?? err}`);
+            // Do NOT retry: the increment may have been applied (see the note
+            // at the top). Force a fresh read so the count re-syncs from
+            // Firestore on the next request.
+            st.readAt = 0;
+            this.logger.error(`Usage counter flush uncertain for ${key} (+${n}), not retried: ${err?.message ?? err}`);
           }
         }
         // Drop finished months once nothing is left to flush for them.
@@ -171,8 +199,7 @@ export class UsageCounterStore implements OnModuleDestroy {
     return st.reading;
   }
 
-  private withTimeout<T>(p: Promise<T>): Promise<T> {
-    const ms = envInt('QUOTA_STORE_TIMEOUT_MS', 3_000);
+  private withTimeout<T>(p: Promise<T>, ms: number = envInt('QUOTA_STORE_TIMEOUT_MS', 3_000)): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
     return Promise.race([
       p,

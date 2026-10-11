@@ -12,7 +12,7 @@ function harness(opts: { plan?: any; used?: number | null; user?: any; planThrow
       return opts.plan ?? { status: 'free', planId: FREE_PRICE_ID };
     }),
   };
-  const counter = { current: jest.fn(async () => (opts.used === undefined ? 0 : opts.used)), record: jest.fn() };
+  const counter = { current: jest.fn(async () => (opts.used === undefined ? 0 : opts.used)), record: jest.fn(), flushSoon: jest.fn() };
   const guard = new MonthlyQuotaGuard(plans as any, counter as any);
   (guard as any).logger = { warn: jest.fn(), error: jest.fn() };
   const res: any = Object.assign(new EventEmitter(), { headers: {} as Record<string, string>, locals: {}, statusCode: 200 });
@@ -58,6 +58,12 @@ describe('MonthlyQuotaGuard', () => {
     await expect(ok.guard.canActivate(ok.ctx)).resolves.toBe(true);
     const blocked = harness({ plan: { status: 'paid', planId: PREMIUM }, used: 2_000 });
     await expect(blocked.guard.canActivate(blocked.ctx)).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('starts pending flushes from the request path, where Cloud Run allocates CPU', async () => {
+    const h = harness({ used: 10 });
+    await h.guard.canActivate(h.ctx);
+    expect(h.counter.flushSoon).toHaveBeenCalledTimes(1);
   });
 
   it('charges only requests that finish below 400', async () => {
