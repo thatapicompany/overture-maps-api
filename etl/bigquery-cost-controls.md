@@ -113,6 +113,91 @@ mirror is live.
    raising the 2000 m cap back up.
 3. The workflow rebuilds it monthly, offset 30 min after the places mirror.
 
+### 7. Country-clustered mirror + country-level is paid only (Oct 2026)
+
+Fix 1 made radius queries prune, but a `/places` query with `country` and no
+lat/lng still read the whole 45 GB table: the geometry cluster cannot prune
+`addresses.list[OFFSET(0)].element.country`, and `name`, `categories` and
+`brand_name` do not prune either. That shape was 9% of requests and 85% of
+September's spend, and caused the 14 Sep (7.1 TiB) and 5 Oct (4.85 TiB,
+109 Free-plan `country=IT&name=...` calls in three hours) spikes.
+
+**In code:**
+- `etl/build-places-country-mirror.sql` + `.github/workflows/places-country-mirror.yml`
+  build `overture-maps-api.overture.place_by_country`: the geometry mirror plus a
+  top-level `country` and a `name_lower` column, clustered by
+  `country, basic_category, name_lower`. Rebuilt monthly, an hour after the
+  geometry mirror it reads from.
+- `BigQueryService.placeSource()` routes queries with no lat/lng to
+  `PLACE_COUNTRY_TABLE` with `country = @country` / `name_lower = LOWER(@name)`
+  predicates; radius queries keep `PLACE_TABLE` and the raw-schema predicates.
+  Covers `/places`, `/places/brands`, `/places/categories`, `/places/countries`.
+  Unset `PLACE_COUNTRY_TABLE` means the old behaviour.
+- Country-level `/places` is **paid plans only**: Free gets a 403 before any
+  BigQuery job (`places/places-cost-guards.ts`). Paid is resolved live from the
+  portal's Firestore (`tiers/plan-lookup.service.ts`), with `PAID_ACCOUNT_IDS` or
+  `isPaidAccount: true` in TheAuthAPI key metadata as an override
+  (`middleware/account-tier.ts`). Never from a TheAuthAPI call.
+- `cost_usd` now prices at US$6.25 per TiB (was US$5 per decimal TB, ~12% low).
+
+**Measured 11 Oct 2026** on the built mirror (73.6M rows, 47.5 GB), real runs
+with the query shapes the API sends (dry-run estimates ignore cluster pruning):
+
+| Query | Before (geometry mirror) | After (country mirror) |
+|---|---|---|
+| `country=IT&name=...` (the 5 Oct shape) | 45.5 GiB | 1.51 GiB |
+| `country=AR&categories=inn` (Sep shape) | 40 to 45 GiB | 0.56 GiB |
+| `country=US&categories=restaurant` (largest country) | ~45 GiB | 10.7 GiB |
+| `/places/countries` aggregate | full struct scan | 2.97 GiB |
+
+The US slice is the ceiling. The categories filter ORs across `categories`,
+`taxonomy` and `basic_category`, so only the `country` cluster key prunes it.
+Column projection would not help much: `parsePlaceRow()` reads nearly every
+column, so `SELECT *` stays.
+
+**To deploy:**
+1. Build the mirror once (workflow dispatch, or
+   `bq query --location=US --use_legacy_sql=false < etl/build-places-country-mirror.sql`).
+2. On the Cloud Run service set
+   `PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country`. Paid is
+   resolved **live from the portal's Firestore** (`overture-api`,
+   `organizations/{accountId}`: `planId` is the Stripe price, paid = not a Free
+   price and status active/trialing/past_due), cached 60s per account, so an
+   upgrade takes effect within a minute with no deploy or env change. The
+   runtime service account needs `roles/datastore.viewer` on `overture-api`.
+   Anything uncertain (no doc, unrecognised status, Firestore error or timeout)
+   **allows**, so a lookup problem can cost money but never locks out a paying
+   customer; watch the logs for `Plan lookup failed`. `PAID_ACCOUNT_IDS` is now
+   only an override for accounts Stripe does not model. IwannaFind ran 325
+   country-level queries in July and resolves as paid.
+
+   Verified 11 Oct 2026: IwannaFind's real country-level parameter sets (GB
+   categories, BM taxonomy + has_contact) and the 5 Oct name query return the
+   same ids, order and `total_count` on the country mirror as on the old path.
+3. Deploy, then watch `usage.api_requests.total_bytes_billed` for country rows.
+
+### 8. Id-clustered division_area mirror (`/divisions/:id`, Oct 2026)
+
+`getDivisionById()` read `bigquery-public-data.overture_maps.division_area`
+(9.7 GB, clustered by geometry) with `WHERE id = @id`, which cannot prune: about
+9 GiB billed for a single-row lookup, 1.6 TiB in the 30 days to 11 Oct 2026, 72 GiB
+from one Free account on 10 Oct.
+
+**In code:** `DIVISION_AREA_TABLE` (unset = public table, unchanged behaviour)
+points the by-id lookup at `overture-maps-api.overture.division_area`, clustered
+by `id` (`etl/build-division-area-mirror.sql`, monthly workflow
+`.github/workflows/division-area-mirror.yml`). If the mirror lacks an id (it lags
+the public table for up to a few weeks after each release) the lookup falls back
+to the public table, so a lagging mirror can never cause a 404. The rare
+NULL-geometry sibling fallback still reads the public table.
+
+**To deploy:**
+1. Build the mirror once:
+   `bq query --location=US --use_legacy_sql=false < etl/build-division-area-mirror.sql`
+   (~9.7 GB scan, ~A$0.08).
+2. Set `DIVISION_AREA_TABLE=overture-maps-api.overture.division_area` on the
+   Cloud Run service, then deploy.
+
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
 the per-user ceiling. 2 is already done. 6 does for `/places/buildings` and
