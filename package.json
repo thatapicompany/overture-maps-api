@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.1",
+    "@google-cloud/firestore": "^7.11.6",
     "@google-cloud/storage": "^7.13.0",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^10.0.0",

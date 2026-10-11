@@ -12,4 +12,6 @@ export interface User {
     accountId: string;
     userId: string;
     isDemoAccount?: boolean;
+    // On a paid plan (see middleware/account-tier.ts). Undefined means Free.
+    isPaidAccount?: boolean;
   }

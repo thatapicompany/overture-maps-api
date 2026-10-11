@@ -35,7 +35,27 @@ const SOURCE_DATASET = "bigquery-public-data.overture_maps"
 // (see etl/build-places-mirror.sql) so radius queries prune spatially instead
 // of scanning the whole ~45GB table on every request. Same schema, so no query
 // changes are needed — only the table name.
-const PLACE_TABLE = process.env.PLACE_TABLE || `${SOURCE_DATASET}.place`;
+const placeTable = (): string => process.env.PLACE_TABLE || `${SOURCE_DATASET}.place`;
+
+// Country-clustered mirror of the same table (etl/build-places-country-mirror.sql)
+// for queries with NO lat/lng. The geometry cluster above cannot prune a
+// predicate on addresses.list[OFFSET(0)].element.country, so every
+// country-level query scanned the whole ~45GB table however narrow its other
+// filters were (the 14 Sep and 5 Oct 2026 spikes, 85% of September's spend).
+// The mirror hoists that country code to a top-level `country` column and
+// clusters on it, so a country query reads one country's slice. Optional: when
+// unset, country-level queries fall back to PLACE_TABLE as before. Read per
+// call so tests and runtime config changes take effect without a reload.
+const placeCountryTable = (): string | undefined => process.env.PLACE_COUNTRY_TABLE || undefined;
+
+// The public division_area table is clustered by geometry, so a lookup by `id`
+// (GET /divisions/:id) scanned all ~9.7GB of it: ~9 GiB billed per call,
+// 1.6 TiB in the 30 days to 11 Oct 2026. DIVISION_AREA_TABLE points at an
+// in-project mirror clustered by id (etl/build-division-area-mirror.sql), so
+// the lookup prunes to a block or two. Same schema, so no query change. When
+// unset, lookups read the public table exactly as before.
+const PUBLIC_DIVISION_AREA_TABLE = `${SOURCE_DATASET}.division_area`;
+const divisionAreaTable = (): string => process.env.DIVISION_AREA_TABLE || PUBLIC_DIVISION_AREA_TABLE;
 
 // The building table queried by getPlacesWithNearestBuilding() and
 // getBuildingsNearby(). Same reasoning as PLACE_TABLE: the raw public table
@@ -183,14 +203,15 @@ export class BigQueryService {
 
   ): Promise<{ names: { primary: string, common: string, rules: string }; wikidata: string; counts: { places: number } }[]> {
 
+    const source = this.placeSource(!!(latitude && longitude));
     let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand , count(id) as count_places
-      FROM \`${PLACE_TABLE}\`
+      FROM \`${source.table}\`
     `;
 
     const params: any = {};
     const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
-    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata, hasCategoriesColumn, params });
+    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata, hasCategoriesColumn, params, countrySql: source.countrySql });
     if (whereClauses.length > 0) {
       query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
@@ -230,9 +251,14 @@ export class BigQueryService {
   }
 
   async getPlaceCountsByCountry(): Promise<{ country: string; counts: { places: number, brands: number } }[]> {
+    // No lat/lng by definition: use the country mirror when configured, so the
+    // aggregate reads the clustered top-level column rather than digging the
+    // country out of the addresses struct on every row.
+    const source = this.placeSource(false);
+    const countryColumn = source.isCountryMirror ? 'country' : 'addresses.list[OFFSET(0)].element.country';
     const query = `-- Overture Maps API: Get place counts by country
-      SELECT addresses.list[OFFSET(0)].element.country AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
-      FROM \`${PLACE_TABLE}\`
+      SELECT ${countryColumn} AS country, COUNT(id) AS count_places, count(DISTINCT brand.names.primary ) as count_brands
+      FROM \`${source.table}\`
       GROUP BY country
       ORDER BY count_places DESC;
     `;
@@ -261,16 +287,17 @@ export class BigQueryService {
     const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
     const categoryColumn = hasCategoriesColumn ? 'categories.primary' : 'taxonomy.primary';
 
+    const source = this.placeSource(!!(latitude && longitude));
     let query = `-- Overture Maps API: Get categories
       SELECT DISTINCT ${categoryColumn} AS category_primary,
       count(1) as count_places,
       count(distinct brand.names.primary) as count_brands
-      FROM \`${PLACE_TABLE}\`
+      FROM \`${source.table}\`
       WHERE ${categoryColumn} IS NOT NULL
     `;
 
     const params: any = {};
-    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, params });
+    const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, params, countrySql: source.countrySql });
     if (whereClauses.length > 0) {
       query += ` AND ${whereClauses.join(' AND ')}`;
     }
@@ -387,7 +414,7 @@ export class BigQueryService {
           ST_Distance(p.geometry, b.building_geometry) AS distance_to_nearest_building,
           ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY ST_Distance(p.geometry, b.building_geometry)) AS distance_rank
         FROM
-          \`${PLACE_TABLE}\` AS p
+          \`${placeTable()}\` AS p
         JOIN
           nearby_buildings AS b
         ON
@@ -418,7 +445,7 @@ export class BigQueryService {
         0 as distance_to_nearest_building,
         COUNT(*) OVER() AS total_count
       FROM
-        \`${PLACE_TABLE}\` AS p
+        \`${placeTable()}\` AS p
       JOIN
         \`${BUILDING_TABLE}\` AS b
       ON
@@ -477,6 +504,11 @@ export class BigQueryService {
     const params: any = {};
     const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
 
+    // With lat/lng the geometry-clustered table prunes on ST_DWithin; without
+    // them only the country-clustered mirror prunes. Pick the table first so
+    // the FROM and the country/name predicates agree on which columns exist.
+    const placeSrc = this.placeSource(!!(latitude && longitude));
+
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *, COUNT(*) OVER() AS total_count`);
@@ -487,7 +519,7 @@ export class BigQueryService {
       params.longitude = longitude;
     }
 
-    queryParts.push(`FROM \`${PLACE_TABLE}\``);
+    queryParts.push(`FROM \`${placeSrc.table}\``);
 
     // Conditional filters
     let whereClauses: string[] = [];
@@ -507,20 +539,15 @@ export class BigQueryService {
     }
 
     if (name) {
-      // Additive filter on the place's own name, not a standalone text search
-      // — always paired with the radius/country predicate above. Matches
-      // names.primary or any localized value in names.common. Unlike the
-      // other repeated fields (websites, addresses, etc.) which use Overture's
-      // Parquet {list:[{element}]} shape, names.common is a MAP<string,string>
-      // and comes through BigQuery as STRUCT<key_value ARRAY<STRUCT<key,value>>>,
-      // so it's unnested via .key_value rather than .list. UNNEST of a NULL
-      // array (places with no common names) yields zero rows, not an error.
-      whereClauses.push(`(LOWER(names.primary) = LOWER(@name) OR EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE LOWER(common_name.value) = LOWER(@name)))`);
+      // Additive filter on the place's own name, not a standalone text search:
+      // always paired with the radius or country predicate. The SQL depends on
+      // which table is being read (see placeSource()).
+      whereClauses.push(placeSrc.nameSql);
       params.name = name;
     }
 
     if (country) {
-      whereClauses.push(`addresses.list[OFFSET(0)].element.country = @country`);
+      whereClauses.push(placeSrc.countrySql);
       params.country = country;
     }
 
@@ -674,9 +701,12 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
     const totalBytesBilled = parseInt(result.statistics.query.totalBytesBilled);
 
-    const costPerTB = 5; // USD per TB
-    const bytesPerTB = 1e12;
-    const costInUSD = (totalBytesBilled / bytesPerTB) * costPerTB;
+    // BigQuery on-demand analysis list price: US$6.25 per TiB (2^40 bytes).
+    // Was US$5 per decimal TB (the pre-July-2023 price), which under-reported
+    // cost_usd in usage.api_requests by ~12% until 10 Oct 2026.
+    const costPerTiB = 6.25;
+    const bytesPerTiB = 2 ** 40;
+    const costInUSD = (totalBytesBilled / bytesPerTiB) * costPerTiB;
 
     const statistics: IQueryStatistics = {
       totalBytesProcessed,
@@ -958,15 +988,25 @@ WHERE ${whereClauses.join('\n  AND ')}`);
   }
 
   async getDivisionById(id: string): Promise<DivisionArea | null> {
-    const query = `-- Overture Maps API: Get Division Area by ID
+    const byIdQuery = (table: string) => `-- Overture Maps API: Get Division Area by ID
 SELECT
   *
 FROM
-  \`bigquery-public-data.overture_maps.division_area\` AS s
+  \`${table}\` AS s
 WHERE s.id = @id
 LIMIT 1;`;
 
-    const { rows } = await this.runQuery(query, { id });
+    const table = divisionAreaTable();
+    let { rows } = await this.runQuery(byIdQuery(table), { id });
+
+    // The mirror is rebuilt monthly, so for up to a few weeks after an Overture
+    // release it can lag the public table. An id the public table has (e.g. one
+    // returned by /divisions search) must never 404 because of that lag: on a
+    // miss, look it up in the public table. Costs the old ~9 GiB only for ids
+    // the mirror lacks, which are new or genuinely unknown.
+    if (!rows.length && table !== PUBLIC_DIVISION_AREA_TABLE) {
+      ({ rows } = await this.runQuery(byIdQuery(PUBLIC_DIVISION_AREA_TABLE), { id }));
+    }
     if (!rows.length) return null;
 
     const division = parseDivisionRow(rows[0]);
@@ -998,6 +1038,43 @@ LIMIT 1;`;
 
     return division;
   }
+  // Country predicate against the raw Overture schema (first address's country).
+  private static readonly COUNTRY_FROM_ADDRESSES_SQL = `addresses.list[OFFSET(0)].element.country = @country`;
+
+  /**
+   * Which place table a query should read, with the country and name
+   * predicates spelt for that table's columns.
+   *
+   * Radius queries (lat/lng present) read PLACE_TABLE, clustered by geometry.
+   * Country-level queries (no lat/lng) read PLACE_COUNTRY_TABLE when it is
+   * configured: the same rows plus a top-level `country` cluster column and a
+   * pre-lowered `name_lower`, so the predicates become plain equalities on
+   * clustered columns instead of struct digs and LOWER() over 45GB. When the
+   * mirror is not configured the raw-schema predicates are used unchanged.
+   */
+  private placeSource(hasLatLng: boolean): { table: string; isCountryMirror: boolean; countrySql: string; nameSql: string } {
+    const commonNameSql = `EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE LOWER(common_name.value) = LOWER(@name))`;
+    const countryTable = placeCountryTable();
+    if (!hasLatLng && countryTable) {
+      return {
+        table: countryTable,
+        isCountryMirror: true,
+        countrySql: `country = @country`,
+        nameSql: `(name_lower = LOWER(@name) OR ${commonNameSql})`,
+      };
+    }
+    return {
+      table: placeTable(),
+      isCountryMirror: false,
+      countrySql: BigQueryService.COUNTRY_FROM_ADDRESSES_SQL,
+      // Matches names.primary or any localized value in names.common. names.common
+      // is a MAP<string,string> and comes through BigQuery as
+      // STRUCT<key_value ARRAY<STRUCT<key,value>>>, so it is unnested via
+      // .key_value rather than .list. UNNEST of a NULL array yields zero rows.
+      nameSql: `(LOWER(names.primary) = LOWER(@name) OR ${commonNameSql})`,
+    };
+  }
+
   private buildWhereClauses({
     country,
     latitude,
@@ -1009,7 +1086,8 @@ LIMIT 1;`;
     min_confidence,
     require_wikidata,
     hasCategoriesColumn = true,
-    params
+    params,
+    countrySql = BigQueryService.COUNTRY_FROM_ADDRESSES_SQL,
   }: {
     country?: string;
     latitude?: number;
@@ -1022,6 +1100,8 @@ LIMIT 1;`;
     require_wikidata?: boolean;
     hasCategoriesColumn?: boolean;
     params: any;
+    // Country predicate for the table being read; see placeSource().
+    countrySql?: string;
   }): string[] {
     const whereClauses: string[] = [];
 
@@ -1032,7 +1112,7 @@ LIMIT 1;`;
       params.radius = radius;
     }
     if (country) {
-      whereClauses.push(`addresses.list[OFFSET(0)].element.country = @country`);
+      whereClauses.push(countrySql);
       params.country = country;
     }
     if (brand_wikidata) {
