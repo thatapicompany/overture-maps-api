@@ -4,6 +4,7 @@ import { User } from '../decorators/authed-user.decorator';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { resolveQuotaPolicy } from './plan-limits';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
+import { ACCOUNT_URL } from '../common/links';
 
 // Monthly request cap per account, enforced inside the API with no call to
 // TheAuthAPI (etl/bigquery-cost-controls.md, section 9).
@@ -35,7 +36,7 @@ export function quotaExceededMessage(plan: string, used: number, allowance: numb
   return (
     `Monthly request limit reached: this account has made ${fmt(used)} requests this month on the ${plan} plan ` +
     `(allowance ${fmt(allowance)}, limit ${fmt(hardLimit)}). It resets at 00:00 UTC on ${reset}. ` +
-    `Upgrade for a higher limit at https://overturemapsapi.com/pricing`
+    `Upgrade for a higher limit at ${ACCOUNT_URL}`
   );
 }
 

@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanStatus } from '../tiers/plan-lookup.service';
+import { ACCOUNT_URL } from '../common/links';
 
 const logger = new Logger('PlacesCostGuards');
 // Country-level /places queries (a `country` filter with no lat/lng) read a
@@ -13,7 +14,7 @@ const logger = new Logger('PlacesCostGuards');
 // etl/bigquery-cost-controls.md, section 7.
 export const COUNTRY_LEVEL_PAID_ONLY_MESSAGE =
   'Country-level queries (a country filter without lat/lng) are available on paid plans. ' +
-  'Free plans query by lat, lng and radius (up to 25 km). See https://overturemapsapi.com/pricing';
+  `Free plans query by lat, lng and radius (up to 25 km). Upgrade at ${ACCOUNT_URL}`;
 
 export interface CountryLevelQuery {
   lat?: number;
