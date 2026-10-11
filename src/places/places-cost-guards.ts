@@ -9,9 +9,8 @@ const logger = new Logger('PlacesCostGuards');
 // country and more for the US; without it, the whole 45GB table. They are
 // also the shape that lets one key paginate an entire country out of the API.
 // That is a paid-plan feature, matching the radius error text that already
-// says "Increase plan or request data at a country level". Decided 10 Oct 2026
-// after the 5 Oct spike (109 Free-plan country+name scans in 3 hours);
-// see docs/cost-budget-rate-limiting.md.
+// says "Increase plan or request data at a country level". See
+// etl/bigquery-cost-controls.md, section 7.
 export const COUNTRY_LEVEL_PAID_ONLY_MESSAGE =
   'Country-level queries (a country filter without lat/lng) are available on paid plans. ' +
   'Free plans query by lat, lng and radius (up to 25 km). See https://overturemapsapi.com/pricing';

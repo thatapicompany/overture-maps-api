@@ -6,12 +6,12 @@ import { resolveQuotaPolicy } from './plan-limits';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
 
 // Monthly request cap per account, enforced inside the API with no call to
-// TheAuthAPI (docs/cost-budget-rate-limiting.md).
+// TheAuthAPI (etl/bigquery-cost-controls.md, section 9).
 //
 // Limits come from the Stripe plan (quota/plan-limits.ts): requests between
 // the advertised allowance and the soft limit work but carry X-Quota-Warning;
 // at the soft limit they are refused with 429 until 00:00 UTC on the 1st.
-// Applies to paid plans too, at their own soft limit (decided 11 Oct 2026).
+// Applies to paid plans too, at their own soft limit.
 //
 // What counts: authenticated, non-demo requests that complete with a status
 // below 400. Auth failures, validation errors, the paid-only 403, and every

@@ -1,17 +1,17 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { BigQuery } from '@google-cloud/bigquery';
-import { firestoreFieldValue, portalFirestore } from '../tiers/portal-firestore';
+import { firestoreFieldValue, portalFirestore, portalFirestoreConfigured } from '../tiers/portal-firestore';
 
 // Per-account monthly request counters, shared across Cloud Run instances.
 //
-// Store: Firestore (project `your-portal-project`, collection `api_usage_monthly`,
-// one doc per account per UTC month, id `{accountId}_{YYYY-MM}`). There is no
-// Redis in this deployment (checked 11 Oct 2026).
+// Store: Firestore (project PLAN_FIRESTORE_PROJECT_ID, collection
+// QUOTA_FIRESTORE_COLLECTION, one doc per account per UTC month, id
+// `{accountId}_{YYYY-MM}`). Chosen because the hosted deployment has no Redis.
 //
 // Writes are batched: each instance accumulates increments in memory and
 // flushes them every 2s with FieldValue.increment, because Firestore sustains
-// about one write per second per document and a single sweep has produced
-// 11,000 requests in two hours from one account.
+// about one write per second per document and one account can send thousands
+// of requests an hour.
 //
 // Reads are cached per instance for 5s and refreshed in the background, so a
 // request waits on Firestore only the first time this instance sees an
@@ -32,7 +32,7 @@ import { firestoreFieldValue, portalFirestore } from '../tiers/portal-firestore'
 // have been applied, and retrying it double counts: on Cloud Run with
 // request-based CPU, background flushes ran slowly, hit the timeout after the
 // write had landed, and were retried, inflating counts 2-3x in the first
-// minutes of production (11 Oct 2026). Dropping an uncertain increment can
+// minutes of production. Dropping an uncertain increment can
 // only under-count, which errs towards allowing; the next read re-syncs.
 // Flushes are also started from the request path (flushSoon), while the
 // instance has CPU, not only from the background timer.
@@ -222,6 +222,7 @@ export class UsageCounterStore implements OnModuleDestroy {
 }
 
 function firestoreBackend(): CounterBackend {
+  if (!portalFirestoreConfigured()) throw new Error('PLAN_FIRESTORE_PROJECT_ID is not set; monthly counters are disabled.');
   const collection = () => portalFirestore().collection(process.env.QUOTA_FIRESTORE_COLLECTION || 'api_usage_monthly');
   return {
     async read(key) {

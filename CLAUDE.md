@@ -1,13 +1,17 @@
 # Instructions for agents working in this repo
 
-## Hard rule: no customer information in the repository
+## Hard rule: no customer or business information in the repository
 
-Never put customer information in anything that is committed or published from
-this repo: commit messages, branch names, PR titles and descriptions, code
-comments, log messages, test names, test fixtures, docs, SQL comments or any
-other file. This repo may be public, and git history is permanent.
+This is a public, open-source repository. Everything committed or published
+from it, including git history and PR descriptions, is readable by anyone and
+is effectively permanent.
 
-That covers:
+Never put customer information or internal business information in anything
+that is committed or published from this repo: commit messages, branch names,
+PR titles and descriptions, code comments, log messages, test names, test
+fixtures, docs, SQL comments or any other file.
+
+Customer information covers:
 
 - company, organisation, app or person names
 - account, org, user, Stripe customer or subscription ids, API keys, emails
@@ -27,5 +31,16 @@ Instead:
 If you find existing customer information while working, remove it in the
 same change and say so. Do not add new instances "temporarily".
 
-Stripe price ids and aggregate counts (for example "508 orgs on the Free
-price") are not customer information.
+Internal business information covers:
+
+- revenue, MRR, pricing deals, customer counts or plan mix
+- spend figures and cost shares tied to accounts or to the business
+- outreach, CRM or sales detail, and who was contacted about what
+- configuration of our hosted service: Stripe price ids, Firebase or other
+  project ids for private systems, service account emails, secrets of any
+  kind. Read these from env and document them in `.env.example` with
+  placeholder values.
+
+Public facts are fine: published plan limits, the data schema, BigQuery bytes
+scanned by a query shape, and the names of the public GCP resources the code
+already references.

@@ -1,15 +1,13 @@
 import { EventEmitter } from 'events';
 import { HttpException } from '@nestjs/common';
 import { MonthlyQuotaGuard } from './monthly-quota.guard';
-import { FREE_PRICE_ID } from './plan-limits';
-
-const PREMIUM = 'price_test_premium';
+import { TEST_FREE, TEST_PREMIUM, useTestPlanConfig } from './test-plan-config';
 
 function harness(opts: { plan?: any; used?: number | null; user?: any; planThrows?: boolean }) {
   const plans = {
     getPlan: jest.fn(async () => {
       if (opts.planThrows) throw new Error('boom');
-      return opts.plan ?? { status: 'free', planId: FREE_PRICE_ID };
+      return opts.plan ?? { status: 'free', planId: TEST_FREE };
     }),
   };
   const counter = { current: jest.fn(async () => (opts.used === undefined ? 0 : opts.used)), record: jest.fn(), flushSoon: jest.fn() };
@@ -24,7 +22,10 @@ function harness(opts: { plan?: any; used?: number | null; user?: any; planThrow
 
 describe('MonthlyQuotaGuard', () => {
   const prevMode = process.env.QUOTA_MODE;
+  let restore: () => void;
+  beforeEach(() => (restore = useTestPlanConfig()));
   afterEach(() => {
+    restore();
     if (prevMode === undefined) delete process.env.QUOTA_MODE; else process.env.QUOTA_MODE = prevMode;
   });
 
@@ -54,9 +55,9 @@ describe('MonthlyQuotaGuard', () => {
   });
 
   it('blocks a paid plan at its own soft limit (Premium: 2,000)', async () => {
-    const ok = harness({ plan: { status: 'paid', planId: PREMIUM }, used: 1_999 });
+    const ok = harness({ plan: { status: 'paid', planId: TEST_PREMIUM }, used: 1_999 });
     await expect(ok.guard.canActivate(ok.ctx)).resolves.toBe(true);
-    const blocked = harness({ plan: { status: 'paid', planId: PREMIUM }, used: 2_000 });
+    const blocked = harness({ plan: { status: 'paid', planId: TEST_PREMIUM }, used: 2_000 });
     await expect(blocked.guard.canActivate(blocked.ctx)).rejects.toBeInstanceOf(HttpException);
   });
 

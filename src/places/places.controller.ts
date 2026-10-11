@@ -51,7 +51,7 @@ export class PlacesController {
   @ValidateLatLngUser()
   async getPlaces(@Query() query: GetPlacesDto, @AuthedUser() user: User) {
 
-    // Cost guardrails (etl/bigquery-cost-controls.md, docs/cost-budget-rate-limiting.md).
+    // Cost guardrails (etl/bigquery-cost-controls.md).
     // Every /places call reads the place table, so block the shapes that read
     // it needlessly: (1) demo traffic, capped to a small radius/limit;
     // (2) whole-country dumps with no narrowing filter; (3) country-level

@@ -3,11 +3,11 @@ import { classifyPlan, PlanLookupService } from './plan-lookup.service';
 const FREE = 'price_test_free';
 const PREMIUM = 'price_test_premium';
 
-describe('classifyPlan (shapes seen in Firestore organizations, 11 Oct 2026)', () => {
+describe('classifyPlan (record shapes the portal writes)', () => {
   const free = new Set([FREE]);
   it.each([
-    ['Free price, active (501 orgs: Free is a $0 Stripe subscription)', { planId: FREE, subscriptionStatus: 'active' }, 'free'],
-    ['Free price, status "free" (7 orgs)', { planId: FREE, subscriptionStatus: 'free' }, 'free'],
+    ['Free price, active (Free is a $0 Stripe subscription)', { planId: FREE, subscriptionStatus: 'active' }, 'free'],
+    ['Free price, status "free"', { planId: FREE, subscriptionStatus: 'free' }, 'free'],
     ['planId 0, canceled', { planId: 0, subscriptionStatus: 'canceled' }, 'free'],
     ['planId 0, free', { planId: 0, subscriptionStatus: 'free' }, 'free'],
     ['paid price, active', { planId: PREMIUM, subscriptionStatus: 'active' }, 'paid'],
@@ -17,22 +17,31 @@ describe('classifyPlan (shapes seen in Firestore organizations, 11 Oct 2026)', (
     ['paid price, canceled', { planId: PREMIUM, subscriptionStatus: 'canceled' }, 'free'],
     ['paid price, no status (unknown, fail open)', { planId: PREMIUM }, 'unknown'],
     ['paid price, unrecognised status (unknown, fail open)', { planId: PREMIUM, subscriptionStatus: 'paused' }, 'unknown'],
-    ['empty doc (6 orgs)', { planId: null, subscriptionStatus: null }, 'unknown'],
+    ['empty doc', { planId: null, subscriptionStatus: null }, 'unknown'],
   ])('%s', (_label, rec, expected) => {
     expect(classifyPlan(rec as any, free)).toBe(expected);
   });
   it('treats a missing doc as unknown', () => {
     expect(classifyPlan(null, free)).toBe('unknown');
   });
+  it('treats every plan as unknown (fail open) when no Free price ids are configured', () => {
+    expect(classifyPlan({ planId: FREE, subscriptionStatus: 'active' }, new Set())).toBe('unknown');
+    expect(classifyPlan({ planId: PREMIUM, subscriptionStatus: 'active' }, new Set())).toBe('unknown');
+  });
 });
 
 describe('PlanLookupService', () => {
   let now = 1_000_000;
+  const prevFree = process.env.FREE_PLAN_PRICE_IDS;
   beforeEach(() => {
     now = 1_000_000;
+    process.env.FREE_PLAN_PRICE_IDS = FREE;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (prevFree === undefined) delete process.env.FREE_PLAN_PRICE_IDS; else process.env.FREE_PLAN_PRICE_IDS = prevFree;
+  });
 
   it('caches a known plan for the TTL, then re-reads (an upgrade shows within a minute)', async () => {
     const svc = new PlanLookupService();

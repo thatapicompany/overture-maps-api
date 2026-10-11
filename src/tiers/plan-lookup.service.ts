@@ -1,23 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { portalFirestore } from './portal-firestore';
+import { portalFirestore, portalFirestoreConfigured } from './portal-firestore';
 
 // Live plan resolution for paid-only features, read from the account
-// portal's Firestore (project `your-portal-project`, collection `organizations`,
-// document id = the API's accountId). The portal writes `planId` (the Stripe
-// price id) and `subscriptionStatus` when a subscription changes, so an
-// upgrade is visible here as soon as that write lands, plus at most one cache
-// TTL (60s by default). Replaces waiting on a scheduled export.
+// portal's Firestore (project PLAN_FIRESTORE_PROJECT_ID, collection
+// `organizations`, document id = the API's accountId). The portal writes
+// `planId` (the Stripe price id) and `subscriptionStatus` when a subscription
+// changes, so an upgrade is visible here as soon as that write lands, plus at
+// most one cache TTL (60s by default).
 //
-// Firestore's `subscriptionStatus` alone is useless: Free is a real $0 Stripe
-// subscription, so ~500 Free orgs read `active`. Paid is decided by `planId`
-// not being a Free price. Any price id we do not recognise as Free counts as
-// paid, so a new paid tier works without a code change.
+// `subscriptionStatus` alone is not enough: a Free plan can be a $0 Stripe
+// subscription, which reads `active`. Paid is decided by `planId` not being
+// one of FREE_PLAN_PRICE_IDS. Any price id not listed as Free counts as paid,
+// so a new paid tier works without a code change.
+//
+// Hosted-service configuration (the Firestore project and the Free price ids)
+// comes from env, never from code: this repo is open source. With either
+// unset, every plan resolves `unknown`.
 //
 // Every uncertain outcome is `unknown`, and callers must treat `unknown` as
-// ALLOW: a missing doc, an odd status, a Firestore error or a slow read must
-// never lock a paying customer out. The cost of failing open is bounded by
-// the BigQuery backstops; the cost of failing closed is a customer's
-// integration breaking.
+// ALLOW: missing config, a missing doc, an odd status, a Firestore error or a
+// slow read must never lock a paying customer out. The cost of failing open is
+// bounded by the BigQuery backstops; the cost of failing closed is a
+// customer's integration breaking.
 
 export type PlanStatus = 'paid' | 'free' | 'unknown';
 
@@ -34,15 +38,12 @@ export interface ResolvedPlan {
   planId?: string;
 }
 
-// The Free plan's Stripe price id, as written by the portal (517 orgs checked
-// 11 Oct 2026: 508 on this price, 1 on a paid price, the rest canceled/empty).
-const DEFAULT_FREE_PRICE_IDS = 'price_test_free';
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const LAPSED_STATUSES = new Set(['canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'free']);
 
 export function freePriceIds(): Set<string> {
   return new Set(
-    (process.env.FREE_PLAN_PRICE_IDS || DEFAULT_FREE_PRICE_IDS)
+    (process.env.FREE_PLAN_PRICE_IDS || '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
@@ -52,6 +53,8 @@ export function freePriceIds(): Set<string> {
 /** Pure classification of one Firestore organizations record. */
 export function classifyPlan(rec: OrgPlanRecord | null, free: Set<string> = freePriceIds()): PlanStatus {
   if (!rec) return 'unknown';
+  // Without the Free price ids we cannot tell Free from paid.
+  if (free.size === 0) return 'unknown';
   const status = typeof rec.subscriptionStatus === 'string' ? rec.subscriptionStatus : '';
   const planId = rec.planId === null || rec.planId === undefined ? '' : String(rec.planId);
   if (!status && !planId) return 'unknown';
@@ -144,6 +147,10 @@ export class PlanLookupService {
   }
 
   private firestoreReader(): OrgReader {
+    if (!portalFirestoreConfigured()) {
+      this.logger.error('PLAN_FIRESTORE_PROJECT_ID is not set: every plan resolves unknown and paid-only features are not restricted.');
+      return async () => null;
+    }
     const db = portalFirestore();
     const collection = process.env.PLAN_FIRESTORE_COLLECTION || 'organizations';
     return async (accountId: string) => {

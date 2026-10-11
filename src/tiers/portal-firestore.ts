@@ -1,5 +1,5 @@
 // One lazily created Firestore client for the account portal's database
-// (project `your-portal-project`), shared by the plan lookup (reads
+// (project PLAN_FIRESTORE_PROJECT_ID), shared by the plan lookup (reads
 // `organizations`) and the monthly usage counters (writes
 // `api_usage_monthly`). Created on first use so nothing needs credentials or
 // opens a connection until a request actually needs it, which keeps unit and
@@ -8,12 +8,17 @@
 // enough for plan reads alone; the counters write).
 let client: any | undefined;
 
+/** Whether the hosted portal's Firestore is configured. Self-hosted installs leave it unset. */
+export function portalFirestoreConfigured(): boolean {
+  return !!process.env.PLAN_FIRESTORE_PROJECT_ID;
+}
+
 export function portalFirestore(): any {
   if (!client) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Firestore } = require('@google-cloud/firestore');
     client = new Firestore({
-      projectId: process.env.PLAN_FIRESTORE_PROJECT_ID || 'your-portal-project',
+      projectId: process.env.PLAN_FIRESTORE_PROJECT_ID,
       preferRest: true,
     });
   }

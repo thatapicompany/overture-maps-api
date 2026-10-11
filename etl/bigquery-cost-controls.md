@@ -118,9 +118,9 @@ mirror is live.
 Fix 1 made radius queries prune, but a `/places` query with `country` and no
 lat/lng still read the whole 45 GB table: the geometry cluster cannot prune
 `addresses.list[OFFSET(0)].element.country`, and `name`, `categories` and
-`brand_name` do not prune either. That shape was 9% of requests and 85% of
-September's spend, and caused the 14 Sep (7.1 TiB) and 5 Oct (4.85 TiB,
-109 Free-plan country + name calls in three hours) spikes.
+`brand_name` do not prune either. That shape was a small share of requests but
+most of the bytes billed, and caused the 14 Sep (7.1 TiB) and 5 Oct (4.85 TiB,
+about a hundred country + name calls in three hours) spikes.
 
 **In code:**
 - `etl/build-places-country-mirror.sql` + `.github/workflows/places-country-mirror.yml`
@@ -160,29 +160,30 @@ column, so `SELECT *` stays.
    `bq query --location=US --use_legacy_sql=false < etl/build-places-country-mirror.sql`).
 2. On the Cloud Run service set
    `PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country`. Paid is
-   resolved **live from the portal's Firestore** (`your-portal-project`,
+   resolved **live from the portal's Firestore** (`PLAN_FIRESTORE_PROJECT_ID`,
    `organizations/{accountId}`: `planId` is the Stripe price, paid = not a Free
-   price and status active/trialing/past_due), cached 60s per account, so an
+   price per `FREE_PLAN_PRICE_IDS` and status active/trialing/past_due), cached
+   60s per account, so an
    upgrade takes effect within a minute with no deploy or env change. The
-   runtime service account needs `roles/datastore.viewer` on `your-portal-project`.
+   runtime service account needs `roles/datastore.viewer` on that project. If
+   `PLAN_FIRESTORE_PROJECT_ID` or `FREE_PLAN_PRICE_IDS` is unset every plan
+   resolves as unknown, which allows.
    Anything uncertain (no doc, unrecognised status, Firestore error or timeout)
-   **allows**, so a lookup problem can cost money but never locks out a paying
-   customer; watch the logs for `Plan lookup failed`. `PAID_ACCOUNT_IDS` is now
-   only an override for accounts Stripe does not model. The paying account
-   at the time ran hundreds of country-level queries in July and resolves as
-   paid.
+   **allows**, so a lookup problem can cost money but never locks out a paid
+   plan; watch the logs for `Plan lookup failed`. `PAID_ACCOUNT_IDS` is only an
+   override for accounts Stripe does not model.
 
-   Verified 11 Oct 2026: that account's real country-level parameter sets
-   (categories, taxonomy + has_contact) and the 5 Oct name query return the
-   same ids, order and `total_count` on the country mirror as on the old path.
+   Verified 11 Oct 2026: representative country-level queries (categories,
+   taxonomy + has_contact, name) return the same ids, order and `total_count`
+   on the country mirror as on the old path.
 3. Deploy, then watch `usage.api_requests.total_bytes_billed` for country rows.
 
 ### 8. Id-clustered division_area mirror (`/divisions/:id`, Oct 2026)
 
 `getDivisionById()` read `bigquery-public-data.overture_maps.division_area`
 (9.7 GB, clustered by geometry) with `WHERE id = @id`, which cannot prune: about
-9 GiB billed for a single-row lookup, 1.6 TiB in the 30 days to 11 Oct 2026, 72 GiB
-from one Free account on 10 Oct.
+9 GiB billed for a single-row lookup, about 1.6 TiB in the 30 days to
+11 Oct 2026.
 
 **In code:** `DIVISION_AREA_TABLE` (unset = public table, unchanged behaviour)
 points the by-id lookup at `overture-maps-api.overture.division_area`, clustered
@@ -205,7 +206,7 @@ Replaces fix 4 (the auth-api quota that never left `log` mode). `MonthlyQuotaGua
 (`src/quota/`) runs on every authenticated, non-demo request, after the
 per-minute throttler.
 
-| Plan (Stripe price) | Allowance (`monthly_requests`) | Refused from (`soft_limit_requests`) |
+| Plan | Allowance (`monthly_requests`) | Refused from (`soft_limit_requests`) |
 |---|---|---|
 | Free | 100 | 200 |
 | Premium | 1,000 | 2,000 |
@@ -223,9 +224,15 @@ paid-only 403 and all 429s are free. The demo key and `PAID_ACCOUNT_IDS` are
 exempt. Plan comes from the Firestore lookup; an unknown plan or a paid price
 with no configured limits is uncapped.
 
-Counters: Firestore `your-portal-project` / `api_usage_monthly`, doc
+Limits come from `QUOTA_PLAN_LIMITS` (JSON keyed by Stripe price id, mirroring
+the price metadata); unset means uncapped. The table above is the current
+configuration.
+
+Counters: Firestore (`PLAN_FIRESTORE_PROJECT_ID`) / `api_usage_monthly`, doc
 `{accountId}_{YYYY-MM}`, incremented in 2s batches per instance (Firestore takes
-about one write per second per doc; one account made 11,000 requests in two hours).
+about one write per second per doc, and bursts of thousands of requests an hour
+have been seen). A timed-out increment is never retried, so a slow write can
+under-count but never double-count; the next read re-syncs.
 A new account-month is seeded from that month's successful rows in
 `usage.api_requests` (10 MB per seed), so enforcement mid-month counts from the
 1st. Overshoot across instances is a few seconds of traffic. Every failure
@@ -233,9 +240,10 @@ A new account-month is seeded from that month's successful rows in
 
 **To deploy:**
 1. Grant the runtime service account write access to the counters:
-   `gcloud projects add-iam-policy-binding your-portal-project --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.
+   `gcloud projects add-iam-policy-binding "$PLAN_FIRESTORE_PROJECT_ID" --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.
    Without it the guard fails open: headers are missing and nobody is blocked.
-2. Deploy. `QUOTA_MODE` defaults to `enforce`; set `QUOTA_MODE=log` on the
+2. Set `PLAN_FIRESTORE_PROJECT_ID`, `FREE_PLAN_PRICE_IDS` and
+   `QUOTA_PLAN_LIMITS` on the service, then deploy. `QUOTA_MODE` defaults to `enforce`; set `QUOTA_MODE=log` on the
    service to dry-run, or `off` to disable, without a code change.
 3. Watch logs for `UsageCounterStore` errors and `Seeded ...` lines.
 
