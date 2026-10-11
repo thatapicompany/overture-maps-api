@@ -55,6 +55,8 @@ export class MonthlyQuotaGuard implements CanActivate {
     const res = context.switchToHttp().getResponse<Response>();
     const user = ((req as any)['user'] || res.locals?.user) as User | undefined;
     if (!user?.accountId || user.isDemoAccount) return true;
+    // Push out increments from earlier requests while this one has CPU.
+    this.counter.flushSoon();
 
     let decision: { block: boolean; message?: string; retryAfter?: number } = { block: false };
     try {
