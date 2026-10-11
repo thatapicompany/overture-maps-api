@@ -17,6 +17,9 @@ import { AppService } from './app.service';
 import { AppCacheModule } from './cache/cache.module';
 import { UsageModule } from './usage/usage.module';
 import { UsageTrackingMiddleware } from './usage/usage.middleware';
+import { TiersModule } from './tiers/tiers.module';
+import { QuotaModule } from './quota/quota.module';
+import { MonthlyQuotaGuard } from './quota/monthly-quota.guard';
 
 @Module({
   imports: [
@@ -28,6 +31,8 @@ import { UsageTrackingMiddleware } from './usage/usage.middleware';
     TransportationModule,
     DivisionsModule,
     UsageModule,
+    TiersModule,
+    QuotaModule,
     ConfigModule.forRoot(),
     // Per-client rate limiting. Each BigQuery-backed request can cost real money,
     // so cap request volume. Overridable via env without a redeploy.
@@ -44,6 +49,8 @@ import { UsageTrackingMiddleware } from './usage/usage.middleware';
     GcsService,
     AppService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // After the per-minute throttler, so its 429s are never charged to the month.
+    { provide: APP_GUARD, useExisting: MonthlyQuotaGuard },
   ],
 })
 export class AppModule {

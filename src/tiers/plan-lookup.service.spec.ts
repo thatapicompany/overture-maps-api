@@ -45,8 +45,11 @@ describe('PlanLookupService', () => {
     expect(await svc.getPlanStatus('acct')).toBe('free');
     expect(reader).toHaveBeenCalledTimes(1);
     now += 2_000;
-    expect(await svc.getPlanStatus('acct')).toBe('paid');
+    // Expired: served stale once while a background read refreshes it.
+    expect(await svc.getPlanStatus('acct')).toBe('free');
+    await new Promise((r) => setImmediate(r));
     expect(reader).toHaveBeenCalledTimes(2);
+    expect(await svc.getPlanStatus('acct')).toBe('paid');
   });
 
   it('returns unknown (fail open) when Firestore errors, and retries sooner than the full TTL', async () => {
@@ -58,8 +61,10 @@ describe('PlanLookupService', () => {
     svc.setReader(reader);
     expect(await svc.getPlanStatus('acct')).toBe('unknown');
     now += 11_000;
-    expect(await svc.getPlanStatus('acct')).toBe('paid');
+    await svc.getPlanStatus('acct'); // stale-while-revalidate kicks off the retry
+    await new Promise((r) => setImmediate(r));
     expect(reader).toHaveBeenCalledTimes(2);
+    expect(await svc.getPlanStatus('acct')).toBe('paid');
   });
 
   it('returns unknown (fail open) when Firestore is slower than the timeout', async () => {
@@ -74,6 +79,20 @@ describe('PlanLookupService', () => {
     } finally {
       if (prev === undefined) delete process.env.PLAN_LOOKUP_TIMEOUT_MS; else process.env.PLAN_LOOKUP_TIMEOUT_MS = prev;
     }
+  });
+
+  it('returns the Stripe price id with the classification', async () => {
+    const svc = new PlanLookupService();
+    svc.setReader(jest.fn().mockResolvedValue({ planId: PREMIUM, subscriptionStatus: 'active' }));
+    expect(await svc.getPlan('acct')).toEqual({ status: 'paid', planId: PREMIUM });
+  });
+
+  it('collapses concurrent first lookups for one account into a single read', async () => {
+    const svc = new PlanLookupService();
+    const reader = jest.fn().mockResolvedValue({ planId: FREE, subscriptionStatus: 'active' });
+    svc.setReader(reader);
+    await Promise.all([svc.getPlan('acct'), svc.getPlan('acct'), svc.getPlan('acct')]);
+    expect(reader).toHaveBeenCalledTimes(1);
   });
 
   it('returns unknown when the org has no Firestore doc', async () => {
