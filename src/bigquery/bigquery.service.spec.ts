@@ -159,6 +159,30 @@ describe('BigQueryService', () => {
       expect(spy.mock.calls[0][1].name).toBeUndefined();
     });
 
+    it('adds a prefix clause for name_prefix: start of the name or of any word, lowercased, nearest first', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(51.5074, -0.1278, 5000, undefined, undefined, undefined, undefined, undefined, 5, undefined, undefined, undefined, 0, undefined, undefined, '  The   Example ');
+      const sql = spy.mock.calls[0][0];
+      const params = spy.mock.calls[0][1];
+      expect(sql).toContain("STARTS_WITH(LOWER(names.primary), @name_prefix)");
+      expect(sql).toContain("STRPOS(LOWER(names.primary), CONCAT(' ', @name_prefix)) > 0");
+      expect(sql).toContain('ORDER BY ext_distance, id');
+      expect(params.name_prefix).toBe('the example');
+      // The prefix is a parameter, never spliced into the SQL.
+      expect(sql).not.toContain('the example');
+    });
+
+    it('adds no prefix clause when name_prefix is omitted', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(10, 20, 500, undefined, undefined, undefined, undefined, undefined, 5);
+      expect(spy.mock.calls[0][0]).not.toContain('@name_prefix');
+      expect(spy.mock.calls[0][1].name_prefix).toBeUndefined();
+    });
+
     it('combines the name filter with other filters (radius + brand_name + name)', async () => {
       const service = new BigQueryService();
       service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
@@ -493,6 +517,16 @@ describe('BigQueryService', () => {
       const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
       expect(sql).toContain('place_by_country');
       expect(sql).toContain('SELECT country AS country');
+    });
+
+    it('uses the pre-lowered name_lower column for name_prefix on the country mirror', async () => {
+      const service = new BigQueryService();
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      const spy = jest.spyOn(service, 'runQuery');
+      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', undefined, 0.6, 20, undefined, undefined, undefined, 0, undefined, undefined, 'exam');
+      const sql = spy.mock.calls[0][0];
+      expect(sql).toContain('STARTS_WITH(name_lower, @name_prefix)');
+      expect(sql).not.toContain('LOWER(names.primary)');
     });
   });
 

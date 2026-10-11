@@ -497,7 +497,8 @@ export class BigQueryService {
     taxonomy?: string[],
     page: number = 0,
     has_contact?: string[],
-    name?: string
+    name?: string,
+    name_prefix?: string
   ): Promise<{ results: Place[]; totalCount: number }> {
 
     let queryParts: string[] = [];
@@ -544,6 +545,11 @@ export class BigQueryService {
       // which table is being read (see placeSource()).
       whereClauses.push(placeSrc.nameSql);
       params.name = name;
+    }
+
+    if (name_prefix) {
+      whereClauses.push(placeSrc.namePrefixSql);
+      params.name_prefix = name_prefix.trim().replace(/\s+/g, ' ').toLowerCase();
     }
 
     if (country) {
@@ -1052,7 +1058,7 @@ LIMIT 1;`;
    * clustered columns instead of struct digs and LOWER() over 45GB. When the
    * mirror is not configured the raw-schema predicates are used unchanged.
    */
-  private placeSource(hasLatLng: boolean): { table: string; isCountryMirror: boolean; countrySql: string; nameSql: string } {
+  private placeSource(hasLatLng: boolean): { table: string; isCountryMirror: boolean; countrySql: string; nameSql: string; namePrefixSql: string } {
     const commonNameSql = `EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE LOWER(common_name.value) = LOWER(@name))`;
     const countryTable = placeCountryTable();
     if (!hasLatLng && countryTable) {
@@ -1061,6 +1067,7 @@ LIMIT 1;`;
         isCountryMirror: true,
         countrySql: `country = @country`,
         nameSql: `(name_lower = LOWER(@name) OR ${commonNameSql})`,
+        namePrefixSql: BigQueryService.namePrefixSql('name_lower'),
       };
     }
     return {
@@ -1072,7 +1079,17 @@ LIMIT 1;`;
       // STRUCT<key_value ARRAY<STRUCT<key,value>>>, so it is unnested via
       // .key_value rather than .list. UNNEST of a NULL array yields zero rows.
       nameSql: `(LOWER(names.primary) = LOWER(@name) OR ${commonNameSql})`,
+      namePrefixSql: BigQueryService.namePrefixSql('LOWER(names.primary)'),
     };
+  }
+
+  /**
+   * Type-ahead match on the primary name: the name starts with the prefix, or
+   * one of its words does. @name_prefix is already lowercased. Plain string
+   * functions rather than a regex, so user input needs no escaping.
+   */
+  private static namePrefixSql(lowerNameExpr: string): string {
+    return `(STARTS_WITH(${lowerNameExpr}, @name_prefix) OR STRPOS(${lowerNameExpr}, CONCAT(' ', @name_prefix)) > 0)`;
   }
 
   private buildWhereClauses({
