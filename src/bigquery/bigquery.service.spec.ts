@@ -353,7 +353,104 @@ describe('BigQueryService', () => {
     });
   });
 
+  describe('country-level routing to PLACE_COUNTRY_TABLE', () => {
+    // The geometry mirror cannot prune a country predicate, so a query with
+    // no lat/lng must read the country-clustered mirror and use its top-level
+    // `country` / `name_lower` columns. With lat/lng it must keep reading the
+    // geometry table with the raw-schema predicates, country filter included.
+    const validRow = {
+      id: '1', geometry: { value: 'POINT(20 10)' }, bbox: { xmin: '0', xmax: '1', ymin: '0', ymax: '1' },
+      version: 'v1', sources: { list: [] }, names: {}, categories: {}, confidence: 1, addresses: [],
+    };
+    const prevPlace = process.env.PLACE_TABLE;
+    const prevCountry = process.env.PLACE_COUNTRY_TABLE;
+    beforeEach(() => {
+      process.env.PLACE_TABLE = 'proj.overture.place';
+      process.env.PLACE_COUNTRY_TABLE = 'proj.overture.place_by_country';
+    });
+    afterEach(() => {
+      if (prevPlace === undefined) delete process.env.PLACE_TABLE; else process.env.PLACE_TABLE = prevPlace;
+      if (prevCountry === undefined) delete process.env.PLACE_COUNTRY_TABLE; else process.env.PLACE_COUNTRY_TABLE = prevCountry;
+    });
+    const stub = () => {
+      const service = new BigQueryService();
+      service.getPlaceColumns = jest.fn().mockResolvedValue(new Set(['categories']));
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
+      return service;
+    };
+
+    it('reads the country mirror with top-level predicates when there is no lat/lng (the 5 Oct 2026 shape)', async () => {
+      const service = stub();
+      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', undefined, 0.6, 20, undefined, undefined, undefined, 0, undefined, 'The Example Cafe');
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('FROM `proj.overture.place_by_country`');
+      expect(sql).toContain('country = @country');
+      expect(sql).not.toContain('addresses.list[OFFSET(0)].element.country');
+      expect(sql).toContain('name_lower = LOWER(@name)');
+      expect(sql).not.toContain('LOWER(names.primary)');
+      expect(sql).toContain('UNNEST(names.common.key_value)');
+      expect(sql).not.toContain('ST_DWithin');
+    });
+
+    it('keeps the geometry table and raw-schema predicates when lat/lng are present, even with a country filter', async () => {
+      const service = stub();
+      await service.getPlacesNearby(51.5074, -0.1278, 100, undefined, undefined, 'GB', undefined, undefined, 20, undefined, undefined, undefined, 0, undefined, 'The Example Cafe');
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('FROM `proj.overture.place`');
+      expect(sql).toContain('ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)');
+      expect(sql).toContain('addresses.list[OFFSET(0)].element.country = @country');
+      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(sql).not.toContain('place_by_country');
+      expect(sql).not.toContain('name_lower');
+    });
+
+    it('falls back to PLACE_TABLE with raw-schema predicates when PLACE_COUNTRY_TABLE is unset', async () => {
+      delete process.env.PLACE_COUNTRY_TABLE;
+      const service = stub();
+      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', ['restaurant'], undefined, 20);
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('FROM `proj.overture.place`');
+      expect(sql).toContain('addresses.list[OFFSET(0)].element.country = @country');
+    });
+
+    it('routes the brands and categories aggregates the same way', async () => {
+      const service = stub();
+      await service.getBrandsNearby('AU');
+      await service.getCategories('AU');
+      await service.getBrandsNearby(undefined, -33.89, 151.28, 1000);
+      const calls = (service.runQuery as jest.Mock).mock.calls.map((c) => c[0] as string);
+      expect(calls[0]).toContain('place_by_country');
+      expect(calls[0]).toContain('country = @country');
+      expect(calls[1]).toContain('place_by_country');
+      expect(calls[1]).toContain('country = @country');
+      expect(calls[2]).toContain('FROM `proj.overture.place`');
+      expect(calls[2]).not.toContain('place_by_country');
+    });
+
+    it('reads place counts by country from the mirror\'s clustered column', async () => {
+      const service = stub();
+      (service.runQuery as jest.Mock).mockResolvedValue({ rows: [{ country: 'AU', count_places: 1, count_brands: 1 }], statistics: {} });
+      await service.getPlaceCountsByCountry();
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('place_by_country');
+      expect(sql).toContain('SELECT country AS country');
+    });
+  });
+
   describe('runQuery', () => {
+    it('prices bytes billed at US$6.25 per TiB (not the pre-2023 US$5 per decimal TB)', async () => {
+      const service = new TestableBigQueryService();
+      const job = {
+        id: 'job-1',
+        getQueryResults: jest.fn().mockResolvedValue([[]]),
+        getMetadata: jest.fn().mockResolvedValue([{ statistics: { totalBytesProcessed: String(2 ** 40), query: { totalBytesBilled: String(2 ** 40), statementType: 'SELECT' } } }]),
+      };
+      service.setBigQueryClient({ createQueryJob: jest.fn().mockResolvedValue([job]) });
+      service.logger = { log: jest.fn(), error: jest.fn() } as any;
+      const { statistics } = await service.runQuery('SELECT 1');
+      expect(statistics.costInUSD).toBeCloseTo(6.25, 6);
+    });
+
     it('should throw and log error if query fails', async () => {
       const service = new TestableBigQueryService();
       const error = new Error('Query failed');

@@ -13,6 +13,7 @@ import { CountryResponseDto, toCountryResponseDto } from './dto/responses/countr
 import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/category-response.dto';
 import { AuthedUser, User } from '../decorators/authed-user.decorator';
 import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
+import { assertCountryLevelAllowed, hasLatLng as hasLatLngQuery } from './places-cost-guards';
 import { PlacesService } from './places.service';
 import { findNearestPolygon, isPointInPolygon, isPointInPolygonWithoutTurf, wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
@@ -49,11 +50,12 @@ export class PlacesController {
   @ValidateLatLngUser()
   async getPlaces(@Query() query: GetPlacesDto, @AuthedUser() user: User) {
 
-    // Cost guardrails (see etl/bigquery-cost-controls.md). Every /places call
-    // scans the place table, so block the two patterns that scan it needlessly:
-    // (1) demo traffic — capped to a small radius/limit; (2) whole-country
-    // dumps with no narrowing filter, which return (and scan for) everything.
-    const hasLatLng = Number.isFinite(query.lat) && Number.isFinite(query.lng);
+    // Cost guardrails (etl/bigquery-cost-controls.md, docs/cost-budget-rate-limiting.md).
+    // Every /places call reads the place table, so block the shapes that read
+    // it needlessly: (1) demo traffic, capped to a small radius/limit;
+    // (2) whole-country dumps with no narrowing filter; (3) country-level
+    // queries from Free accounts.
+    const hasLatLng = hasLatLngQuery(query);
     if (user?.isDemoAccount) {
       // The mirror is clustered by geometry, so only lat/lng radius queries
       // prune. A demo country-level query still scans the whole ~45GB table —
@@ -61,13 +63,18 @@ export class PlacesController {
       // demo key is for trying nearby search, so restrict it to lat/lng only.
       if (!hasLatLng) {
         throw new HttpException(
-          'The demo key supports lat/lng radius queries only. Get a free API key at overturemapsapi.com for country-level queries.',
+          'The demo key supports lat/lng radius queries only. Get an API key at overturemapsapi.com; country-level queries are available on paid plans.',
           400,
         );
       }
       query.radius = Math.min(query.radius ?? 1000, 2000);
       query.limit = Math.min(query.limit ?? 25, 25);
     }
+    // (3) country-level queries on a Free plan: paid tiers only (403). Even on
+    // the country-clustered mirror a whole-country slice is the most expensive
+    // shape the API serves, and it is how one key walks a country out of the
+    // API a page at a time.
+    assertCountryLevelAllowed(query, user);
     if (
       query.country && !hasLatLng &&
       !query.categories?.length && !query.taxonomy?.length &&

@@ -6,6 +6,7 @@ import {
 
 import { Request, Response } from 'express';
 import { User } from '../decorators/authed-user.decorator';
+import { isPaidAccount } from './account-tier';
 //import CacheService from '../cache/CacheService';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -97,6 +98,7 @@ export class AuthAPIMiddleware implements NestMiddleware {
             isDemoAccount: metaData.isDemoAccount || false,
             accountId: apiKey.customAccountId,
             userId: apiKey.customUserId,
+            isPaidAccount: isPaidAccount(apiKey.customAccountId, metaData),
           };
 
           //set to both req and locals for backwards compatibility

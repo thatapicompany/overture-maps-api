@@ -1,0 +1,38 @@
+name: Rebuild Places Country Mirror (clustered by country)
+
+# Rebuilds the country-clustered mirror of the Overture place table
+# (etl/build-places-country-mirror.sql) so country-level /places queries read
+# one country's slice instead of scanning ~45GB each. Runs monthly, one hour
+# after the geometry mirror it is built from (places-mirror.yml, 04:00 UTC on
+# the 25th). Idempotent (CREATE OR REPLACE). Point the API at it with
+# PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country.
+#
+# Uses the same service account and secrets as places-mirror.yml.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 25 * *' # 25th of each month, 05:00 UTC, after places-mirror
+
+jobs:
+  build-country-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Rebuild country-clustered place mirror
+        run: |
+          bq query \
+            --project_id="${{ secrets.BIGQUERY_PROJECT_ID }}" \
+            --location=US \
+            --use_legacy_sql=false \
+            < etl/build-places-country-mirror.sql
