@@ -199,6 +199,46 @@ NULL-geometry sibling fallback still reads the public table.
 2. Set `DIVISION_AREA_TABLE=overture-maps-api.overture.division_area` on the
    Cloud Run service, then deploy.
 
+### 9. Monthly request cap, enforced in the API (Oct 2026)
+
+Replaces fix 4 (the auth-api quota that never left `log` mode). `MonthlyQuotaGuard`
+(`src/quota/`) runs on every authenticated, non-demo request, after the
+per-minute throttler.
+
+| Plan (Stripe price) | Allowance (`monthly_requests`) | Refused from (`soft_limit_requests`) |
+|---|---|---|
+| Free | 100 | 200 |
+| Premium | 1,000 | 2,000 |
+| Growth | 4,000 | 6,000 |
+| Scale | 10,000 | 20,000 |
+
+Between allowance and limit requests work and carry `X-Quota-Warning`. At the
+limit: 429 `monthly_quota_exceeded`, `Retry-After` to 00:00 UTC on the 1st, a
+message naming the plan and the upgrade URL. Every response carries
+`X-Quota-Plan/-Limit/-Hard-Limit/-Used/-Remaining/-Reset` (exposed via CORS).
+Paid plans are capped at their own limit too (decided 11 Oct 2026).
+
+Only requests finishing below 400 count. Auth failures, validation errors, the
+paid-only 403 and all 429s are free. The demo key and `PAID_ACCOUNT_IDS` are
+exempt. Plan comes from the Firestore lookup; an unknown plan or a paid price
+with no configured limits is uncapped.
+
+Counters: Firestore `your-portal-project` / `api_usage_monthly`, doc
+`{accountId}_{YYYY-MM}`, incremented in 2s batches per instance (Firestore takes
+about one write per second per doc; one account made 11,000 requests in two hours).
+A new account-month is seeded from that month's successful rows in
+`usage.api_requests` (10 MB per seed), so enforcement mid-month counts from the
+1st. Overshoot across instances is a few seconds of traffic. Every failure
+(Firestore, BigQuery, timeout) allows the request.
+
+**To deploy:**
+1. Grant the runtime service account write access to the counters:
+   `gcloud projects add-iam-policy-binding your-portal-project --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.
+   Without it the guard fails open: headers are missing and nobody is blocked.
+2. Deploy. `QUOTA_MODE` defaults to `enforce`; set `QUOTA_MODE=log` on the
+   service to dry-run, or `off` to disable, without a code change.
+3. Watch logs for `UsageCounterStore` errors and `Seeded ...` lines.
+
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
 the per-user ceiling. 2 is already done. 6 does for `/places/buildings` and
