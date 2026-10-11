@@ -25,6 +25,7 @@ import { CountHeader } from '../decorators/count-header.decorator';
 import { loadEnrichmentAdapter } from '../data-adapters/loadEnrichmentAdapter';
 import { EnrichmentAdapter } from '../data-adapters/EnrichmentAdapter';
 import { BrandsEnrichmentService } from './brands-enrichment.service';
+import { ACCOUNT_URL } from '../common/links';
 
 @ApiTags('Places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
@@ -64,7 +65,7 @@ export class PlacesController {
       // demo key is for trying nearby search, so restrict it to lat/lng only.
       if (!hasLatLng) {
         throw new HttpException(
-          'The demo key supports lat/lng radius queries only. Get an API key at overturemapsapi.com; country-level queries are available on paid plans.',
+          `The demo key supports lat/lng radius queries only. Get a free API key at ${ACCOUNT_URL}; country-level queries are available on paid plans.`,
           400,
         );
       }
