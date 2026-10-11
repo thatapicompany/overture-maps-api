@@ -40,6 +40,6 @@ SELECT
 FROM `overture-maps-api.overture.place`;
 
 -- Sanity check after building: a country query should bill one country's
--- slice (low single-digit GiB for IT), not 45 GiB.
+-- slice (low single-digit GiB for a small country), not 45 GiB.
 --   SELECT COUNT(*) FROM `overture-maps-api.overture.place_by_country`
---   WHERE country = 'IT' AND name_lower = 'bar centrale';
+--   WHERE country = 'GB' AND name_lower = 'the example cafe';

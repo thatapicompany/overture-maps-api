@@ -8,13 +8,13 @@ describe('isPaidAccount', () => {
 
   it('treats unknown accounts as Free', () => {
     delete process.env.PAID_ACCOUNT_IDS;
-    expect(isPaidAccount('2255a93b-1a13-4cad-aee2-b71c7b9abd10')).toBe(false);
+    expect(isPaidAccount('free-acct')).toBe(false);
     expect(isPaidAccount(undefined)).toBe(false);
   });
 
   it('reads PAID_ACCOUNT_IDS per call, tolerating spaces and trailing commas', () => {
-    process.env.PAID_ACCOUNT_IDS = ' 88756c26-b11b-476f-9aeb-4e817b1daf92 , other-id,';
-    expect(isPaidAccount('88756c26-b11b-476f-9aeb-4e817b1daf92')).toBe(true);
+    process.env.PAID_ACCOUNT_IDS = ' paid-acct , other-id,';
+    expect(isPaidAccount('paid-acct')).toBe(true);
     expect(isPaidAccount('other-id')).toBe(true);
     expect(isPaidAccount('')).toBe(false);
   });

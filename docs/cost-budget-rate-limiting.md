@@ -11,18 +11,17 @@ auth-api via `MONTHLY_QUOTA_MODE=enforce`) is replaced by this.
 baseline under A$1 a day. Both accounts were Free-plan signups, not test
 accounts, and nothing we run stopped them:
 
-- TobiaScivoletto (`2255a93b…`, signed up 16:59 UTC on 5 Oct) made 109
-  `/places?name=…&country=IT` calls from 17:09. Each scanned the full 45.5 GiB
-  place mirror because nothing in the predicate prunes a geometry-clustered
-  table. 4.85 TiB, about A$41, in three hours.
-- Suntria (`ac81fa05…`, `quotaState=EXCEEDED` in Twenty since 15 Sep) swept
-  Oklahoma City with 11,278 `/buildings?radius=40` calls in two hours on 6 Oct.
-  8,917 were 429'd, 2,361 ran at 1.4 GiB each. 3.25 TiB, about A$27.
+- One account, minutes after signing up, made 109 country + name `/places`
+  calls in three hours. Each scanned the full 45.5 GiB place mirror because
+  nothing in the predicate prunes a geometry-clustered table. 4.85 TiB, about
+  A$41.
+- Another, already over its allowance for weeks, swept a city with 11,278
+  small-radius `/buildings` calls in two hours on 6 Oct. 8,917 were 429'd,
+  2,361 ran at 1.4 GiB each. 3.25 TiB, about A$27.
 
-The same `/places` country shape produced the 14 Sep spike (Codoma.tech,
-7.1 TiB) and smaller hits from Dreamer-Land, JoinAppex and petsns. Country
-queries are 9% of requests and 85% of spend. Total Overture MRR is US$25
-(IwannaFind, Premium).
+The same `/places` country shape produced the 14 Sep spike (one account,
+7.1 TiB) and smaller hits from several others. Country queries are 9% of
+requests and 85% of spend. Total Overture MRR is US$25 (one Premium account).
 
 What exists today and why it did not help:
 
@@ -43,7 +42,7 @@ What exists today and why it did not help:
 2. **Make a request cost roughly the same whatever its parameters**, so a
    request count is a fair proxy for cost. Today one request can bill 20 MiB
    or 45 GiB; the count cannot tell them apart. Enforcing 100 a month on
-   Tobia would still have cost about A$38.
+   the 5 Oct account would still have cost about A$38.
 3. **Shapes that cannot be made cheap are gated by plan, not by a hidden
    threshold.** Country-level without lat/lng is paid tiers only.
 4. **Byte caps exist only as backstops**, set where no legitimate query can
@@ -147,8 +146,8 @@ pruning):
 
 | Query | Before | After |
 |---|---|---|
-| `country=IT&name=...` (the 5 Oct shape) | 45.5 GiB | 1.51 GiB |
-| `country=AR&categories=inn` (September shape) | 40 to 45 GiB | 0.56 GiB |
+| small country + `name` (the 5 Oct shape) | 45.5 GiB | 1.51 GiB |
+| small country + `categories` (the September shape) | 40 to 45 GiB | 0.56 GiB |
 | `country=US&categories=restaurant` (largest country) | ~45 GiB | 10.7 GiB |
 | `/places/countries` aggregate | full struct scan | 2.97 GiB |
 
@@ -195,7 +194,7 @@ needed; can be done today.
 ## Rollout
 
 1. Today, no deploy: project quotas and billing budget. Optionally email
-   Tobia and Kyle; both hit a wall they could not see.
+   the two accounts behind 5 and 6 Oct; both hit a wall they could not see.
 2. Done 11 Oct 2026 on `feat/places-country-mirror`: country-level
    paid-only gate with the plan read live from Firestore, `cost_usd` rate
    fix, country mirror and id-clustered division_area mirror built in
@@ -211,8 +210,8 @@ needed; can be done today.
    `usage.api_requests`: the 109 name scans 403 at request one, the
    buildings sweep 429s at request 101.
 4. Enforcement on deploy was chosen over a notice period (11 Oct 2026).
-   At that date 7 Free accounts were already past 200 for October: Suntria,
-   CWYC, Joey, PawPrints Dispatch, TobiaScivoletto, Cost Seg Smart, tasneem.
+   At that date 7 Free accounts were already past 200 for October and 5
+   more were between 100 and 199.
 5. Country mirror: done in step 2. Measured; the backstop stays at 16 GiB.
 6. Observability: scheduled query producing per-account daily requests and
    bytes into `usage.account_daily_usage`; log-based alert on any account

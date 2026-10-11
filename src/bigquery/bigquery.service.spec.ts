@@ -440,7 +440,7 @@ describe('BigQueryService', () => {
 
     it('reads the country mirror with top-level predicates when there is no lat/lng (the 5 Oct 2026 shape)', async () => {
       const service = stub();
-      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'IT', undefined, 0.6, 20, undefined, undefined, undefined, 0, undefined, 'Bar Noviziato');
+      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', undefined, 0.6, 20, undefined, undefined, undefined, 0, undefined, 'The Example Cafe');
       const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
       expect(sql).toContain('FROM `proj.overture.place_by_country`');
       expect(sql).toContain('country = @country');
@@ -453,7 +453,7 @@ describe('BigQueryService', () => {
 
     it('keeps the geometry table and raw-schema predicates when lat/lng are present, even with a country filter', async () => {
       const service = stub();
-      await service.getPlacesNearby(38.14, 15.52, 100, undefined, undefined, 'IT', undefined, undefined, 20, undefined, undefined, undefined, 0, undefined, 'Bar Noviziato');
+      await service.getPlacesNearby(51.5074, -0.1278, 100, undefined, undefined, 'GB', undefined, undefined, 20, undefined, undefined, undefined, 0, undefined, 'The Example Cafe');
       const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
       expect(sql).toContain('FROM `proj.overture.place`');
       expect(sql).toContain('ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)');
@@ -466,7 +466,7 @@ describe('BigQueryService', () => {
     it('falls back to PLACE_TABLE with raw-schema predicates when PLACE_COUNTRY_TABLE is unset', async () => {
       delete process.env.PLACE_COUNTRY_TABLE;
       const service = stub();
-      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'IT', ['restaurant'], undefined, 20);
+      await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', ['restaurant'], undefined, 20);
       const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
       expect(sql).toContain('FROM `proj.overture.place`');
       expect(sql).toContain('addresses.list[OFFSET(0)].element.country = @country');

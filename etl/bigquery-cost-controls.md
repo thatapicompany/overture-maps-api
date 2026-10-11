@@ -120,7 +120,7 @@ lat/lng still read the whole 45 GB table: the geometry cluster cannot prune
 `addresses.list[OFFSET(0)].element.country`, and `name`, `categories` and
 `brand_name` do not prune either. That shape was 9% of requests and 85% of
 September's spend, and caused the 14 Sep (7.1 TiB) and 5 Oct (4.85 TiB,
-109 Free-plan `country=IT&name=...` calls in three hours) spikes.
+109 Free-plan country + name calls in three hours) spikes.
 
 **In code:**
 - `etl/build-places-country-mirror.sql` + `.github/workflows/places-country-mirror.yml`
@@ -145,8 +145,8 @@ with the query shapes the API sends (dry-run estimates ignore cluster pruning):
 
 | Query | Before (geometry mirror) | After (country mirror) |
 |---|---|---|
-| `country=IT&name=...` (the 5 Oct shape) | 45.5 GiB | 1.51 GiB |
-| `country=AR&categories=inn` (Sep shape) | 40 to 45 GiB | 0.56 GiB |
+| small country + `name` (the 5 Oct shape) | 45.5 GiB | 1.51 GiB |
+| small country + `categories` (Sep shape) | 40 to 45 GiB | 0.56 GiB |
 | `country=US&categories=restaurant` (largest country) | ~45 GiB | 10.7 GiB |
 | `/places/countries` aggregate | full struct scan | 2.97 GiB |
 
@@ -168,11 +168,12 @@ column, so `SELECT *` stays.
    Anything uncertain (no doc, unrecognised status, Firestore error or timeout)
    **allows**, so a lookup problem can cost money but never locks out a paying
    customer; watch the logs for `Plan lookup failed`. `PAID_ACCOUNT_IDS` is now
-   only an override for accounts Stripe does not model. IwannaFind ran 325
-   country-level queries in July and resolves as paid.
+   only an override for accounts Stripe does not model. The paying account
+   at the time ran hundreds of country-level queries in July and resolves as
+   paid.
 
-   Verified 11 Oct 2026: IwannaFind's real country-level parameter sets (GB
-   categories, BM taxonomy + has_contact) and the 5 Oct name query return the
+   Verified 11 Oct 2026: that account's real country-level parameter sets
+   (categories, taxonomy + has_contact) and the 5 Oct name query return the
    same ids, order and `total_count` on the country mirror as on the old path.
 3. Deploy, then watch `usage.api_requests.total_bytes_billed` for country rows.
 
@@ -224,7 +225,7 @@ with no configured limits is uncapped.
 
 Counters: Firestore `overture-api` / `api_usage_monthly`, doc
 `{accountId}_{YYYY-MM}`, incremented in 2s batches per instance (Firestore takes
-about one write per second per doc; Suntria made 11,000 requests in two hours).
+about one write per second per doc; one account made 11,000 requests in two hours).
 A new account-month is seeded from that month's successful rows in
 `usage.api_requests` (10 MB per seed), so enforcement mid-month counts from the
 1st. Overshoot across instances is a few seconds of traffic. Every failure

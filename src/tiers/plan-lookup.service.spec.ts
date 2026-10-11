@@ -10,7 +10,7 @@ describe('classifyPlan (shapes seen in Firestore organizations, 11 Oct 2026)', (
     ['Free price, status "free" (7 orgs)', { planId: FREE, subscriptionStatus: 'free' }, 'free'],
     ['planId 0, canceled', { planId: 0, subscriptionStatus: 'canceled' }, 'free'],
     ['planId 0, free', { planId: 0, subscriptionStatus: 'free' }, 'free'],
-    ['paid price, active (IwannaFind)', { planId: PREMIUM, subscriptionStatus: 'active' }, 'paid'],
+    ['paid price, active', { planId: PREMIUM, subscriptionStatus: 'active' }, 'paid'],
     ['paid price, trialing', { planId: PREMIUM, subscriptionStatus: 'trialing' }, 'paid'],
     ['paid price, past_due (grace: still paid)', { planId: PREMIUM, subscriptionStatus: 'past_due' }, 'paid'],
     ['a paid price we have never seen, active (new tier works with no code change)', { planId: 'price_new_tier', subscriptionStatus: 'active' }, 'paid'],
