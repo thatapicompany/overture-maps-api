@@ -4,6 +4,11 @@ import { assertCountryLevelAllowed, isCountryLevel, COUNTRY_LEVEL_PAID_ONLY_MESS
 describe('places cost guards: country-level is paid only', () => {
   const free = { accountId: 'free-acct', userId: 'u1' };
   const paid = { accountId: 'paid-acct', userId: 'u2', isPaidAccount: true };
+  const prev = process.env.PAID_ACCOUNT_IDS;
+  beforeEach(() => { process.env.PAID_ACCOUNT_IDS = 'paid-acct'; });
+  afterEach(() => {
+    if (prev === undefined) delete process.env.PAID_ACCOUNT_IDS; else process.env.PAID_ACCOUNT_IDS = prev;
+  });
 
   it('identifies a country filter with no lat/lng as country-level', () => {
     expect(isCountryLevel({ country: 'IT' })).toBe(true);
@@ -31,6 +36,12 @@ describe('places cost guards: country-level is paid only', () => {
 
   it('allows a paid account to run country-level queries', () => {
     expect(() => assertCountryLevelAllowed({ country: 'IT' }, paid)).not.toThrow();
+  });
+
+  it('fails OPEN when no paid-tier source is configured, so a missed env var cannot lock out a paying customer', () => {
+    delete process.env.PAID_ACCOUNT_IDS;
+    expect(() => assertCountryLevelAllowed({ country: 'IT' }, free)).not.toThrow();
+    expect(() => assertCountryLevelAllowed({ country: 'BM' }, { accountId: '88756c26-b11b-476f-9aeb-4e817b1daf92', userId: 'u' })).not.toThrow();
   });
 
   it('never blocks radius queries, whatever the plan', () => {

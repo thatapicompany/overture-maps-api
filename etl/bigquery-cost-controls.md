@@ -159,9 +159,40 @@ column, so `SELECT *` stays.
    `bq query --location=US --use_legacy_sql=false < etl/build-places-country-mirror.sql`).
 2. On the Cloud Run service set
    `PLACE_COUNTRY_TABLE=overture-maps-api.overture.place_by_country` and
-   `PAID_ACCOUNT_IDS=<paid org ids>` **before** the new image goes live, or paying
-   customers get the 403 too.
+   `PAID_ACCOUNT_IDS=<paid org ids>`. The gate **fails open** when
+   `PAID_ACCOUNT_IDS` is unset (logs an error, restricts nothing), so a missed
+   env var costs money but never locks out a paying customer. IwannaFind
+   (`88756c26-b11b-476f-9aeb-4e817b1daf92`) ran 325 country-level queries in July
+   and must be in the list. Until tiers.json replaces it, **add the org id to
+   `PAID_ACCOUNT_IDS` whenever an account upgrades**, or their country-level
+   queries 403.
+
+   Verified 11 Oct 2026: IwannaFind's real country-level parameter sets (GB
+   categories, BM taxonomy + has_contact) and the 5 Oct name query return the
+   same ids, order and `total_count` on the country mirror as on the old path.
 3. Deploy, then watch `usage.api_requests.total_bytes_billed` for country rows.
+
+### 8. Id-clustered division_area mirror (`/divisions/:id`, Oct 2026)
+
+`getDivisionById()` read `bigquery-public-data.overture_maps.division_area`
+(9.7 GB, clustered by geometry) with `WHERE id = @id`, which cannot prune: about
+9 GiB billed for a single-row lookup, 1.6 TiB in the 30 days to 11 Oct 2026, 72 GiB
+from one Free account on 10 Oct.
+
+**In code:** `DIVISION_AREA_TABLE` (unset = public table, unchanged behaviour)
+points the by-id lookup at `overture-maps-api.overture.division_area`, clustered
+by `id` (`etl/build-division-area-mirror.sql`, monthly workflow
+`.github/workflows/division-area-mirror.yml`). If the mirror lacks an id (it lags
+the public table for up to a few weeks after each release) the lookup falls back
+to the public table, so a lagging mirror can never cause a 404. The rare
+NULL-geometry sibling fallback still reads the public table.
+
+**To deploy:**
+1. Build the mirror once:
+   `bq query --location=US --use_legacy_sql=false < etl/build-division-area-mirror.sql`
+   (~9.7 GB scan, ~A$0.08).
+2. Set `DIVISION_AREA_TABLE=overture-maps-api.overture.division_area` on the
+   Cloud Run service, then deploy.
 
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is

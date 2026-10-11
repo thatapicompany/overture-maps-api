@@ -11,6 +11,17 @@
 // Read per call so tests and runtime config changes take effect without a
 // module reload.
 
+/**
+ * True when a paid-tier source is configured at all. Gates that restrict
+ * features to paid plans must fail OPEN when this is false: a missing or
+ * mistyped env var on deploy must never lock a paying customer out. The cost
+ * of failing open is bounded by the per-job and project BigQuery backstops;
+ * the cost of failing closed is a paying customer's integration breaking.
+ */
+export function paidTierSourceConfigured(): boolean {
+  return paidAccountIds().size > 0;
+}
+
 function paidAccountIds(): Set<string> {
   return new Set(
     (process.env.PAID_ACCOUNT_IDS || '')

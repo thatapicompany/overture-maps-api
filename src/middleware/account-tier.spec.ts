@@ -1,4 +1,4 @@
-import { isPaidAccount } from './account-tier';
+import { isPaidAccount, paidTierSourceConfigured } from './account-tier';
 
 describe('isPaidAccount', () => {
   const prev = process.env.PAID_ACCOUNT_IDS;
@@ -17,6 +17,15 @@ describe('isPaidAccount', () => {
     expect(isPaidAccount('88756c26-b11b-476f-9aeb-4e817b1daf92')).toBe(true);
     expect(isPaidAccount('other-id')).toBe(true);
     expect(isPaidAccount('')).toBe(false);
+  });
+
+  it('reports whether a paid-tier source is configured at all', () => {
+    delete process.env.PAID_ACCOUNT_IDS;
+    expect(paidTierSourceConfigured()).toBe(false);
+    process.env.PAID_ACCOUNT_IDS = ' , ';
+    expect(paidTierSourceConfigured()).toBe(false);
+    process.env.PAID_ACCOUNT_IDS = 'a';
+    expect(paidTierSourceConfigured()).toBe(true);
   });
 
   it('honours an explicit isPaidAccount flag in TheAuthAPI key metadata', () => {
