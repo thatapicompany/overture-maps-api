@@ -3,7 +3,7 @@ import { HttpException } from '@nestjs/common';
 import { MonthlyQuotaGuard } from './monthly-quota.guard';
 import { TEST_FREE, TEST_PREMIUM, useTestPlanConfig } from './test-plan-config';
 
-function harness(opts: { plan?: any; used?: number | null; user?: any; planThrows?: boolean }) {
+function harness(opts: { plan?: any; used?: number | null; user?: any; planThrows?: boolean; notices?: any }) {
   const plans = {
     getPlan: jest.fn(async () => {
       if (opts.planThrows) throw new Error('boom');
@@ -11,7 +11,7 @@ function harness(opts: { plan?: any; used?: number | null; user?: any; planThrow
     }),
   };
   const counter = { current: jest.fn(async () => (opts.used === undefined ? 0 : opts.used)), record: jest.fn(), flushSoon: jest.fn() };
-  const guard = new MonthlyQuotaGuard(plans as any, counter as any);
+  const guard = new MonthlyQuotaGuard(plans as any, counter as any, opts.notices);
   (guard as any).logger = { warn: jest.fn(), error: jest.fn() };
   const res: any = Object.assign(new EventEmitter(), { headers: {} as Record<string, string>, locals: {}, statusCode: 200 });
   res.setHeader = (k: string, v: string) => (res.headers[k] = v);
@@ -120,5 +120,35 @@ describe('MonthlyQuotaGuard', () => {
     const o = harness({ user: { accountId: 'vip', userId: 'v', isPaidAccount: true }, used: 10_000 });
     await expect(o.guard.canActivate(o.ctx)).resolves.toBe(true);
     expect(o.plans.getPlan).not.toHaveBeenCalled();
+  });
+  describe('quota notices', () => {
+    const notices = () => ({ notify: jest.fn(async () => 'sent') });
+
+    it('asks for a notice once usage reaches the allowance, not before', async () => {
+      const below = notices();
+      const h1 = harness({ used: 99, notices: below });
+      await h1.guard.canActivate(h1.ctx);
+      expect(below.notify).not.toHaveBeenCalled();
+
+      const over = notices();
+      const h2 = harness({ used: 150, notices: over });
+      await h2.guard.canActivate(h2.ctx);
+      expect(over.notify).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acct', plan: 'Free', used: 150, allowance: 100, hardLimit: 200 }));
+    });
+
+    it('asks for a notice on the request that is refused', async () => {
+      const n = notices();
+      const h = harness({ used: 200, notices: n });
+      await expect(h.guard.canActivate(h.ctx)).rejects.toBeDefined();
+      expect(n.notify).toHaveBeenCalledWith(expect.objectContaining({ used: 200 }));
+    });
+
+    it('sends no notices to accounts on a manual override', async () => {
+      const n = notices();
+      const plan = { status: 'paid', override: { plan: 'Premium', until: new Date(Date.now() + 86_400_000), reason: 't' } };
+      const h = harness({ plan, used: 1_500, notices: n });
+      await h.guard.canActivate(h.ctx);
+      expect(n.notify).not.toHaveBeenCalled();
+    });
   });
 });
