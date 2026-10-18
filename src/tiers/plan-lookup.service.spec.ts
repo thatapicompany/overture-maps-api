@@ -1,4 +1,4 @@
-import { classifyPlan, PlanLookupService } from './plan-lookup.service';
+import { activeOverride, classifyPlan, PlanLookupService } from './plan-lookup.service';
 
 const FREE = 'price_test_free';
 const PREMIUM = 'price_test_premium';
@@ -109,5 +109,51 @@ describe('PlanLookupService', () => {
     (svc as any).logger = { warn: jest.fn(), error: jest.fn() };
     svc.setReader(jest.fn().mockResolvedValue(null));
     expect(await svc.getPlanStatus('missing')).toBe('unknown');
+  });
+
+  it('treats an active override as paid, even on the Free price', async () => {
+    const svc = new PlanLookupService();
+    (svc as any).logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    const until = new Date(now + 86_400_000);
+    svc.setReader(jest.fn().mockResolvedValue({ planId: FREE, subscriptionStatus: 'active', planOverride: { plan: 'Growth', until: until.toISOString(), reason: 'test' } }));
+    const plan = await svc.getPlan('acct');
+    expect(plan.status).toBe('paid');
+    expect(plan.planId).toBe(FREE);
+    expect(plan.override).toEqual({ plan: 'Growth', until, reason: 'test' });
+  });
+
+  it('re-reads as soon as a cached override expires, rather than serving it stale', async () => {
+    const svc = new PlanLookupService();
+    (svc as any).logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    const reader = jest.fn().mockResolvedValue({ planId: FREE, subscriptionStatus: 'active', planOverride: { plan: 'Growth', until: new Date(now + 1_000) } });
+    svc.setReader(reader);
+    expect(await svc.getPlanStatus('acct')).toBe('paid');
+    now += 1_001; // past the override, still inside the 60s cache TTL
+    expect(await svc.getPlanStatus('acct')).toBe('free');
+    expect(reader).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('activeOverride', () => {
+  const now = Date.parse('2026-10-18T00:00:00Z');
+  it.each([
+    ['ISO date string', { plan: 'Growth', until: '2026-11-30' }],
+    ['Date', { plan: 'Growth', until: new Date('2026-11-30') }],
+    ['Firestore Timestamp', { plan: 'unlimited', until: { toDate: () => new Date('2026-11-30') } }],
+  ])('accepts a future override as %s', (_label, planOverride) => {
+    expect(activeOverride({ planOverride }, now)).toMatchObject({ plan: planOverride.plan, until: new Date('2026-11-30') });
+  });
+  it.each([
+    ['expired', { plan: 'Growth', until: '2026-10-01' }],
+    ['no until (an override must expire)', { plan: 'Growth' }],
+    ['unparseable until', { plan: 'Growth', until: 'soon' }],
+    ['no plan', { until: '2026-11-30' }],
+    ['blank plan', { plan: '  ', until: '2026-11-30' }],
+    ['not an object', 'Growth'],
+  ])('ignores an override that is %s', (_label, planOverride) => {
+    expect(activeOverride({ planOverride } as any, now)).toBeUndefined();
+  });
+  it('ignores a missing record', () => {
+    expect(activeOverride(null, now)).toBeUndefined();
   });
 });
