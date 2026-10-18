@@ -254,6 +254,26 @@ A new account-month is seeded from that month's successful rows in
 1st. Overshoot across instances is a few seconds of traffic. Every failure
 (Firestore, BigQuery, timeout) allows the request.
 
+**Allowance and limit emails** (`src/quota/quota-notices.ts`). When an
+account passes its allowance, and again when it reaches the limit, the guard
+emails every member of the account (from `organizations/{id}.members` and
+`users/{uid}.email`) through Postmark's transactional stream. Each notice goes
+at most once per account per month: it is claimed on the counter doc
+(`notices.allowance` / `notices.limit`) in a transaction, so one instance sends
+it, and the outcome (message id, failure, or no recipients) is written beside
+the claim. A failed send is recorded, not retried. Accounts with an active
+`planOverride` get no notices. The email waits on the triggering request for
+at most `QUOTA_NOTICE_TIMEOUT_MS` (4s) and never fails it.
+
+`QUOTA_NOTICE_MODE`: `off` (default), `log` (logs who would be emailed, writes
+nothing) or `send`. Sending needs `POSTMARK_SERVER_TOKEN`, `QUOTA_NOTICE_FROM`
+(the sender address; it also gets a Bcc and replies), optionally
+`QUOTA_NOTICE_FROM_NAME` (display name and sign-off) and
+`POSTMARK_MESSAGE_STREAM` (default `outbound`). Turning on `send` mid-month
+emails accounts already over their allowance on their next request, once; run
+`log` for a day first to see who that will be. To resend a notice, delete its
+`notices.<kind>` field on the counter doc.
+
 **To deploy:**
 1. Grant the runtime service account write access to the counters:
    `gcloud projects add-iam-policy-binding "$PLAN_FIRESTORE_PROJECT_ID" --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.
@@ -262,6 +282,9 @@ A new account-month is seeded from that month's successful rows in
    `QUOTA_PLAN_LIMITS` on the service, then deploy. `QUOTA_MODE` defaults to `enforce`; set `QUOTA_MODE=log` on the
    service to dry-run, or `off` to disable, without a code change.
 3. Watch logs for `UsageCounterStore` errors and `Seeded ...` lines.
+4. For the emails: mount the Postmark server token as `POSTMARK_SERVER_TOKEN`
+   (Secret Manager), set `QUOTA_NOTICE_FROM`, and set `QUOTA_NOTICE_MODE=log`.
+   Check the `QuotaNotices` log lines, then switch to `send`.
 
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is

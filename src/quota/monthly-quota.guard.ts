@@ -1,9 +1,11 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { resolveQuotaPolicy } from './plan-limits';
+import { QuotaNoticeService } from './quota-notices';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
+import { PRICING_URL } from '../common/links';
 
 // Monthly request cap per account, enforced inside the API with no call to
 // TheAuthAPI (etl/bigquery-cost-controls.md, section 9).
@@ -20,6 +22,9 @@ import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
 // QUOTA_MODE: `enforce` (default) blocks; `log` counts, sets headers and logs
 // what it would have blocked; `off` does nothing.
 //
+// Passing the allowance and reaching the limit each trigger one email to the
+// account's team per month (QUOTA_NOTICE_MODE, quota/quota-notices.ts).
+//
 // Fails open everywhere: unknown plan, counter unavailable, or any error in
 // this guard lets the request through.
 
@@ -35,7 +40,7 @@ export function quotaExceededMessage(plan: string, used: number, allowance: numb
   return (
     `Monthly request limit reached: this account has made ${fmt(used)} requests this month on the ${plan} plan ` +
     `(allowance ${fmt(allowance)}, limit ${fmt(hardLimit)}). It resets at 00:00 UTC on ${reset}. ` +
-    `Upgrade for a higher limit at https://overturemapsapi.com/pricing`
+    `Upgrade for a higher limit: ${PRICING_URL}`
   );
 }
 
@@ -46,6 +51,7 @@ export class MonthlyQuotaGuard implements CanActivate {
   constructor(
     private readonly plans: PlanLookupService,
     private readonly counter: UsageCounterStore,
+    @Optional() private readonly notices?: QuotaNoticeService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -87,6 +93,14 @@ export class MonthlyQuotaGuard implements CanActivate {
           'X-Quota-Warning',
           `Over the ${fmt(allowance)} requests/month included in the ${planName} plan; requests are refused from ${fmt(hardLimit)}.`,
         );
+      }
+      // Email the team once when they pass the allowance and once when
+      // requests start being refused (quota/quota-notices.ts). Not for manual
+      // overrides: whoever set one is already talking to the account.
+      const override = 'override' in plan ? plan.override : undefined;
+      const overridden = !!override && override.until.getTime() > now.getTime();
+      if (used >= allowance && this.notices && !overridden) {
+        await this.notices.notify({ accountId: user.accountId, plan: planName, used, allowance, hardLimit, now });
       }
       if (used >= hardLimit) {
         const retryAfter = Math.max(1, Math.ceil((resetAt.getTime() - now.getTime()) / 1000));
