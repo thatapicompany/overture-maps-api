@@ -47,6 +47,15 @@ export function resolveQuotaPolicy(user: User | undefined, plan: ResolvedPlan): 
   if (user.isDemoAccount) return { kind: 'unlimited', reason: 'demo key (has its own location and size limits)' };
   if (user.isPaidAccount) return { kind: 'unlimited', reason: 'PAID_ACCOUNT_IDS / key metadata override' };
   const table = planLimitsTable();
+  if (plan.override && plan.override.until.getTime() > Date.now()) {
+    const name = plan.override.plan.toLowerCase();
+    const until = plan.override.until.toISOString().slice(0, 10);
+    if (name === 'unlimited') return { kind: 'unlimited', reason: `plan override (unlimited) until ${until}` };
+    const limits = Object.values(table).find((l) => l?.plan?.toLowerCase() === name);
+    return limits
+      ? { kind: 'limited', limits }
+      : { kind: 'unlimited', reason: `plan override names ${plan.override.plan}, which has no configured limits` };
+  }
   if (plan.status === 'unknown') return { kind: 'unlimited', reason: 'plan unknown (fail open)' };
   if (plan.status === 'free') {
     // Free price, or a lapsed/empty plan (planId 0, canceled): Free limits.
