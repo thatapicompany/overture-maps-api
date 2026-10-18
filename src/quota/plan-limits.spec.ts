@@ -17,6 +17,25 @@ describe('resolveQuotaPolicy', () => {
     expect(resolveQuotaPolicy(u, { status: status as any, planId })).toEqual({ kind: 'limited', limits: { plan, allowance, hardLimit } });
   });
 
+  describe('plan override on the org record', () => {
+    const future = new Date(Date.now() + 86_400_000);
+    const past = new Date(Date.now() - 1_000);
+    it('uses the named plan\'s limits, matched case-insensitively', () => {
+      expect(resolveQuotaPolicy(u, { status: 'paid', planId: TEST_FREE, override: { plan: 'growth', until: future } }))
+        .toEqual({ kind: 'limited', limits: { plan: 'Growth', allowance: 4_000, hardLimit: 6_000 } });
+    });
+    it('is uncapped for "unlimited"', () => {
+      expect(resolveQuotaPolicy(u, { status: 'paid', planId: TEST_FREE, override: { plan: 'unlimited', until: future } }).kind).toBe('unlimited');
+    });
+    it('fails open when the named plan has no configured limits', () => {
+      expect(resolveQuotaPolicy(u, { status: 'paid', planId: TEST_FREE, override: { plan: 'Enterprise', until: future } }).kind).toBe('unlimited');
+    });
+    it('is ignored once expired', () => {
+      expect(resolveQuotaPolicy(u, { status: 'free', planId: TEST_FREE, override: { plan: 'Growth', until: past } }))
+        .toMatchObject({ kind: 'limited', limits: { plan: 'Free' } });
+    });
+  });
+
   it('gives lapsed or empty plans (planId 0, canceled) the Free limits', () => {
     expect(resolveQuotaPolicy(u, { status: 'free', planId: '0' })).toEqual({ kind: 'limited', limits: { plan: 'Free', allowance: 100, hardLimit: 200 } });
     expect(resolveQuotaPolicy(u, { status: 'free' })).toMatchObject({ kind: 'limited', limits: { plan: 'Free' } });

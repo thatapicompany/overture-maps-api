@@ -224,6 +224,22 @@ paid-only 403 and all 429s are free. The demo key and `PAID_ACCOUNT_IDS` are
 exempt. Plan comes from the Firestore lookup; an unknown plan or a paid price
 with no configured limits is uncapped.
 
+**Per-account overrides.** To comp an account, honour pricing agreed outside
+Stripe, or unblock one while billing is sorted, add a `planOverride` map to its
+`organizations/{accountId}` doc:
+
+```
+planOverride: { plan: "Growth", until: <timestamp or "YYYY-MM-DD">, reason: "..." }
+```
+
+`plan` is a plan name from `QUOTA_PLAN_LIMITS` (case-insensitive) or
+`"unlimited"`. While `until` is in the future the account counts as paid (so
+country-level queries work) and is capped at that plan's limits. It takes
+effect within a minute, needs no deploy, and stops applying on its own at
+`until`. A missing or past `until` means the override is ignored. Prefer this
+to `PAID_ACCOUNT_IDS`, which needs a redeploy for every change and never
+expires.
+
 Limits come from `QUOTA_PLAN_LIMITS` (JSON keyed by Stripe price id, mirroring
 the price metadata); unset means uncapped. The table above is the current
 configuration.
