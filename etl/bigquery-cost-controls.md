@@ -274,6 +274,15 @@ emails accounts already over their allowance on their next request, once; run
 `log` for a day first to see who that will be. To resend a notice, delete its
 `notices.<kind>` field on the counter doc.
 
+Pacing, so nobody gets two in a day: the allowance notice waits
+`QUOTA_ALLOWANCE_NOTICE_DELAY_HOURS` (24) after the account first passes its
+allowance (`notices.allowance.firstSeenAt`), and an account that reaches the
+limit inside that window gets only the limit notice (the allowance one is then
+marked `mergedIntoLimit`). It also waits while the account's team has had any
+other email through Postmark in the last `QUOTA_NOTICE_QUIET_HOURS` (24), other
+than sign-in links and the welcome; if that check fails it waits rather than
+risk a second email. The limit notice never waits: requests are being refused.
+
 **To deploy:**
 1. Grant the runtime service account write access to the counters:
    `gcloud projects add-iam-policy-binding "$PLAN_FIRESTORE_PROJECT_ID" --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.

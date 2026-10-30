@@ -21,6 +21,16 @@ import { monthKey, nextMonthStartUtc } from './usage-counter.store';
 //
 // Accounts on a manual plan override get no notices (the guard skips them):
 // whoever set the override is already talking to that account.
+//
+// Pacing, so nobody gets two of these in a day:
+//   - The allowance notice waits QUOTA_ALLOWANCE_NOTICE_DELAY_HOURS (24) after
+//     the account first passes its allowance. An account that reaches the limit
+//     inside that window gets only the limit notice: scripts that burn through
+//     100 and 200 requests in minutes would otherwise get both minutes apart.
+//   - The allowance notice also waits while the account's team has had any other
+//     email from us (other than sign-in links and the welcome) in the last
+//     QUOTA_NOTICE_QUIET_HOURS (24). The limit notice does not wait: it explains
+//     why their requests are being refused.
 
 export type NoticeKind = 'allowance' | 'limit';
 
@@ -41,6 +51,8 @@ export interface Recipients {
 export interface NoticeBackend {
   /** Claim this month's notice of this kind. False if it was already claimed. */
   claim(docId: string, kind: NoticeKind, data: Record<string, unknown>): Promise<boolean>;
+  /** When this account first passed its allowance this month; records `at` if it is the first time. */
+  firstSeen(docId: string, kind: NoticeKind, at: Date): Promise<Date>;
   /** Record what happened after a claim. */
   record(docId: string, kind: NoticeKind, data: Record<string, unknown>): Promise<void>;
   recipients(accountId: string): Promise<Recipients>;
@@ -55,7 +67,12 @@ export interface OutgoingNotice {
 /** Sends one email; resolves to the provider's message id. */
 export type Mailer = (msg: OutgoingNotice) => Promise<string>;
 
-export type NoticeOutcome = 'off' | 'none' | 'handled' | 'logged' | 'claimed-elsewhere' | 'no-recipients' | 'sent' | 'failed';
+/** Whether any of these addresses had a non-service email from us since `since`. */
+export type MailHistory = (emails: string[], since: Date) => Promise<boolean>;
+
+export type NoticeOutcome =
+  | 'off' | 'none' | 'handled' | 'logged' | 'claimed-elsewhere' | 'no-recipients' | 'sent' | 'failed'
+  | 'waiting' | 'recently-emailed';
 
 const fmt = (n: number) => n.toLocaleString('en-GB');
 
@@ -127,16 +144,18 @@ export function composeNotice(kind: NoticeKind, ctx: NoticeContext, orgName?: st
 @Injectable()
 export class QuotaNoticeService {
   private readonly logger = new Logger('QuotaNotices');
-  /** `${docId}:${kind}` this instance has already dealt with. */
-  private readonly handled = new Set<string>();
+  /** `${docId}:${kind}` -> earliest time this instance should look at it again. */
+  private readonly nextCheck = new Map<string, number>();
   private backend?: NoticeBackend;
   private mailer?: Mailer;
+  private history?: MailHistory;
 
   /** Test seam. Production builds Firestore and Postmark adapters lazily. */
-  configure(backend: NoticeBackend, mailer: Mailer): void {
+  configure(backend: NoticeBackend, mailer: Mailer, history?: MailHistory): void {
     this.backend = backend;
     this.mailer = mailer;
-    this.handled.clear();
+    this.history = history ?? (async () => false);
+    this.nextCheck.clear();
   }
 
   /** Never throws; waits at most QUOTA_NOTICE_TIMEOUT_MS. */
@@ -159,14 +178,16 @@ export class QuotaNoticeService {
     const kind = noticeKindFor(ctx.used, ctx.allowance, ctx.hardLimit);
     if (!kind) return 'none';
     const docId = `${ctx.accountId}_${monthKey(ctx.now)}`;
-    const handledKey = `${docId}:${kind}`;
-    if (this.handled.has(handledKey)) return 'handled';
-    if (this.handled.size > 10_000) this.handled.clear();
+    const key = `${docId}:${kind}`;
+    const nowMs = ctx.now.getTime();
+    if ((this.nextCheck.get(key) ?? 0) > nowMs) return 'handled';
+    if (this.nextCheck.size > 10_000) this.nextCheck.clear();
     // Mark before any await, so concurrent requests on this instance do one lookup.
-    this.handled.add(handledKey);
+    this.nextCheck.set(key, Number.POSITIVE_INFINITY);
 
     const backend = this.getBackend();
     const mode = noticeMode();
+    const HOUR = 3_600_000;
 
     if (mode === 'log') {
       const r = await backend.recipients(ctx.accountId);
@@ -175,11 +196,40 @@ export class QuotaNoticeService {
       return 'logged';
     }
 
+    let r: Recipients | undefined;
+    if (kind === 'allowance') {
+      const delayMs = envInt('QUOTA_ALLOWANCE_NOTICE_DELAY_HOURS', 24) * HOUR;
+      const first = await backend.firstSeen(docId, kind, ctx.now);
+      if (nowMs - first.getTime() < delayMs) {
+        // Look again once the delay is up. If the limit is reached first, the
+        // limit notice goes instead and this one never does.
+        this.nextCheck.set(key, first.getTime() + delayMs);
+        return 'waiting';
+      }
+      r = await backend.recipients(ctx.accountId);
+      const quietMs = envInt('QUOTA_NOTICE_QUIET_HOURS', 24) * HOUR;
+      let recent = true;
+      try {
+        recent = r.emails.length > 0 && (await this.getHistory()(r.emails, new Date(nowMs - quietMs)));
+      } catch (err: any) {
+        // Unsure counts as recent: this notice can wait, a second email in a day cannot be unsent.
+        this.logger.warn(`Quota notice: mail history check failed for account ${ctx.accountId}, waiting: ${err?.message ?? err}`);
+      }
+      if (recent) {
+        this.nextCheck.set(key, nowMs + HOUR);
+        return 'recently-emailed';
+      }
+    }
+
     const claimed = await backend.claim(docId, kind, { claimedAt: new Date(), plan: ctx.plan, used: ctx.used });
     if (!claimed) return 'claimed-elsewhere';
+    if (kind === 'limit') {
+      // Covers the allowance notice too, for anyone who has not had it yet.
+      await backend.claim(docId, 'allowance', { claimedAt: new Date(), mergedIntoLimit: true }).catch(() => false);
+    }
 
     try {
-      const r = await backend.recipients(ctx.accountId);
+      r = r ?? (await backend.recipients(ctx.accountId));
       if (!r.emails.length) {
         await backend.record(docId, kind, { status: 'no-recipients', at: new Date() });
         this.logger.warn(`Quota notice (${kind}) for account ${ctx.accountId}: no member emails found; nothing sent.`);
@@ -207,6 +257,11 @@ export class QuotaNoticeService {
     if (!this.mailer) this.mailer = postmarkMailer();
     return this.mailer;
   }
+
+  private getHistory(): MailHistory {
+    if (!this.history) this.history = postmarkHistory();
+    return this.history;
+  }
 }
 
 function firestoreNoticeBackend(): NoticeBackend {
@@ -218,9 +273,19 @@ function firestoreNoticeBackend(): NoticeBackend {
       const ref = counters().doc(docId);
       return db().runTransaction(async (tx: any) => {
         const snap = await tx.get(ref);
-        if (snap.exists && snap.data()?.notices?.[kind]) return false;
+        if (snap.exists && snap.data()?.notices?.[kind]?.claimedAt) return false;
         tx.set(ref, { notices: { [kind]: data } }, { merge: true });
         return true;
+      });
+    },
+    async firstSeen(docId, kind, at) {
+      const ref = counters().doc(docId);
+      return db().runTransaction(async (tx: any) => {
+        const snap = await tx.get(ref);
+        const seen = snap.exists ? snap.data()?.notices?.[kind]?.firstSeenAt : undefined;
+        if (seen) return typeof seen.toDate === 'function' ? seen.toDate() : new Date(seen);
+        tx.set(ref, { notices: { [kind]: { firstSeenAt: at } } }, { merge: true });
+        return at;
       });
     },
     async record(docId, kind, data) {
@@ -274,5 +339,37 @@ export function postmarkMailer(): Mailer {
       throw new Error(`Postmark ${res.status}: ${body.Message ?? 'no message'}`);
     }
     return String(body.MessageID);
+  };
+}
+
+/** Postmark reads `fromdate` as US Eastern time, so a UTC clock time shifts the window by hours. */
+export function postmarkDate(d: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    }).formatToParts(d).map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+/** Mail someone asked for (sign-in links) or the one-off welcome; neither counts against the quiet period. */
+const SERVICE_SUBJECTS = [/^sign in to /i, /api key is ready/i];
+
+/** Every customer email goes through the same Postmark server, so its outbound log sees them all. */
+export function postmarkHistory(): MailHistory {
+  const token = process.env.POSTMARK_SERVER_TOKEN;
+  if (!token) throw new Error('POSTMARK_SERVER_TOKEN must be set to check recent mail.');
+  return async (emails, since) => {
+    for (const email of emails.slice(0, 10)) {
+      const url = `https://api.postmarkapp.com/messages/outbound?count=20&offset=0&recipient=${encodeURIComponent(email)}&fromdate=${encodeURIComponent(postmarkDate(since))}`;
+      const res = await fetch(url, { headers: { 'X-Postmark-Server-Token': token, accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Postmark ${res.status}`);
+      const body: any = await res.json();
+      const recent = (body.Messages ?? []).some((m: any) =>
+        new Date(m.ReceivedAt).getTime() >= since.getTime() && !SERVICE_SUBJECTS.some((p) => p.test(m.Subject ?? '')));
+      if (recent) return true;
+    }
+    return false;
   };
 }
