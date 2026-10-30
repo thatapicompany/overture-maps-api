@@ -2,16 +2,25 @@ import { composeNotice, nextPlan, NoticeBackend, noticeKindFor, QuotaNoticeServi
 import { useTestPlanConfig } from './test-plan-config';
 
 const NOW = new Date(Date.UTC(2026, 9, 18, 12));
-const ctx = (used: number, plan = 'Free', allowance = 100, hardLimit = 200) => ({ accountId: 'acct-1', plan, used, allowance, hardLimit, now: NOW });
+const HOUR = 3_600_000;
+const ctx = (used: number, plan = 'Free', allowance = 100, hardLimit = 200, now = NOW) => ({ accountId: 'acct-1', plan, used, allowance, hardLimit, now });
 
-function fakes(opts: { claimed?: boolean; emails?: string[]; mailerThrows?: boolean } = {}) {
+function fakes(opts: { claimed?: boolean; emails?: string[]; mailerThrows?: boolean; firstSeen?: Date; recent?: boolean | 'throw' } = {}) {
   const claims = new Set<string>();
+  const seen = new Map<string, Date>();
+  // By default the account passed its allowance two days ago, so the delay is over.
+  seen.set('acct-1_2026-10:allowance', opts.firstSeen ?? new Date(NOW.getTime() - 48 * HOUR));
   const backend: NoticeBackend & { records: any[] } = {
     records: [],
     claim: jest.fn(async (doc, kind) => {
       if (opts.claimed === false || claims.has(`${doc}:${kind}`)) return false;
       claims.add(`${doc}:${kind}`);
       return true;
+    }),
+    firstSeen: jest.fn(async (doc, kind, at) => {
+      const k = `${doc}:${kind}`;
+      if (!seen.has(k)) seen.set(k, at);
+      return seen.get(k) as Date;
     }),
     record: jest.fn(async (doc, kind, data) => void backend.records.push({ doc, kind, data })),
     recipients: jest.fn(async () => ({ orgName: 'Example Co', emails: opts.emails ?? ['a@example.com', 'b@example.com'] })),
@@ -20,10 +29,14 @@ function fakes(opts: { claimed?: boolean; emails?: string[]; mailerThrows?: bool
     if (opts.mailerThrows) throw new Error('postmark down');
     return 'msg-1';
   });
+  const history = jest.fn(async () => {
+    if (opts.recent === 'throw') throw new Error('postmark down');
+    return opts.recent === true;
+  });
   const svc = new QuotaNoticeService();
   (svc as any).logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  svc.configure(backend, mailer);
-  return { svc, backend, mailer };
+  svc.configure(backend, mailer, history);
+  return { svc, backend, mailer, history, claims };
 }
 
 describe('quota notices', () => {
@@ -99,6 +112,46 @@ describe('quota notices', () => {
     // Reaching the limit is a separate notice.
     await expect(f.svc.notify(ctx(200))).resolves.toBe('sent');
     expect(f.mailer).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds the allowance notice for a day after the account passes its allowance', async () => {
+    const f = fakes({ firstSeen: NOW });
+    await expect(f.svc.notify(ctx(150))).resolves.toBe('waiting');
+    expect(f.backend.claim).not.toHaveBeenCalled();
+    // Same instance, an hour later: still inside the delay, not even looked up again.
+    await expect(f.svc.notify(ctx(160, 'Free', 100, 200, new Date(NOW.getTime() + HOUR)))).resolves.toBe('handled');
+    // A day later and still under the limit: it goes.
+    await expect(f.svc.notify(ctx(170, 'Free', 100, 200, new Date(NOW.getTime() + 25 * HOUR)))).resolves.toBe('sent');
+    expect(f.mailer).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('passed its monthly allowance') }));
+  });
+
+  it('sends only the limit notice when an account burns through both in one go', async () => {
+    const f = fakes({ firstSeen: NOW });
+    await expect(f.svc.notify(ctx(120))).resolves.toBe('waiting');
+    await expect(f.svc.notify(ctx(200, 'Free', 100, 200, new Date(NOW.getTime() + 6 * 60_000)))).resolves.toBe('sent');
+    expect(f.mailer).toHaveBeenCalledTimes(1);
+    expect(f.mailer).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('reached its monthly limit') }));
+    // The allowance notice is marked as covered, so it can never follow later.
+    expect(f.claims.has('acct-1_2026-10:allowance')).toBe(true);
+  });
+
+  it('holds the allowance notice while the team has had another email in the last day', async () => {
+    const f = fakes({ recent: true });
+    await expect(f.svc.notify(ctx(150))).resolves.toBe('recently-emailed');
+    expect(f.backend.claim).not.toHaveBeenCalled();
+    expect(f.mailer).not.toHaveBeenCalled();
+  });
+
+  it('treats a failed mail history check as recent and waits', async () => {
+    const f = fakes({ recent: 'throw' });
+    await expect(f.svc.notify(ctx(150))).resolves.toBe('recently-emailed');
+    expect(f.mailer).not.toHaveBeenCalled();
+  });
+
+  it('sends the limit notice even after a recent email, because requests are being refused', async () => {
+    const f = fakes({ recent: true });
+    await expect(f.svc.notify(ctx(200))).resolves.toBe('sent');
+    expect(f.history).not.toHaveBeenCalled();
   });
 
   it('sends nothing when another instance already claimed it', async () => {
