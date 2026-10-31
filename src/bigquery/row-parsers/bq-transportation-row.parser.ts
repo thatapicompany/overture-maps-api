@@ -1,10 +1,10 @@
 import { TransportationSegment } from "../../transportation/interfaces/transportation.interface";
-import { parsePointToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from "../../utils/geojson";
+import { parsePointToGeoJSON, parsePolygonToGeoJSON, parseAnyWKTToGeoJSON } from "../../utils/geojson";
 
 export const parseTransportationRow = (row: any): TransportationSegment => {
     let geometry;
     try {
-        geometry = parseWKTToGeoJSON(row.geometry.value)
+        geometry = parseAnyWKTToGeoJSON(row.geometry.value)
     } catch {
         geometry = typeof row.geometry === 'string' ? JSON.parse(row.geometry) : row.geometry;
     }

@@ -4,8 +4,23 @@ Expect string to be in format "POLYGON((151.2762519003 -33.8915747100951, 151.27
 
 */
 import * as turf from '@turf/turf'
-import { Feature, MultiPolygon, Point, Polygon } from 'geojson';
+import { Feature, LineString, MultiLineString, MultiPolygon, Point, Polygon } from 'geojson';
 //import geojson 
+
+/**
+ * Like parseWKTToGeoJSON, but also handles LINESTRING and MULTILINESTRING.
+ * Transportation segments are lines; parseWKTToGeoJSON returned undefined for
+ * them, so every segment came back from /transportation with no geometry.
+ */
+export const parseAnyWKTToGeoJSON = (wkt: string): Point | LineString | MultiLineString | Polygon | MultiPolygon => {
+    if (wkt.includes("MULTILINESTRING")) {
+        return parseMultiLineStringToGeoJSON(wkt);
+    }
+    if (wkt.includes("LINESTRING")) {
+        return parseLineStringToGeoJSON(wkt);
+    }
+    return parseWKTToGeoJSON(wkt);
+}
 
 export const parseWKTToGeoJSON = (wkt: string): Point | Polygon | MultiPolygon => {
     //if MULTI use parseMultiPolygonToGeoJSON
@@ -141,6 +156,41 @@ export const parseMultiPolygonToGeoJSON = (multiPolygonStr: string): MultiPolygo
         coordinates: polygons
     } as MultiPolygon;
 }
+const parseCoordinateList = (list: string): number[][] =>
+    list
+        .split(',')
+        .map(pair => pair.trim().split(/\s+/).map(Number))
+        .filter(pair => pair.length >= 2 && !isNaN(pair[0]) && !isNaN(pair[1]))
+        .map(pair => [pair[0], pair[1]]);
+
+/*
+LINESTRING(-0.0984 51.5138, -0.0979 51.5141)
+*/
+export const parseLineStringToGeoJSON = (wkt: string): LineString => {
+    const match = wkt.match(/LINESTRING\s*\(([^()]*)\)/i);
+    if (!match) return null;
+    const coordinates = parseCoordinateList(match[1]);
+    if (coordinates.length < 2) return null;
+    return { type: 'LineString', coordinates };
+}
+
+/*
+MULTILINESTRING((-0.0984 51.5138, -0.0979 51.5141), (-0.0975 51.5143, -0.0970 51.5146))
+*/
+export const parseMultiLineStringToGeoJSON = (wkt: string): MultiLineString => {
+    const match = wkt.match(/MULTILINESTRING\s*\((.*)\)/is);
+    if (!match) return null;
+    const lines: number[][][] = [];
+    const lineRegex = /\(([^()]*)\)/g;
+    let m;
+    while ((m = lineRegex.exec(match[1])) !== null) {
+        const coordinates = parseCoordinateList(m[1]);
+        if (coordinates.length >= 2) lines.push(coordinates);
+    }
+    if (lines.length === 0) return null;
+    return { type: 'MultiLineString', coordinates: lines };
+}
+
 /*
 export string of POINT(151.2772322 -33.8913828)
 */
