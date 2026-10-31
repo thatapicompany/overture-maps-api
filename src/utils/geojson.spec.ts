@@ -1,5 +1,5 @@
 
-import { parseMultiPolygonToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from "./geojson";
+import { parseAnyWKTToGeoJSON, parseMultiPolygonToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from "./geojson";
 
 
 const PolygonStr = "POLYGON((151.2762519003 -33.8915747100951, 151.276258302075 -33.8914594937271, 151.276189186945 -33.8914340614275, 151.276066105576 -33.8914671922852, 151.276054954362 -33.8914667647, 151.275981484004 -33.8914858830191, 151.275999470338 -33.8915335108494, 151.275962780589 -33.8915430560486, 151.275960784231 -33.8915789311803, 151.275923313259 -33.8915774943851, 151.275920283167 -33.8916319459681, 151.275975754972 -33.891634069767, 151.275983409999 -33.8916543402525, 151.275981862028 -33.8916821576985, 151.27603392474 -33.8916841540002, 151.276035202591 -33.8916611558307, 151.276077326459 -33.8916501944598, 151.276088482028 -33.891650622211, 151.276167145946 -33.8916301570429, 151.276169244963 -33.8915924371208, 151.276165426201 -33.8915823250443, 151.276215281919 -33.8915842367227, 151.2762519003 -33.8915747100951))"
@@ -45,3 +45,33 @@ describe('GeoJSON tests', () => {
         expect(parseWKTToGeoJSON(multiPolygonStr).type).toBe('MultiPolygon');
     });
 })
+describe('line geometries (transportation segments)', () => {
+    const line = 'LINESTRING(2.3466 48.8607, 2.3470 48.8609, 2.3475 48.8611)';
+    const multi = 'MULTILINESTRING((2.3466 48.8607, 2.3470 48.8609), (2.3480 48.8612, 2.3485 48.8615, 2.3490 48.8617))';
+
+    it('parses a LINESTRING into a GeoJSON LineString', () => {
+        expect(parseAnyWKTToGeoJSON(line)).toEqual({
+            type: 'LineString',
+            coordinates: [[2.3466, 48.8607], [2.347, 48.8609], [2.3475, 48.8611]],
+        });
+    });
+
+    it('parses a MULTILINESTRING into a GeoJSON MultiLineString', () => {
+        expect(parseAnyWKTToGeoJSON(multi)).toEqual({
+            type: 'MultiLineString',
+            coordinates: [
+                [[2.3466, 48.8607], [2.347, 48.8609]],
+                [[2.348, 48.8612], [2.3485, 48.8615], [2.349, 48.8617]],
+            ],
+        });
+    });
+
+    it('still routes polygons and points to their own parsers', () => {
+        expect(parseAnyWKTToGeoJSON('POINT(151.2772322 -33.8913828)').type).toBe('Point');
+        expect(parseAnyWKTToGeoJSON('POLYGON((0 0, 1 0, 1 1, 0 0))').type).toBe('Polygon');
+    });
+
+    it('returns null for a LINESTRING with fewer than two points', () => {
+        expect(parseAnyWKTToGeoJSON('LINESTRING(2.3466 48.8607)')).toBeNull();
+    });
+});
