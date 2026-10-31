@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 
 export class GetPlacesDto extends GetByLocationDto {
@@ -80,6 +80,20 @@ export class GetPlacesDto extends GetByLocationDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Partial-name search for type-ahead: matches places whose primary name starts with this text, or has a word that does ' +
+      '(so "blue bo" and "bottle" both match "Blue Bottle Coffee"). Case-insensitive, at least 2 characters. ' +
+      'Combine with lat/lng/radius and a small limit: results come nearest first.',
+    example: 'blue bo',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : value))
+  @MinLength(2, { message: 'name_prefix must be at least 2 characters.' })
+  @MaxLength(100, { message: 'name_prefix must be 100 characters or fewer.' })
+  name_prefix?: string;
 
   @ApiPropertyOptional({
     description: 'Minimum confidence score for the places to be returned, defaulting to 0.5 if not provided.',

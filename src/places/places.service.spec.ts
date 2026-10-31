@@ -232,7 +232,8 @@ describe('PlacesService', () => {
       undefined, // taxonomy
       0,         // page
       undefined, // has_contact
-      undefined  // name
+      undefined, // name
+      undefined  // name_prefix
     );
 
     expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);
@@ -272,7 +273,8 @@ describe('PlacesService', () => {
       undefined, // taxonomy
       0,         // page
       undefined, // has_contact
-      'Intermarché'
+      'Intermarché',
+      undefined  // name_prefix
     );
     expect(mockCacheSet).toHaveBeenCalledWith(placesKey(query), paginatedResponse, CACHE_TTL_SECONDS);
   });
