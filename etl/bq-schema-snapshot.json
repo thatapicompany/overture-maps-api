@@ -5,33 +5,6 @@
       "type": "STRING"
     },
     {
-      "name": "categories",
-      "type": "RECORD",
-      "fields": [
-        {
-          "name": "primary",
-          "type": "STRING"
-        },
-        {
-          "name": "alternate",
-          "type": "RECORD",
-          "fields": [
-            {
-              "name": "list",
-              "type": "RECORD",
-              "mode": "REPEATED",
-              "fields": [
-                {
-                  "name": "element",
-                  "type": "STRING"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
       "name": "confidence",
       "type": "FLOAT"
     },
@@ -922,6 +895,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }
@@ -1307,6 +1292,18 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "name": "provider",
+                  "type": "STRING"
+                },
+                {
+                  "name": "resource",
+                  "type": "STRING"
+                },
+                {
+                  "name": "version",
+                  "type": "STRING"
                 }
               ]
             }

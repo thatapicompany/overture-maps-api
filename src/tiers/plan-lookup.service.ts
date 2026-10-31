@@ -17,6 +17,17 @@ import { portalFirestore, portalFirestoreConfigured } from './portal-firestore';
 // comes from env, never from code: this repo is open source. With either
 // unset, every plan resolves `unknown`.
 //
+// An org can also carry a manual override, for comped access, agreed pricing
+// that is not in Stripe yet, or unblocking an account while billing is sorted:
+//
+//   planOverride: { plan: "Growth", until: <timestamp or ISO date>, reason: "..." }
+//
+// `plan` names a plan in QUOTA_PLAN_LIMITS, or "unlimited". `until` is required
+// so nobody stays exempt by accident. While it is in the future the account is
+// paid, and the monthly cap uses that plan's limits; once it passes, the org
+// is classified from Stripe as usual. A malformed or expired override is
+// ignored.
+//
 // Every uncertain outcome is `unknown`, and callers must treat `unknown` as
 // ALLOW: missing config, a missing doc, an odd status, a Firestore error or a
 // slow read must never lock a paying customer out. The cost of failing open is
@@ -28,6 +39,14 @@ export type PlanStatus = 'paid' | 'free' | 'unknown';
 export interface OrgPlanRecord {
   planId?: unknown;
   subscriptionStatus?: unknown;
+  planOverride?: unknown;
+}
+
+export interface PlanOverride {
+  /** A plan name from QUOTA_PLAN_LIMITS (case-insensitive), or "unlimited". */
+  plan: string;
+  until: Date;
+  reason?: string;
 }
 
 export type OrgReader = (accountId: string) => Promise<OrgPlanRecord | null>;
@@ -36,6 +55,8 @@ export type OrgReader = (accountId: string) => Promise<OrgPlanRecord | null>;
 export interface ResolvedPlan {
   status: PlanStatus;
   planId?: string;
+  /** Present while a manual override is active; status is then 'paid'. */
+  override?: PlanOverride;
 }
 
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
@@ -62,6 +83,27 @@ export function classifyPlan(rec: OrgPlanRecord | null, free: Set<string> = free
   if (PAID_STATUSES.has(status)) return 'paid';
   if (LAPSED_STATUSES.has(status)) return 'free';
   return 'unknown';
+}
+
+function toDate(v: unknown): Date | undefined {
+  if (v instanceof Date) return v;
+  // Firestore Timestamp
+  if (v && typeof (v as any).toDate === 'function') {
+    const d = (v as any).toDate();
+    return d instanceof Date ? d : undefined;
+  }
+  if (typeof v === 'string' || typeof v === 'number') return new Date(v);
+  return undefined;
+}
+
+/** The record's override if it is well formed and has not expired, else undefined. */
+export function activeOverride(rec: OrgPlanRecord | null, now: number = Date.now()): PlanOverride | undefined {
+  const raw = rec?.planOverride as any;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const plan = typeof raw.plan === 'string' ? raw.plan.trim() : '';
+  const until = toDate(raw.until);
+  if (!plan || !until || Number.isNaN(until.getTime()) || until.getTime() <= now) return undefined;
+  return { plan, until, reason: typeof raw.reason === 'string' ? raw.reason : undefined };
 }
 
 const envInt = (name: string, fallback: number): number => {
@@ -96,6 +138,10 @@ export class PlanLookupService {
    */
   async getPlan(accountId: string): Promise<ResolvedPlan> {
     const hit = this.cache.get(accountId);
+    // An override that expired while cached must not outlive its date.
+    if (hit?.plan.override && hit.plan.override.until.getTime() <= Date.now()) {
+      return this.refresh(accountId);
+    }
     if (hit) {
       if (hit.expires <= Date.now()) void this.refresh(accountId);
       return hit.plan;
@@ -132,11 +178,16 @@ export class PlanLookupService {
         timer.unref?.();
       });
       const rec = await Promise.race([reader(accountId), timeout]);
+      const planId = rec?.planId === null || rec?.planId === undefined ? undefined : String(rec.planId);
+      const override = activeOverride(rec);
+      if (override) {
+        this.logger.log(`Plan override for account ${accountId}: ${override.plan} until ${override.until.toISOString()}.`);
+        return { status: 'paid', planId, override };
+      }
       const status = classifyPlan(rec);
       if (status === 'unknown') {
         this.logger.warn(`Plan unknown for account ${accountId} (${rec ? 'unrecognised plan/status' : 'no organizations doc'}); allowing paid-only features.`);
       }
-      const planId = rec?.planId === null || rec?.planId === undefined ? undefined : String(rec.planId);
       return { status, planId };
     } catch (err: any) {
       this.logger.error(`Plan lookup failed for account ${accountId}: ${err?.message ?? err}; allowing paid-only features.`);

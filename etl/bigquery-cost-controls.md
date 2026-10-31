@@ -224,6 +224,22 @@ paid-only 403 and all 429s are free. The demo key and `PAID_ACCOUNT_IDS` are
 exempt. Plan comes from the Firestore lookup; an unknown plan or a paid price
 with no configured limits is uncapped.
 
+**Per-account overrides.** To comp an account, honour pricing agreed outside
+Stripe, or unblock one while billing is sorted, add a `planOverride` map to its
+`organizations/{accountId}` doc:
+
+```
+planOverride: { plan: "Growth", until: <timestamp or "YYYY-MM-DD">, reason: "..." }
+```
+
+`plan` is a plan name from `QUOTA_PLAN_LIMITS` (case-insensitive) or
+`"unlimited"`. While `until` is in the future the account counts as paid (so
+country-level queries work) and is capped at that plan's limits. It takes
+effect within a minute, needs no deploy, and stops applying on its own at
+`until`. A missing or past `until` means the override is ignored. Prefer this
+to `PAID_ACCOUNT_IDS`, which needs a redeploy for every change and never
+expires.
+
 Limits come from `QUOTA_PLAN_LIMITS` (JSON keyed by Stripe price id, mirroring
 the price metadata); unset means uncapped. The table above is the current
 configuration.
@@ -238,6 +254,35 @@ A new account-month is seeded from that month's successful rows in
 1st. Overshoot across instances is a few seconds of traffic. Every failure
 (Firestore, BigQuery, timeout) allows the request.
 
+**Allowance and limit emails** (`src/quota/quota-notices.ts`). When an
+account passes its allowance, and again when it reaches the limit, the guard
+emails every member of the account (from `organizations/{id}.members` and
+`users/{uid}.email`) through Postmark's transactional stream. Each notice goes
+at most once per account per month: it is claimed on the counter doc
+(`notices.allowance` / `notices.limit`) in a transaction, so one instance sends
+it, and the outcome (message id, failure, or no recipients) is written beside
+the claim. A failed send is recorded, not retried. Accounts with an active
+`planOverride` get no notices. The email waits on the triggering request for
+at most `QUOTA_NOTICE_TIMEOUT_MS` (4s) and never fails it.
+
+`QUOTA_NOTICE_MODE`: `off` (default), `log` (logs who would be emailed, writes
+nothing) or `send`. Sending needs `POSTMARK_SERVER_TOKEN`, `QUOTA_NOTICE_FROM`
+(the sender address; it also gets a Bcc and replies), optionally
+`QUOTA_NOTICE_FROM_NAME` (display name and sign-off) and
+`POSTMARK_MESSAGE_STREAM` (default `outbound`). Turning on `send` mid-month
+emails accounts already over their allowance on their next request, once; run
+`log` for a day first to see who that will be. To resend a notice, delete its
+`notices.<kind>` field on the counter doc.
+
+Pacing, so nobody gets two in a day: the allowance notice waits
+`QUOTA_ALLOWANCE_NOTICE_DELAY_HOURS` (24) after the account first passes its
+allowance (`notices.allowance.firstSeenAt`), and an account that reaches the
+limit inside that window gets only the limit notice (the allowance one is then
+marked `mergedIntoLimit`). It also waits while the account's team has had any
+other email through Postmark in the last `QUOTA_NOTICE_QUIET_HOURS` (24), other
+than sign-in links and the welcome; if that check fails it waits rather than
+risk a second email. The limit notice never waits: requests are being refused.
+
 **To deploy:**
 1. Grant the runtime service account write access to the counters:
    `gcloud projects add-iam-policy-binding "$PLAN_FIRESTORE_PROJECT_ID" --member=serviceAccount:<runtime-service-account> --role=roles/datastore.user`.
@@ -246,6 +291,9 @@ A new account-month is seeded from that month's successful rows in
    `QUOTA_PLAN_LIMITS` on the service, then deploy. `QUOTA_MODE` defaults to `enforce`; set `QUOTA_MODE=log` on the
    service to dry-run, or `off` to disable, without a code change.
 3. Watch logs for `UsageCounterStore` errors and `Seeded ...` lines.
+4. For the emails: mount the Postmark server token as `POSTMARK_SERVER_TOKEN`
+   (Secret Manager), set `QUOTA_NOTICE_FROM`, and set `QUOTA_NOTICE_MODE=log`.
+   Check the `QuotaNotices` log lines, then switch to `send`.
 
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
