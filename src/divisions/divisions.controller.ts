@@ -8,6 +8,8 @@ import { ApiSecurity, ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nest
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
+import { AuthedUser, User } from '../decorators/authed-user.decorator';
+import { checkDemoDivisionsScope } from './demo-divisions-scope';
 
 @ApiTags('Divisions')
 @ApiSecurity('API_KEY')
@@ -25,7 +27,10 @@ export class DivisionsController {
     @ApiOperation({ summary: 'Get Division areas using Query params as filters' })
     @ApiResponse({ status: 200, description: 'Return Division areas.', type: DivisionDto, isArray: true })
     @CountHeader()
-    async getDivisions(@Query() query: GetDivisionsQuery): Promise<DivisionDto[] | any> {
+    async getDivisions(@Query() query: GetDivisionsQuery, @AuthedUser() user: User): Promise<DivisionDto[] | any> {
+
+        // Demo key: points near a demo city, or name searches without geometry
+        checkDemoDivisionsScope(query, query.resolveIncludeGeometry(), user);
 
         const { results, totalCount } = await this.divisionsService.getDivisions(query);
 
