@@ -315,6 +315,15 @@ default. Do not set it below the full-table estimate of every query shape. If
 the API ever returns "This query would read too much data to run" for
 ordinary queries, unset it.
 
+Production is the Cloud Run service `overture-maps-api-prod` in project
+`overture-maps-api`, region `us-central1` (it holds the
+`api.overturemapsapi.com` domain mapping). Always pass `--project`: the
+default gcloud project on a dev machine may be a different one. Env changes
+take effect without a deploy, for example:
+
+    gcloud run services update overture-maps-api-prod --project overture-maps-api \
+      --region us-central1 --update-env-vars BQ_MAX_BYTES_BILLED=0
+
 The guards that do work on actual bytes are the project-level BigQuery quotas
 ("Query usage per day", and per user for the runtime service account) and the
 Cloud Billing budget alerts.
