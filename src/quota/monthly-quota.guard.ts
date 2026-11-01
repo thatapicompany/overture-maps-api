@@ -6,6 +6,7 @@ import { resolveQuotaPolicy } from './plan-limits';
 import { QuotaNoticeService } from './quota-notices';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
 import { PRICING_URL } from '../common/links';
+import { recordUsageError } from '../usage/usage.context';
 
 // Monthly request cap per account, enforced inside the API with no call to
 // TheAuthAPI (etl/bigquery-cost-controls.md, section 9).
@@ -118,6 +119,7 @@ export class MonthlyQuotaGuard implements CanActivate {
 
     if (decision.block) {
       res.setHeader('Retry-After', String(decision.retryAfter));
+      recordUsageError('monthly_quota_exceeded');
       throw new HttpException(
         { statusCode: HttpStatus.TOO_MANY_REQUESTS, error: 'monthly_quota_exceeded', message: decision.message },
         HttpStatus.TOO_MANY_REQUESTS,

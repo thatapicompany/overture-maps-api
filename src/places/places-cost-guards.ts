@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanStatus } from '../tiers/plan-lookup.service';
 import { PRICING_URL } from '../common/links';
+import { recordUsageError } from '../usage/usage.context';
 
 const logger = new Logger('PlacesCostGuards');
 // Country-level /places queries (a `country` filter with no lat/lng) read a
@@ -50,10 +51,12 @@ export async function checkCountryLevelAllowed(query: CountryLevelQuery, user: U
   if (!isCountryLevel(query)) return;
   if (user?.isPaidAccount) return;
   if (!user?.accountId) {
+    recordUsageError('country_level_paid_only');
     throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
   }
   const status = await plans.getPlanStatus(user.accountId);
   if (status === 'free') {
+    recordUsageError('country_level_paid_only');
     throw new HttpException(COUNTRY_LEVEL_PAID_ONLY_MESSAGE, HttpStatus.FORBIDDEN);
   }
   if (status === 'unknown') {
