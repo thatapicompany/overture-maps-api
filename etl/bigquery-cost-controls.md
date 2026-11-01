@@ -295,26 +295,29 @@ risk a second email. The limit notice never waits: requests are being refused.
    (Secret Manager), set `QUOTA_NOTICE_FROM`, and set `QUOTA_NOTICE_MODE=log`.
    Check the `QuotaNotices` log lines, then switch to `send`.
 
-### 10. Per-job bytes-billed backstop (Nov 2026)
+### 10. Large-job warning, and why there is no per-job byte cap (Nov 2026)
 
-`BigQueryService.runQuery()` sets `maximumBytesBilled` on every query job,
-24 GiB by default (`BQ_MAX_BYTES_BILLED`, in bytes; `0` turns it off).
-BigQuery checks it against bytes billed after cluster pruning, and a job over
-the cap fails without being charged. The API turns that failure into a 400
-that tells the caller to add lat/lng or narrow the filters, and the usage row
-records `error = bytes_billed_limit_exceeded` with zero bytes billed.
+Any job billing more than 12 GiB (`BQ_WARN_BYTES_BILLED`, in bytes) is logged
+as a warning ("BigQuery: large job billed ..."). It uses actual bytes billed
+after pruning. The largest legitimate shape, a whole-country `/places` slice
+for the biggest country, bills about 11 GiB and grows with each Overture
+release, so this is the early signal to re-measure. Add a log-based alert on
+it.
 
-Any job billing more than 12 GiB (`BQ_WARN_BYTES_BILLED`) is logged as a
-warning ("large job billed ..."). The largest legitimate shape, a
-whole-country `/places` slice for the biggest country, bills about 11 GiB and
-grows with each Overture release, so this warning is the early signal to
-re-measure before the cap is anywhere near. A log-based alert on that message
-is worth adding.
+A per-job `maximumBytesBilled` cap was shipped on 1 Nov 2026 at 24 GiB and
+broke every BigQuery-backed endpoint within minutes. BigQuery checks the cap
+against its upfront estimate, and for a clustered table that estimate is the
+upper bound for the columns read across the whole table. Pruning only happens
+at execution. A 400 m radius query that bills about 1 GiB is estimated at the
+full table's column size (tens of GiB for places, more for buildings), so it
+was refused. The code still accepts `BQ_MAX_BYTES_BILLED` but leaves it off by
+default. Do not set it below the full-table estimate of every query shape. If
+the API ever returns "This query would read too much data to run" for
+ordinary queries, unset it.
 
-As measured in Oct 2026, every legitimate shape bills well under the cap:
-paid `/divisions/:id` at about 9 GiB, `/buildings` at a 20 km radius under
-4 GiB. It is a backstop, not a customer limit: keep it out of the pricing page
-and the docs.
+The guards that do work on actual bytes are the project-level BigQuery quotas
+("Query usage per day", and per user for the runtime service account) and the
+Cloud Billing budget alerts.
 
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is

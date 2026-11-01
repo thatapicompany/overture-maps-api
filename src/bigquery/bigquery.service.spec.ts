@@ -593,23 +593,25 @@ describe('BigQueryService bytes billed backstop', () => {
     getMetadata: jest.fn().mockResolvedValue([{ statistics: { totalBytesProcessed: '10', query: { totalBytesBilled: '10' } } }]),
   };
 
-  it('defaults to a 24 GiB cap on every job', async () => {
+  it('sets no cap by default (BigQuery checks it against an upper-bound estimate)', async () => {
     delete process.env.BQ_MAX_BYTES_BILLED;
     const { service, createQueryJob } = serviceWith(okJob);
     await service.runQuery('SELECT 1');
-    expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBe(String(24 * 2 ** 30));
+    expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBeUndefined();
   });
 
-  it('can be overridden, or turned off with 0', async () => {
+  it('applies a cap only when BQ_MAX_BYTES_BILLED is set to a positive number', async () => {
     process.env.BQ_MAX_BYTES_BILLED = '1000';
     let { service, createQueryJob } = serviceWith(okJob);
     await service.runQuery('SELECT 1');
     expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBe('1000');
 
-    process.env.BQ_MAX_BYTES_BILLED = '0';
-    ({ service, createQueryJob } = serviceWith(okJob));
-    await service.runQuery('SELECT 1');
-    expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBeUndefined();
+    for (const v of ['0', '-5', 'nonsense']) {
+      process.env.BQ_MAX_BYTES_BILLED = v;
+      ({ service, createQueryJob } = serviceWith(okJob));
+      await service.runQuery('SELECT 1');
+      expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBeUndefined();
+    }
   });
 
   it('turns a bytesBilledLimitExceeded failure into a 400 with guidance', async () => {
