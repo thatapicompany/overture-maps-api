@@ -1,4 +1,5 @@
 import { Controller, Logger, Query, Get, UseGuards } from '@nestjs/common';
+import { requirePoint } from '../common/require-point';
 import { BaseService } from './base.service';
 import { GetBaseQuery } from './dto/requests/get-base-query.dto';
 import { BaseDto, toBaseDto } from './dto/responses/base-response.dto';
@@ -26,6 +27,7 @@ export class BaseController {
     @ApiResponse({ status: 200, description: 'Return Base features.', type: BaseDto, isArray: true })
     @CountHeader()
     async getBaseFeatures(@Query() query: GetBaseQuery): Promise<BaseDto[] | any> {
+    requirePoint(query, '/base');
 
         const { results, totalCount } = await this.baseService.getBaseFeatures(query);
 

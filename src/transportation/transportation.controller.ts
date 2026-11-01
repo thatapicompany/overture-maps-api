@@ -1,4 +1,5 @@
 import { Controller, Logger, Query, Get, UseGuards } from '@nestjs/common';
+import { requirePoint } from '../common/require-point';
 import { TransportationService } from './transportation.service';
 import { GetTransportationQuery } from './dto/requests/get-transportation-query.dto';
 import { TransportationDto, toTransportationDto } from './dto/responses/transportation-response.dto';
@@ -26,6 +27,7 @@ export class TransportationController {
     @ApiResponse({ status: 200, description: 'Return Transportation segments.', type: TransportationDto, isArray: true })
     @CountHeader()
     async getTransportationSegments(@Query() query: GetTransportationQuery): Promise<TransportationDto[] | any> {
+    requirePoint(query, '/transportation');
 
         const { results, totalCount } = await this.transportationService.getTransportationSegments(query);
 

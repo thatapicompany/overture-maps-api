@@ -1,5 +1,6 @@
 
 import { Controller, Get, HttpException, Logger, Query, UseGuards } from '@nestjs/common';
+import { requirePoint } from '../common/require-point';
 import { BigQueryService } from '../bigquery/bigquery.service';
 import { GcsService } from '../gcs/gcs.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
@@ -143,6 +144,7 @@ export class PlacesController {
   @CountHeader() 
   @ValidateLatLngUser()
   async getPlacesWithBuildings(@Query() query: GetPlacesWithBuildingsDto, @AuthedUser() user: User) {
+    requirePoint(query, '/places/buildings');
 
     if(query.match_nearest_building!==true) {
       throw new HttpException("match_nearest_building must be true in the Demo API to get building shapes due to cost reasons", 400);
