@@ -16,6 +16,14 @@ import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
 import { currentRequestId, recordBqJob } from '../usage/usage.context';
 
+// True when both coordinates are real numbers. Not `lat && lng`: 0 is a valid
+// latitude (the equator) and longitude (Greenwich), and treating it as missing
+// dropped the spatial filter and scanned the whole table.
+export function hasCoords(latitude?: number | null, longitude?: number | null): boolean {
+  return typeof latitude === 'number' && typeof longitude === 'number'
+    && Number.isFinite(latitude) && Number.isFinite(longitude);
+}
+
 interface IQueryStatistics {
   totalBytesProcessed: number;
   totalBytesBilled: number;
@@ -203,7 +211,7 @@ export class BigQueryService {
 
   ): Promise<{ names: { primary: string, common: string, rules: string }; wikidata: string; counts: { places: number } }[]> {
 
-    const source = this.placeSource(!!(latitude && longitude));
+    const source = this.placeSource(hasCoords(latitude, longitude));
     let query = `-- Overture Maps API: Get brands nearby
       SELECT DISTINCT brand , count(id) as count_places
       FROM \`${source.table}\`
@@ -219,7 +227,7 @@ export class BigQueryService {
     /*
         if (country) {
           query += ` WHERE addresses.list[OFFSET(0)].element.country = "${country}"`;
-        } else if (latitude && longitude) {
+        } else if (hasCoords(latitude, longitude)) {
           query += ` WHERE ST_DISTANCE(
             ST_GEOGPOINT(${longitude}, ${latitude}),
             ST_GEOGPOINT(CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(0)] AS FLOAT64), CAST(SPLIT(SUBSTR(geometry, 7), ' ')[SAFE_OFFSET(1)] AS FLOAT64))
@@ -287,7 +295,7 @@ export class BigQueryService {
     const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
     const categoryColumn = hasCategoriesColumn ? 'categories.primary' : 'taxonomy.primary';
 
-    const source = this.placeSource(!!(latitude && longitude));
+    const source = this.placeSource(hasCoords(latitude, longitude));
     let query = `-- Overture Maps API: Get categories
       SELECT DISTINCT ${categoryColumn} AS category_primary,
       count(1) as count_places,
@@ -350,7 +358,7 @@ export class BigQueryService {
     // Build the WHERE clause for additional filters
     let whereClauses: string[] = [];
 
-    if (latitude && longitude && radius) {
+    if (hasCoords(latitude, longitude) && radius) {
       // Add radius condition if not already in WHERE clause
       whereClauses.push(`ST_DWithin(p.geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
     }
@@ -508,13 +516,13 @@ export class BigQueryService {
     // With lat/lng the geometry-clustered table prunes on ST_DWithin; without
     // them only the country-clustered mirror prunes. Pick the table first so
     // the FROM and the country/name predicates agree on which columns exist.
-    const placeSrc = this.placeSource(!!(latitude && longitude));
+    const placeSrc = this.placeSource(hasCoords(latitude, longitude));
 
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *, COUNT(*) OVER() AS total_count`);
 
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`, ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance`);
       params.latitude = latitude;
       params.longitude = longitude;
@@ -525,7 +533,7 @@ export class BigQueryService {
     // Conditional filters
     let whereClauses: string[] = [];
 
-    if (latitude && longitude && radius) {
+    if (hasCoords(latitude, longitude) && radius) {
       whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
       params.radius = radius;
     }
@@ -599,7 +607,7 @@ export class BigQueryService {
     // existing unpaginated behaviour.
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
     // pages regardless of which page a client requests first.
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`ORDER BY ext_distance, id`);
     } else {
       queryParts.push(`ORDER BY id`);
@@ -647,7 +655,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
     // pages regardless of which page a client requests first.
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`ORDER BY ext_distance, id`);
     } else {
       queryParts.push(`ORDER BY id`);
@@ -762,7 +770,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
     // pages regardless of which page a client requests first.
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`ORDER BY ext_distance, id`);
     } else {
       queryParts.push(`ORDER BY id`);
@@ -837,7 +845,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
     // pages regardless of which page a client requests first.
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`ORDER BY ext_distance, id`);
     } else {
       queryParts.push(`ORDER BY id`);
@@ -879,7 +887,7 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
     // pages regardless of which page a client requests first.
-    if (latitude && longitude) {
+    if (hasCoords(latitude, longitude)) {
       queryParts.push(`ORDER BY ext_distance, id`);
     } else {
       queryParts.push(`ORDER BY id`);
@@ -1122,7 +1130,7 @@ LIMIT 1;`;
   }): string[] {
     const whereClauses: string[] = [];
 
-    if (latitude && longitude && radius) {
+    if (hasCoords(latitude, longitude) && radius) {
       whereClauses.push(`ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
       params.latitude = latitude;
       params.longitude = longitude;
