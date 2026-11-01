@@ -3,6 +3,7 @@ https://docs.nestjs.com/controllers#controllers
 */
 
 import { Controller, Logger, Query, Get } from '@nestjs/common';
+import { requirePoint } from '../common/require-point';
 import { BuildingsService } from './buildings.service';
 import { GetBuildingsQuery } from './dto/requests/get-buildings-query.dto';
 import { BuildingDto, toBuildingDto } from './dto/responses/building-response.dto';
@@ -29,6 +30,7 @@ export class BuildingsController {
   @Get()
   @CountHeader()
   async getBuildings(@Query() query: GetBuildingsQuery): Promise<BuildingDto[] | any> {
+    requirePoint(query, '/buildings');
 
 
     const { results, totalCount } = await this.buildingsService.getBuildings(query);
