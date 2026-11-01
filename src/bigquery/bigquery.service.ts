@@ -20,8 +20,22 @@ import { currentRequestId, recordBqJob, recordUsageError } from '../usage/usage.
 // after cluster pruning; a job over the cap fails and is not charged. Set well
 // above every legitimate query shape so nobody meets it in normal use; it exists
 // for the whole-table scan we have not thought of yet. Override with
-// BQ_MAX_BYTES_BILLED (bytes); 0 turns it off. Default 16 GiB.
-export const DEFAULT_MAX_BYTES_BILLED = 16 * 2 ** 30;
+// BQ_MAX_BYTES_BILLED (bytes); 0 turns it off. Default 24 GiB.
+export const DEFAULT_MAX_BYTES_BILLED = 24 * 2 ** 30;
+
+// Jobs billing more than this are logged as a warning, so a query shape that is
+// growing towards the cap (the largest country slice grows with each Overture
+// release) shows up in the logs well before the cap starts refusing it.
+// BQ_WARN_BYTES_BILLED (bytes); 0 turns it off. Default 12 GiB.
+export const DEFAULT_WARN_BYTES_BILLED = 12 * 2 ** 30;
+
+export function warnBytesBilled(): number | null {
+  const raw = process.env.BQ_WARN_BYTES_BILLED;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_WARN_BYTES_BILLED;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_WARN_BYTES_BILLED;
+  return n === 0 ? null : Math.floor(n);
+}
 
 export function maxBytesBilled(): number | null {
   const raw = process.env.BQ_MAX_BYTES_BILLED;
@@ -778,6 +792,14 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     }
 
     const QueryFirstLine = query.split('\n')[0];
+    const warnAt = warnBytesBilled();
+    if (warnAt !== null && totalBytesBilled > warnAt) {
+      const gib = (n: number) => (n / 2 ** 30).toFixed(1);
+      this.logger.warn(
+        `BigQuery: large job billed ${gib(totalBytesBilled)} GiB (warn at ${gib(warnAt)} GiB, cap ${cap === null ? 'off' : gib(cap) + ' GiB'}). ` +
+        `Request ${currentRequestId() ?? '-'}. Query Line 1: ${QueryFirstLine}`,
+      );
+    }
     this.logger.log(`BigQuery: Duration: ${statistics.durationMs}ms. Billed ${statistics.billedAmountInGB} GB. USD $$${costInUSD.toFixed(4)}. Query Line 1: ${QueryFirstLine}`);
 
     // Attribute this job's cost to the current API request for per-customer usage modelling.

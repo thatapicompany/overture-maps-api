@@ -539,7 +539,7 @@ describe('BigQueryService', () => {
         getMetadata: jest.fn().mockResolvedValue([{ statistics: { totalBytesProcessed: String(2 ** 40), query: { totalBytesBilled: String(2 ** 40), statementType: 'SELECT' } } }]),
       };
       service.setBigQueryClient({ createQueryJob: jest.fn().mockResolvedValue([job]) });
-      service.logger = { log: jest.fn(), error: jest.fn() } as any;
+      service.logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() } as any;
       const { statistics } = await service.runQuery('SELECT 1');
       expect(statistics.costInUSD).toBeCloseTo(6.25, 6);
     });
@@ -548,7 +548,7 @@ describe('BigQueryService', () => {
       const service = new TestableBigQueryService();
       const error = new Error('Query failed');
       service.setBigQueryClient({ createQueryJob: jest.fn().mockRejectedValue(error) });
-      service.logger = { log: jest.fn(), error: jest.fn() } as any;
+      service.logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() } as any;
       await expect(service.runQuery('SELECT 1')).rejects.toThrow('Query failed');
     });
   });
@@ -593,11 +593,11 @@ describe('BigQueryService bytes billed backstop', () => {
     getMetadata: jest.fn().mockResolvedValue([{ statistics: { totalBytesProcessed: '10', query: { totalBytesBilled: '10' } } }]),
   };
 
-  it('defaults to a 16 GiB cap on every job', async () => {
+  it('defaults to a 24 GiB cap on every job', async () => {
     delete process.env.BQ_MAX_BYTES_BILLED;
     const { service, createQueryJob } = serviceWith(okJob);
     await service.runQuery('SELECT 1');
-    expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBe(String(16 * 2 ** 30));
+    expect(createQueryJob.mock.calls[0][0].maximumBytesBilled).toBe(String(24 * 2 ** 30));
   });
 
   it('can be overridden, or turned off with 0', async () => {
@@ -620,6 +620,22 @@ describe('BigQueryService bytes billed backstop', () => {
     };
     const { service } = serviceWith(failing);
     await expect(service.runQuery('SELECT 1')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('warns when a job bills more than the warning threshold', async () => {
+    delete process.env.BQ_WARN_BYTES_BILLED;
+    const big = 13 * 2 ** 30;
+    const job = {
+      id: 'job-4',
+      getQueryResults: jest.fn().mockResolvedValue([[]]),
+      getMetadata: jest.fn().mockResolvedValue([{ statistics: { totalBytesProcessed: String(big), query: { totalBytesBilled: String(big) } } }]),
+    };
+    const { service } = serviceWith(job);
+    await service.runQuery('SELECT 1');
+    expect((service as any).logger.warn).toHaveBeenCalledWith(expect.stringMatching(/large job billed 13\.0 GiB/));
+    const small = serviceWith(okJob);
+    await small.service.runQuery('SELECT 1');
+    expect((small.service as any).logger.warn).not.toHaveBeenCalled();
   });
 
   it('passes other BigQuery errors through unchanged', async () => {

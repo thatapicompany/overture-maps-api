@@ -298,17 +298,23 @@ risk a second email. The limit notice never waits: requests are being refused.
 ### 10. Per-job bytes-billed backstop (Nov 2026)
 
 `BigQueryService.runQuery()` sets `maximumBytesBilled` on every query job,
-16 GiB by default (`BQ_MAX_BYTES_BILLED`, in bytes; `0` turns it off).
+24 GiB by default (`BQ_MAX_BYTES_BILLED`, in bytes; `0` turns it off).
 BigQuery checks it against bytes billed after cluster pruning, and a job over
 the cap fails without being charged. The API turns that failure into a 400
 that tells the caller to add lat/lng or narrow the filters, and the usage row
 records `error = bytes_billed_limit_exceeded` with zero bytes billed.
 
-The cap sits above every legitimate shape the mirrors produce (the largest,
-a whole-country slice for the biggest country, bills about 11 GiB), so nobody
-should meet it in normal use. Do not lower it below 12 GiB without
-re-measuring. It is a backstop, not a customer limit: keep it out of the
-pricing page and the docs.
+Any job billing more than 12 GiB (`BQ_WARN_BYTES_BILLED`) is logged as a
+warning ("large job billed ..."). The largest legitimate shape, a
+whole-country `/places` slice for the biggest country, bills about 11 GiB and
+grows with each Overture release, so this warning is the early signal to
+re-measure before the cap is anywhere near. A log-based alert on that message
+is worth adding.
+
+As measured in Oct 2026, every legitimate shape bills well under the cap:
+paid `/divisions/:id` at about 9 GiB, `/buildings` at a 20 km radius under
+4 GiB. It is a backstop, not a customer limit: keep it out of the pricing page
+and the docs.
 
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
