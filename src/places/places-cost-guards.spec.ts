@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { checkCountryLevelAllowed, isCountryLevel, COUNTRY_LEVEL_PAID_ONLY_MESSAGE, PlanSource } from './places-cost-guards';
 import { PlanStatus } from '../tiers/plan-lookup.service';
+import { usageStorage, UsageStore } from '../usage/usage.context';
 
 const plans = (status: PlanStatus) => {
   const getPlanStatus = jest.fn().mockResolvedValue(status);
@@ -56,5 +57,16 @@ describe('places cost guards: country-level is paid only', () => {
     await expect(checkCountryLevelAllowed({ country: 'GB', lat: 51.5074, lng: -0.1278 }, free, p)).resolves.toBeUndefined();
     await expect(checkCountryLevelAllowed({ lat: 51.5074, lng: -0.1278 }, free, p)).resolves.toBeUndefined();
     expect(p.getPlanStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('places cost guards: usage row', () => {
+  it('records country_level_paid_only when a Free account is refused', async () => {
+    const plans: PlanSource = { getPlanStatus: async () => 'free' as PlanStatus } as any;
+    const store: UsageStore = { requestId: 'req-2', startTime: Date.now(), jobs: [] };
+    await usageStorage.run(store, async () => {
+      await expect(checkCountryLevelAllowed({ country: 'FR' } as any, { accountId: 'acct-free-9' } as any, plans)).rejects.toBeInstanceOf(HttpException);
+    });
+    expect(store.error).toBe('country_level_paid_only');
   });
 });

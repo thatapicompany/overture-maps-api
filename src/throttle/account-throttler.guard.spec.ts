@@ -2,6 +2,7 @@ import { ExecutionContext, HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerStorageService } from '@nestjs/throttler';
 import { AccountThrottlerGuard, rateLimitedMessage } from './account-throttler.guard';
+import { usageStorage, UsageStore } from '../usage/usage.context';
 
 // Fake values only: no real accounts here.
 function ctxFor(user: any, ip = '10.0.0.1') {
@@ -92,6 +93,19 @@ describe('AccountThrottlerGuard', () => {
     const { context } = ctxFor({ accountId: 'acct-free-2' });
     await hits(guard, context, 3);
     await expect(guard.canActivate(context)).rejects.toMatchObject({ response: { error: 'rate_limited' } });
+    storage.onApplicationShutdown();
+  });
+
+  it('records rate_limited on the usage row when it refuses', async () => {
+    const { guard, storage } = await makeGuard('free');
+    const { context } = ctxFor({ accountId: 'acct-free-3' });
+    const store: UsageStore = { requestId: 'req-1', startTime: Date.now(), jobs: [] };
+    await usageStorage.run(store, async () => {
+      await hits(guard, context, 3);
+      expect(store.error).toBeUndefined();
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(HttpException);
+    });
+    expect(store.error).toBe('rate_limited');
     storage.onApplicationShutdown();
   });
 });

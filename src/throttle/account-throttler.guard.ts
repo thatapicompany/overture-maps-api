@@ -11,6 +11,7 @@ import {
 import { PRICING_URL } from '../common/links';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
+import { recordUsageError } from '../usage/usage.context';
 
 // Per-minute rate limit, counted per account and sized by plan.
 //
@@ -100,6 +101,8 @@ export class AccountThrottlerGuard extends ThrottlerGuard {
   protected async throwThrottlingException(context: ExecutionContext, detail: LimitDetail): Promise<void> {
     const { req } = this.getRequestResponse(context);
     const paid = !!(req as any).__throttlePaid;
+    // So usage.api_requests can tell a per-minute refusal from a monthly one
+    recordUsageError('rate_limited');
     throw new HttpException(
       { statusCode: HttpStatus.TOO_MANY_REQUESTS, error: 'rate_limited', message: rateLimitedMessage(detail.limit, detail.ttl, paid) },
       HttpStatus.TOO_MANY_REQUESTS,
