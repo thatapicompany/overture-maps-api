@@ -16,16 +16,20 @@ import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
 import { currentRequestId, recordBqJob, recordUsageError } from '../usage/usage.context';
 
-// Per-job backstop on bytes billed. BigQuery enforces it on actual bytes billed
-// after cluster pruning; a job over the cap fails and is not charged. Set well
-// above every legitimate query shape so nobody meets it in normal use; it exists
-// for the whole-table scan we have not thought of yet. Override with
-// BQ_MAX_BYTES_BILLED (bytes); 0 turns it off. Default 24 GiB.
-export const DEFAULT_MAX_BYTES_BILLED = 24 * 2 ** 30;
+// Optional per-job cap on bytes billed (BQ_MAX_BYTES_BILLED, in bytes). OFF
+// unless set. BigQuery checks maximumBytesBilled against its upfront estimate,
+// and for clustered tables that estimate is the upper bound for the columns
+// read across the whole table, not what pruning will actually bill. A 400 m
+// radius query that bills about 1 GiB is estimated at the full column size, so
+// a cap below the largest table's column size refuses ordinary queries. That
+// took production down on 1 Nov 2026 with a 24 GiB default. Only set this
+// above the full-table estimate of every query shape, if at all; the 12 GiB
+// warning below and the project-level daily quota are the real guards.
+export const DEFAULT_MAX_BYTES_BILLED: number | null = null;
 
 // Jobs billing more than this are logged as a warning, so a query shape that is
-// growing towards the cap (the largest country slice grows with each Overture
-// release) shows up in the logs well before the cap starts refusing it.
+// growing (the largest country slice grows with each Overture release) shows
+// up in the logs. Based on actual bytes billed, after pruning.
 // BQ_WARN_BYTES_BILLED (bytes); 0 turns it off. Default 12 GiB.
 export const DEFAULT_WARN_BYTES_BILLED = 12 * 2 ** 30;
 
@@ -41,8 +45,8 @@ export function maxBytesBilled(): number | null {
   const raw = process.env.BQ_MAX_BYTES_BILLED;
   if (raw === undefined || raw.trim() === '') return DEFAULT_MAX_BYTES_BILLED;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return DEFAULT_MAX_BYTES_BILLED;
-  return n === 0 ? null : Math.floor(n);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.floor(n);
 }
 
 export function isBytesBilledLimitError(err: any): boolean {
