@@ -1,4 +1,5 @@
 import { Controller, Logger, Query, Get, UseGuards } from '@nestjs/common';
+import { requirePoint } from '../common/require-point';
 import { AddressesService } from './addresses.service';
 import { GetAddressesQuery } from './dto/requests/get-addresses-query.dto';
 import { AddressDto, toAddressDto } from './dto/responses/address-response.dto';
@@ -26,6 +27,7 @@ export class AddressesController {
     @ApiResponse({ status: 200, description: 'Return Addresses.', type: AddressDto, isArray: true })
     @CountHeader()
     async getAddresses(@Query() query: GetAddressesQuery): Promise<AddressDto[] | any> {
+    requirePoint(query, '/addresses');
 
         const { results, totalCount } = await this.addressesService.getAddresses(query);
 
