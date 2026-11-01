@@ -45,7 +45,8 @@ export function ValidateLatLngUser(): MethodDecorator {
       const lng = request?.lng;
       const user = args[1];
 
-      if (lat && lng && user?.isDemoAccount) {
+      // 0 is a real coordinate: check presence, not truthiness
+      if (Number.isFinite(lat) && Number.isFinite(lng) && user?.isDemoAccount) {
         // Allow within 10,000 meters of any demo city
         const withinRadius = demoCities.some(city =>
           haversineDistance(lat, lng, city.lat, city.lng) <= 10000

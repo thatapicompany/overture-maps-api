@@ -553,3 +553,22 @@ describe('BigQueryService', () => {
     });
   });
 });
+
+describe('zero coordinates', () => {
+  it('hasCoords treats 0 as a real coordinate', () => {
+    const { hasCoords } = require('./bigquery.service');
+    expect(hasCoords(0, 0)).toBe(true);
+    expect(hasCoords(0, 151.2)).toBe(true);
+    expect(hasCoords(undefined, 151.2)).toBe(false);
+    expect(hasCoords(NaN, 0)).toBe(false);
+    expect(hasCoords(null, 0)).toBe(false);
+  });
+
+  it('keeps the spatial filter for a point on the equator', async () => {
+    const service = new BigQueryService();
+    const spy = jest.fn().mockResolvedValue({ rows: [], statistics: {} });
+    service.runQuery = spy;
+    await service.getPlacesNearby(0, 10, 2000);
+    expect(spy.mock.calls[0][0]).toMatch(/ST_DWithin/i);
+  });
+});
