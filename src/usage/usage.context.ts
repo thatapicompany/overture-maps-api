@@ -17,6 +17,8 @@ export interface UsageStore {
   requestId: string;
   startTime: number;
   jobs: BqJobUsage[];
+  /** Machine-readable reason a request failed inside the service layer, if any. */
+  error?: string;
 }
 
 export const usageStorage = new AsyncLocalStorage<UsageStore>();
@@ -27,6 +29,15 @@ export function recordBqJob(job: BqJobUsage): void {
   const store = usageStorage.getStore();
   if (store) {
     store.jobs.push(job);
+  }
+}
+
+// Note why the current request failed (e.g. a BigQuery guardrail fired), so the
+// usage row records it. No-op outside a request.
+export function recordUsageError(code: string): void {
+  const store = usageStorage.getStore();
+  if (store) {
+    store.error = code;
   }
 }
 

@@ -106,7 +106,7 @@ export function buildUsageRow(req: Request, res: Response, store: UsageStore): U
     cost_usd: costUsd,
     env: process.env.ENV ?? null,
     api_version: process.env.npm_package_version ?? null,
-    error: null,
+    error: store.error ?? null,
     jobs: jobs.map((j) => ({
       job_id: j.jobId,
       bytes_processed: j.bytesProcessed,
