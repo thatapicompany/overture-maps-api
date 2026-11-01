@@ -27,7 +27,7 @@ async function bootstrap() {
     "optionsSuccessStatus": 204,
     "credentials": false,
     "allowedHeaders": 'Content-Type, Authorization, Accept, Observe, x-api-key',
-    "exposedHeaders": "Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version, X-Quota-Plan, X-Quota-Limit, X-Quota-Hard-Limit, X-Quota-Used, X-Quota-Remaining, X-Quota-Reset, X-Quota-Warning, Retry-After"
+    "exposedHeaders": "Pagination-Count, Pagination-Page, Pagination-Limit, Query-Version, X-Quota-Plan, X-Quota-Limit, X-Quota-Hard-Limit, X-Quota-Used, X-Quota-Remaining, X-Quota-Reset, X-Quota-Warning, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset"
   }
 
   app.enableCors(corsOptions);

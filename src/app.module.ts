@@ -8,7 +8,8 @@ import { DivisionsModule } from './divisions/divisions.module';
 import { BigQueryService } from './bigquery/bigquery.service';
 import { GcsService } from './gcs/gcs.service';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AccountThrottlerGuard } from './throttle/account-throttler.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { AuthAPIMiddleware } from './middleware/auth-api.middleware';
@@ -34,8 +35,8 @@ import { MonthlyQuotaGuard } from './quota/monthly-quota.guard';
     TiersModule,
     QuotaModule,
     ConfigModule.forRoot(),
-    // Per-client rate limiting. Each BigQuery-backed request can cost real money,
-    // so cap request volume. Overridable via env without a redeploy.
+    // Per-minute rate limiting, per account and sized by plan (throttle/).
+    // THROTTLE_LIMIT is the Free/anonymous limit; THROTTLE_LIMIT_PAID the paid one.
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL_MS || '60000', 10),
@@ -48,7 +49,7 @@ import { MonthlyQuotaGuard } from './quota/monthly-quota.guard';
     BigQueryService,
     GcsService,
     AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AccountThrottlerGuard },
     // After the per-minute throttler, so its 429s are never charged to the month.
     { provide: APP_GUARD, useExisting: MonthlyQuotaGuard },
   ],
