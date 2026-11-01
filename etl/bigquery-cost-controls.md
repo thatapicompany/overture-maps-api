@@ -295,6 +295,21 @@ risk a second email. The limit notice never waits: requests are being refused.
    (Secret Manager), set `QUOTA_NOTICE_FROM`, and set `QUOTA_NOTICE_MODE=log`.
    Check the `QuotaNotices` log lines, then switch to `send`.
 
+### 10. Per-job bytes-billed backstop (Nov 2026)
+
+`BigQueryService.runQuery()` sets `maximumBytesBilled` on every query job,
+16 GiB by default (`BQ_MAX_BYTES_BILLED`, in bytes; `0` turns it off).
+BigQuery checks it against bytes billed after cluster pruning, and a job over
+the cap fails without being charged. The API turns that failure into a 400
+that tells the caller to add lat/lng or narrow the filters, and the usage row
+records `error = bytes_billed_limit_exceeded` with zero bytes billed.
+
+The cap sits above every legitimate shape the mirrors produce (the largest,
+a whole-country slice for the biggest country, bills about 11 GiB), so nobody
+should meet it in normal use. Do not lower it below 12 GiB without
+re-measuring. It is a backstop, not a customer limit: keep it out of the
+pricing page and the docs.
+
 ## Order of impact
 1 (clustering) removes ~90% of the cost. 5 and 3 stop the abuse patterns. 4 is
 the per-user ceiling. 2 is already done. 6 does for `/places/buildings` and

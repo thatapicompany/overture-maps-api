@@ -1,5 +1,5 @@
 
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { BigQuery } from '@google-cloud/bigquery';
 import { Place, PlaceWithBuilding } from '../places/interfaces/place.interface';
 import { Building } from '../buildings/interfaces/building.interface';
@@ -14,7 +14,30 @@ import { TransportationSegment } from '../transportation/interfaces/transportati
 import { parseTransportationRow } from './row-parsers/bq-transportation-row.parser';
 import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
-import { currentRequestId, recordBqJob } from '../usage/usage.context';
+import { currentRequestId, recordBqJob, recordUsageError } from '../usage/usage.context';
+
+// Per-job backstop on bytes billed. BigQuery enforces it on actual bytes billed
+// after cluster pruning; a job over the cap fails and is not charged. Set well
+// above every legitimate query shape so nobody meets it in normal use; it exists
+// for the whole-table scan we have not thought of yet. Override with
+// BQ_MAX_BYTES_BILLED (bytes); 0 turns it off. Default 16 GiB.
+export const DEFAULT_MAX_BYTES_BILLED = 16 * 2 ** 30;
+
+export function maxBytesBilled(): number | null {
+  const raw = process.env.BQ_MAX_BYTES_BILLED;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_MAX_BYTES_BILLED;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_MAX_BYTES_BILLED;
+  return n === 0 ? null : Math.floor(n);
+}
+
+export function isBytesBilledLimitError(err: any): boolean {
+  const reasons = [err?.reason, ...(Array.isArray(err?.errors) ? err.errors.map((e: any) => e?.reason) : [])];
+  return reasons.includes('bytesBilledLimitExceeded') || /bytesBilledLimitExceeded|bytes billed limit/i.test(String(err?.message ?? ''));
+}
+
+export const BYTES_BILLED_LIMIT_MESSAGE =
+  'This query would read too much data to run. Add lat and lng with a radius, or narrow the filters (for example a smaller country or a category).';
 
 // True when both coordinates are real numbers. Not `lat && lng`: 0 is a valid
 // latitude (the equator) and longitude (Greenwich), and treating it as missing
@@ -705,11 +728,34 @@ WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radi
     if (params) {
       options.params = params;
     }
-    // Run the query as a job
-    const [job] = await this.bigQueryClient.createQueryJob(options);
+    const cap = maxBytesBilled();
+    if (cap !== null) {
+      options.maximumBytesBilled = String(cap);
+    }
 
-    // Wait for the query to finish
-    const [rows] = await job.getQueryResults();
+    let job: any;
+    let rows: any[];
+    try {
+      // Run the query as a job, and wait for it to finish
+      [job] = await this.bigQueryClient.createQueryJob(options);
+      [rows] = await job.getQueryResults();
+    } catch (err) {
+      if (isBytesBilledLimitError(err)) {
+        const QueryFirstLine = query.split('\n')[0];
+        this.logger.warn(`BigQuery: bytes billed limit (${cap} bytes) stopped a query, not charged. Query Line 1: ${QueryFirstLine}`);
+        recordUsageError('bytes_billed_limit_exceeded');
+        recordBqJob({
+          jobId: job?.id ?? null,
+          bytesProcessed: 0,
+          bytesBilled: 0,
+          costUsd: 0,
+          durationMs: Date.now() - start,
+          statementType: null,
+        });
+        throw new BadRequestException(BYTES_BILLED_LIMIT_MESSAGE);
+      }
+      throw err;
+    }
     const [result] = await job.getMetadata();
 
     const totalBytesProcessed = parseInt(result.statistics.totalBytesProcessed);
