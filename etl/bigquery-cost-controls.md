@@ -274,6 +274,15 @@ emails accounts already over their allowance on their next request, once; run
 `log` for a day first to see who that will be. To resend a notice, delete its
 `notices.<kind>` field on the counter doc.
 
+`QUOTA_NOTICE_PROMO_CODE` (optional) adds one sentence to both notices offering
+a first-month-free Stripe promotion code for the recommended plan, and only
+when that plan is `QUOTA_NOTICE_PROMO_PLAN` (default `Premium`), so a Premium
+account being pointed at Growth never sees a code its checkout would refuse.
+Unset, the copy is unchanged. The code itself is a shared Stripe promotion
+code on a 100%-off-once coupon restricted to the Premium product; measure it
+by the coupon's redemptions in Stripe against `notices.*.result.status = sent`
+on the counter docs for the same period.
+
 Pacing, so nobody gets two in a day: the allowance notice waits
 `QUOTA_ALLOWANCE_NOTICE_DELAY_HOURS` (24) after the account first passes its
 allowance (`notices.allowance.firstSeenAt`), and an account that reaches the

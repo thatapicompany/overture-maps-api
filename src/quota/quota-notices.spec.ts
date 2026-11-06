@@ -1,4 +1,4 @@
-import { composeNotice, nextPlan, NoticeBackend, noticeKindFor, QuotaNoticeService } from './quota-notices';
+import { composeNotice, nextPlan, NoticeBackend, noticeKindFor, promoFor, QuotaNoticeService } from './quota-notices';
 import { useTestPlanConfig } from './test-plan-config';
 
 const NOW = new Date(Date.UTC(2026, 9, 18, 12));
@@ -83,6 +83,39 @@ describe('quota notices', () => {
     const scale = composeNotice('limit', ctx(20_000, 'Scale', 10_000, 20_000), 'Example Co');
     expect(scale.text).toContain('custom plan');
     expect(scale.text).not.toMatch(/[–—]/);
+  });
+
+  describe('first-month-free code', () => {
+    const KEYS = ['QUOTA_NOTICE_PROMO_CODE', 'QUOTA_NOTICE_PROMO_PLAN'] as const;
+    let prev: (string | undefined)[];
+    beforeEach(() => { prev = KEYS.map((k) => process.env[k]); });
+    afterEach(() => KEYS.forEach((k, i) => { if (prev[i] === undefined) delete process.env[k]; else process.env[k] = prev[i]; }));
+
+    it('is absent when no code is configured, leaving the copy unchanged', () => {
+      delete process.env.QUOTA_NOTICE_PROMO_CODE;
+      expect(promoFor(nextPlan({ plan: 'Free', allowance: 100 }))).toBeNull();
+      expect(composeNotice('limit', ctx(200), 'Example Co').text).not.toMatch(/Enter the code|checkout/);
+    });
+
+    it('offers the code in both notices when the recommended plan is Premium', () => {
+      process.env.QUOTA_NOTICE_PROMO_CODE = 'TESTCODE';
+      const allowance = composeNotice('allowance', ctx(150), 'Example Co').text;
+      const limit = composeNotice('limit', ctx(200), undefined).text;
+      for (const text of [allowance, limit]) {
+        expect(text).toContain('Enter the code TESTCODE at checkout and your first month of Premium is free.');
+        expect(text).not.toMatch(/[–—]/);
+      }
+      expect(limit.indexOf('keeps serving up to 2,000.')).toBeLessThan(limit.indexOf('TESTCODE'));
+    });
+
+    it('never offers it when the recommended plan is not the one the code is for', () => {
+      process.env.QUOTA_NOTICE_PROMO_CODE = 'TESTCODE';
+      expect(composeNotice('limit', ctx(2_000, 'Premium', 1_000, 2_000), 'Example Co').text).not.toContain('TESTCODE');
+      expect(composeNotice('limit', ctx(20_000, 'Scale', 10_000, 20_000), 'Example Co').text).not.toContain('TESTCODE');
+      process.env.QUOTA_NOTICE_PROMO_PLAN = 'Growth';
+      expect(composeNotice('limit', ctx(200), 'Example Co').text).not.toContain('TESTCODE');
+      expect(composeNotice('limit', ctx(2_000, 'Premium', 1_000, 2_000), 'Example Co').text).toContain('first month of Growth is free');
+    });
   });
 
   it('does nothing when off (the default)', async () => {

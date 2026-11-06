@@ -19,6 +19,9 @@ import { monthKey, nextMonthStartUtc } from './usage-counter.store';
 // the counter doc and logged instead, because retrying after an ambiguous
 // failure is how people get the same email twice.
 //
+// QUOTA_NOTICE_PROMO_CODE adds a first-month-free code for the recommended
+// plan (QUOTA_NOTICE_PROMO_PLAN, default Premium). See promoFor().
+//
 // Accounts on a manual plan override get no notices (the guard skips them):
 // whoever set the override is already talking to that account.
 //
@@ -104,10 +107,26 @@ export function nextPlan(current: { plan: string; allowance: number }): PlanLimi
   return [...byName.values()].filter((l) => l.allowance > current.allowance).sort((a, b) => a.allowance - b.allowance)[0];
 }
 
+/**
+ * A first-month-free code for the plan the notice recommends, when one is
+ * configured. QUOTA_NOTICE_PROMO_CODE is the Stripe promotion code and
+ * QUOTA_NOTICE_PROMO_PLAN (default Premium) the plan it applies to; the offer
+ * is only written when the recommended plan is that one, so a Premium account
+ * being pointed at Growth never sees a code that would fail at checkout. Unset
+ * means the copy is exactly as before.
+ */
+export function promoFor(next: PlanLimits | undefined): { code: string; plan: string } | null {
+  const code = (process.env.QUOTA_NOTICE_PROMO_CODE || '').trim();
+  if (!code || !next) return null;
+  const plan = (process.env.QUOTA_NOTICE_PROMO_PLAN || 'Premium').trim();
+  return next.plan.toLowerCase() === plan.toLowerCase() ? { code, plan: next.plan } : null;
+}
+
 export function composeNotice(kind: NoticeKind, ctx: NoticeContext, orgName?: string): { subject: string; text: string } {
   const reset = nextMonthStartUtc(ctx.now).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
   const account = orgName ? `Your ${orgName} account` : 'Your account';
   const next = nextPlan(ctx);
+  const promo = promoFor(next);
   const signoff = process.env.QUOTA_NOTICE_FROM_NAME || 'The Overture Maps API team';
   const lines: string[] = ['Hi there,', ''];
   let subject: string;
@@ -120,7 +139,7 @@ export function composeNotice(kind: NoticeKind, ctx: NoticeContext, orgName?: st
       `Nothing has been cut off. Requests keep working up to ${fmt(ctx.hardLimit)} this month. From then on they are refused until the count resets at 00:00 UTC on ${reset}.`,
       '',
       next
-        ? `If this is your usual level of use, the ${next.plan} plan includes ${fmt(next.allowance)} requests a month. Plans are at ${PRICING_URL} and you can change yours at ${ACCOUNT_URL}.`
+        ? `If this is your usual level of use, the ${next.plan} plan includes ${fmt(next.allowance)} requests a month.${promo ? ` Enter the code ${promo.code} at checkout and your first month of ${promo.plan} is free.` : ''} Plans are at ${PRICING_URL} and you can change yours at ${ACCOUNT_URL}.`
         : `If you need more than the ${ctx.plan} plan allows, reply to this email and we can set up a custom plan.`,
       '',
       'Every API response also carries X-Quota-Used and X-Quota-Remaining headers, if you would like to track this in your app.',
@@ -131,7 +150,7 @@ export function composeNotice(kind: NoticeKind, ctx: NoticeContext, orgName?: st
       `${account} has reached ${fmt(ctx.hardLimit)} requests to the Overture Maps API this month, the limit on the ${ctx.plan} plan. Requests now return a 429 until the count resets at 00:00 UTC on ${reset}.`,
       '',
       next
-        ? `Upgrading lifts the limit within a minute. The ${next.plan} plan includes ${fmt(next.allowance)} requests a month and keeps serving up to ${fmt(next.hardLimit)}. You can change plan at ${ACCOUNT_URL}, and every plan is at ${PRICING_URL}.`
+        ? `Upgrading lifts the limit within a minute. The ${next.plan} plan includes ${fmt(next.allowance)} requests a month and keeps serving up to ${fmt(next.hardLimit)}.${promo ? ` Enter the code ${promo.code} at checkout and your first month of ${promo.plan} is free.` : ''} You can change plan at ${ACCOUNT_URL}, and every plan is at ${PRICING_URL}.`
         : 'Reply to this email and we can set up a custom plan to get you running again.',
       '',
       "If something unexpected caused this, such as a retry loop, reply and we'll take a look.",
