@@ -3,7 +3,7 @@ https://docs.nestjs.com/providers#services
 */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { BigQueryService } from '../bigquery/bigquery.service';
+import { BigQueryService, isNamedBrand } from '../bigquery/bigquery.service';
 import { GetPlacesDto } from './dto/requests/get-places.dto';
 import { PlaceResponseDto, toPlaceDto } from './dto/responses/place-response.dto';
 import { GetBrandsDto } from './dto/requests/get-brands.dto';
@@ -100,7 +100,8 @@ export class PlacesService {
         const cacheKey = buildCacheKey('get-places-brands', { country, lat, lng, radius, categories });
         const cachedResult = await this.cacheService.get<any[]>(cacheKey);
         if (cachedResult) {
-          return cachedResult.map((brand: any) => this.toBrandDtoWithEnrichment(brand));
+          // Results cached before unbranded rows were filtered out in SQL.
+          return cachedResult.filter(isNamedBrand).map((brand: any) => this.toBrandDtoWithEnrichment(brand));
         }
 
         const results = await this.bigQueryService.getBrandsNearby(country, lat, lng, radius, categories);
