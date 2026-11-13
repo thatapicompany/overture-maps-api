@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { ACCOUNT_URL, PRICING_URL } from '../common/links';
+import { Format } from '../common/dto/requests/get-by-location.dto';
 
 // Self-hosted deployments can point these at their own URLs.
 export const PUBLIC_API_URL = process.env.PUBLIC_API_URL || 'https://api.overturemapsapi.com';
@@ -67,5 +68,36 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   // The root endpoint needs no key.
   const root = document.paths['/']?.get;
   if (root) root.security = [];
+  normaliseParameters(document);
   return document;
+}
+
+/**
+ * Many request DTOs omit an explicit type, which leaves generated clients and
+ * AI tools guessing. Fill in types from each parameter's example/default, list
+ * the format options, and mark lat/lng optional (most endpoints accept a
+ * country or name instead; the descriptions say when a point is required).
+ */
+export function normaliseParameters(document: OpenAPIObject): void {
+  for (const item of Object.values(document.paths)) {
+    for (const op of Object.values(item as Record<string, any>)) {
+      for (const param of (op?.parameters ?? []) as any[]) {
+        if (param.in !== 'query') continue;
+        const schema = (param.schema ??= {});
+        if (param.name === 'format') {
+          schema.type = 'string';
+          schema.enum = Object.values(Format);
+        }
+        if (!schema.type && !schema.$ref && !schema.oneOf) {
+          const sample = schema.example ?? schema.default;
+          if (typeof sample === 'number') {
+            schema.type = Number.isInteger(sample) && !['lat', 'lng', 'min_confidence'].includes(param.name) ? 'integer' : 'number';
+          } else if (typeof sample === 'boolean' || sample === 'true' || sample === 'false') {
+            schema.type = 'boolean';
+          } else schema.type = 'string';
+        }
+        if (param.name === 'lat' || param.name === 'lng') param.required = false;
+      }
+    }
+  }
 }

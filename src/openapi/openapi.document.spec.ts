@@ -60,6 +60,19 @@ describe('OpenAPI document', () => {
     expect(doc.paths['/'].get?.security).toEqual([]);
   });
 
+  it('types every query parameter and lists the format options', () => {
+    for (const { path, op } of ops) {
+      for (const p of op.parameters ?? []) {
+        if (p.in !== 'query') continue;
+        expect([path, p.name, !!(p.schema?.type || p.schema?.$ref || p.schema?.oneOf)]).toEqual([path, p.name, true]);
+      }
+    }
+    const format = doc.paths['/places'].get?.parameters?.find((p: any) => p.name === 'format') as any;
+    expect(format.schema.enum).toEqual(['json', 'csv', 'geojson']);
+    const lat = doc.paths['/places'].get?.parameters?.find((p: any) => p.name === 'lat') as any;
+    expect(lat.required).toBe(false);
+  });
+
   it('lists only the production server', () => {
     expect(doc.servers?.map((s) => s.url)).toEqual(['https://api.overturemapsapi.com']);
   });

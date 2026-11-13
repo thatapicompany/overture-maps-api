@@ -25,7 +25,7 @@
         "parameters": [
           {
             "name": "lat",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Latitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -35,7 +35,7 @@
           },
           {
             "name": "lng",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Longitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -232,18 +232,20 @@
             "description": "Latitude coordinate. Required if country code is not provided.",
             "name": "lat",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": 40.7128
+              "example": 40.7128,
+              "type": "number"
             }
           },
           {
             "description": "Longitude coordinate. Required if country code is not provided.",
             "name": "lng",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": -74.006
+              "example": -74.006,
+              "type": "number"
             }
           },
           {
@@ -254,7 +256,8 @@
             "schema": {
               "minimum": 1,
               "default": 1000,
-              "example": 1000
+              "example": 1000,
+              "type": "integer"
             }
           },
           {
@@ -265,7 +268,8 @@
             "schema": {
               "minimum": 1,
               "default": 100,
-              "example": 10
+              "example": 10,
+              "type": "integer"
             }
           },
           {
@@ -276,7 +280,8 @@
             "schema": {
               "minimum": 0,
               "default": 0,
-              "example": 0
+              "example": 0,
+              "type": "integer"
             }
           },
           {
@@ -286,7 +291,13 @@
             "in": "query",
             "schema": {
               "default": "json",
-              "example": "json"
+              "example": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "geojson"
+              ]
             }
           },
           {
@@ -299,7 +310,8 @@
                 "id",
                 "geometry",
                 "properties"
-              ]
+              ],
+              "type": "string"
             }
           },
           {
@@ -308,7 +320,8 @@
             "name": "country",
             "in": "query",
             "schema": {
-              "example": "US"
+              "example": "US",
+              "type": "string"
             }
           },
           {
@@ -317,7 +330,8 @@
             "name": "source",
             "in": "query",
             "schema": {
-              "example": "meta"
+              "example": "meta",
+              "type": "string"
             }
           },
           {
@@ -326,7 +340,8 @@
             "name": "brand_wikidata",
             "in": "query",
             "schema": {
-              "example": "Q12345"
+              "example": "Q12345",
+              "type": "string"
             }
           },
           {
@@ -335,7 +350,8 @@
             "name": "brand_name",
             "in": "query",
             "schema": {
-              "example": "Starbucks"
+              "example": "Starbucks",
+              "type": "string"
             }
           },
           {
@@ -344,7 +360,8 @@
             "name": "name",
             "in": "query",
             "schema": {
-              "example": "Central Park"
+              "example": "Central Park",
+              "type": "string"
             }
           },
           {
@@ -353,7 +370,8 @@
             "name": "name_prefix",
             "in": "query",
             "schema": {
-              "example": "blue bo"
+              "example": "blue bo",
+              "type": "string"
             }
           },
           {
@@ -363,7 +381,8 @@
             "in": "query",
             "schema": {
               "default": 0.5,
-              "example": 0.5
+              "example": 0.5,
+              "type": "number"
             }
           },
           {
@@ -372,7 +391,8 @@
             "name": "categories",
             "in": "query",
             "schema": {
-              "example": "food,retail"
+              "example": "food,retail",
+              "type": "string"
             }
           },
           {
@@ -381,7 +401,8 @@
             "name": "taxonomy",
             "in": "query",
             "schema": {
-              "example": "food_and_drink"
+              "example": "food_and_drink",
+              "type": "string"
             }
           },
           {
@@ -390,7 +411,8 @@
             "name": "operating_status",
             "in": "query",
             "schema": {
-              "example": "open"
+              "example": "open",
+              "type": "string"
             }
           },
           {
@@ -399,7 +421,8 @@
             "name": "enrichment_fields",
             "in": "query",
             "schema": {
-              "example": "brand"
+              "example": "brand",
+              "type": "string"
             }
           },
           {
@@ -408,7 +431,8 @@
             "name": "has_contact",
             "in": "query",
             "schema": {
-              "example": "website,social"
+              "example": "website,social",
+              "type": "string"
             }
           }
         ],
@@ -521,18 +545,20 @@
             "description": "Latitude coordinate. Required if country code is not provided.",
             "name": "lat",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": 40.7128
+              "example": 40.7128,
+              "type": "number"
             }
           },
           {
             "description": "Longitude coordinate. Required if country code is not provided.",
             "name": "lng",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": -74.006
+              "example": -74.006,
+              "type": "number"
             }
           },
           {
@@ -544,7 +570,8 @@
               "minimum": 1,
               "maximum": 2000,
               "default": 1000,
-              "example": 1000
+              "example": 1000,
+              "type": "integer"
             }
           },
           {
@@ -555,7 +582,8 @@
             "schema": {
               "minimum": 1,
               "default": 100,
-              "example": 10
+              "example": 10,
+              "type": "integer"
             }
           },
           {
@@ -566,7 +594,8 @@
             "schema": {
               "minimum": 0,
               "default": 0,
-              "example": 0
+              "example": 0,
+              "type": "integer"
             }
           },
           {
@@ -576,7 +605,13 @@
             "in": "query",
             "schema": {
               "default": "json",
-              "example": "json"
+              "example": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "geojson"
+              ]
             }
           },
           {
@@ -589,7 +624,8 @@
                 "id",
                 "geometry",
                 "properties"
-              ]
+              ],
+              "type": "string"
             }
           },
           {
@@ -598,7 +634,8 @@
             "name": "country",
             "in": "query",
             "schema": {
-              "example": "US"
+              "example": "US",
+              "type": "string"
             }
           },
           {
@@ -607,7 +644,8 @@
             "name": "source",
             "in": "query",
             "schema": {
-              "example": "meta"
+              "example": "meta",
+              "type": "string"
             }
           },
           {
@@ -616,7 +654,8 @@
             "name": "brand_wikidata",
             "in": "query",
             "schema": {
-              "example": "Q12345"
+              "example": "Q12345",
+              "type": "string"
             }
           },
           {
@@ -625,7 +664,8 @@
             "name": "brand_name",
             "in": "query",
             "schema": {
-              "example": "Starbucks"
+              "example": "Starbucks",
+              "type": "string"
             }
           },
           {
@@ -634,7 +674,8 @@
             "name": "name",
             "in": "query",
             "schema": {
-              "example": "Central Park"
+              "example": "Central Park",
+              "type": "string"
             }
           },
           {
@@ -643,7 +684,8 @@
             "name": "name_prefix",
             "in": "query",
             "schema": {
-              "example": "blue bo"
+              "example": "blue bo",
+              "type": "string"
             }
           },
           {
@@ -653,7 +695,8 @@
             "in": "query",
             "schema": {
               "default": 0.5,
-              "example": 0.5
+              "example": 0.5,
+              "type": "number"
             }
           },
           {
@@ -662,7 +705,8 @@
             "name": "categories",
             "in": "query",
             "schema": {
-              "example": "food,retail"
+              "example": "food,retail",
+              "type": "string"
             }
           },
           {
@@ -671,7 +715,8 @@
             "name": "taxonomy",
             "in": "query",
             "schema": {
-              "example": "food_and_drink"
+              "example": "food_and_drink",
+              "type": "string"
             }
           },
           {
@@ -680,7 +725,8 @@
             "name": "operating_status",
             "in": "query",
             "schema": {
-              "example": "open"
+              "example": "open",
+              "type": "string"
             }
           },
           {
@@ -689,7 +735,8 @@
             "name": "enrichment_fields",
             "in": "query",
             "schema": {
-              "example": "brand"
+              "example": "brand",
+              "type": "string"
             }
           },
           {
@@ -698,7 +745,8 @@
             "name": "has_contact",
             "in": "query",
             "schema": {
-              "example": "website,social"
+              "example": "website,social",
+              "type": "string"
             }
           }
         ],
@@ -811,18 +859,20 @@
             "description": "Latitude coordinate. Required if country code is not provided.",
             "name": "lat",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": 40.7128
+              "example": 40.7128,
+              "type": "number"
             }
           },
           {
             "description": "Longitude coordinate. Required if country code is not provided.",
             "name": "lng",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": -74.006
+              "example": -74.006,
+              "type": "number"
             }
           },
           {
@@ -833,7 +883,8 @@
             "schema": {
               "minimum": 1,
               "default": 1000,
-              "example": 1000
+              "example": 1000,
+              "type": "integer"
             }
           },
           {
@@ -844,7 +895,8 @@
             "schema": {
               "minimum": 1,
               "default": 100,
-              "example": 10
+              "example": 10,
+              "type": "integer"
             }
           },
           {
@@ -855,7 +907,8 @@
             "schema": {
               "minimum": 0,
               "default": 0,
-              "example": 0
+              "example": 0,
+              "type": "integer"
             }
           },
           {
@@ -865,7 +918,13 @@
             "in": "query",
             "schema": {
               "default": "json",
-              "example": "json"
+              "example": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "geojson"
+              ]
             }
           },
           {
@@ -878,7 +937,8 @@
                 "id",
                 "geometry",
                 "properties"
-              ]
+              ],
+              "type": "string"
             }
           },
           {
@@ -887,7 +947,8 @@
             "name": "country",
             "in": "query",
             "schema": {
-              "example": "US"
+              "example": "US",
+              "type": "string"
             }
           },
           {
@@ -899,7 +960,8 @@
               "example": [
                 "food",
                 "retail"
-              ]
+              ],
+              "type": "string"
             }
           }
         ],
@@ -1117,18 +1179,20 @@
             "description": "Latitude coordinate. Required if country code is not provided.",
             "name": "lat",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": 40.7128
+              "example": 40.7128,
+              "type": "number"
             }
           },
           {
             "description": "Longitude coordinate. Required if country code is not provided.",
             "name": "lng",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "example": -74.006
+              "example": -74.006,
+              "type": "number"
             }
           },
           {
@@ -1139,7 +1203,8 @@
             "schema": {
               "minimum": 1,
               "default": 1000,
-              "example": 1000
+              "example": 1000,
+              "type": "integer"
             }
           },
           {
@@ -1150,7 +1215,8 @@
             "schema": {
               "minimum": 1,
               "default": 100,
-              "example": 10
+              "example": 10,
+              "type": "integer"
             }
           },
           {
@@ -1161,7 +1227,8 @@
             "schema": {
               "minimum": 0,
               "default": 0,
-              "example": 0
+              "example": 0,
+              "type": "integer"
             }
           },
           {
@@ -1171,7 +1238,13 @@
             "in": "query",
             "schema": {
               "default": "json",
-              "example": "json"
+              "example": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "geojson"
+              ]
             }
           },
           {
@@ -1184,7 +1257,8 @@
                 "id",
                 "geometry",
                 "properties"
-              ]
+              ],
+              "type": "string"
             }
           },
           {
@@ -1195,7 +1269,8 @@
             "schema": {
               "minLength": 2,
               "maxLength": 2,
-              "example": "US"
+              "example": "US",
+              "type": "string"
             }
           }
         ],
@@ -1306,7 +1381,7 @@
         "parameters": [
           {
             "name": "lat",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Latitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -1316,7 +1391,7 @@
           },
           {
             "name": "lng",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Longitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -1511,7 +1586,7 @@
         "parameters": [
           {
             "name": "lat",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Latitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -1521,7 +1596,7 @@
           },
           {
             "name": "lng",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Longitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -1716,7 +1791,7 @@
         "parameters": [
           {
             "name": "lat",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Latitude coordinate. Required if country code is not provided.",
             "schema": {
@@ -1726,7 +1801,7 @@
           },
           {
             "name": "lng",
-            "required": true,
+            "required": false,
             "in": "query",
             "description": "Longitude coordinate. Required if country code is not provided.",
             "schema": {
