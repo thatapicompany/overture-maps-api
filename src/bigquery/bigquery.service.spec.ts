@@ -530,6 +530,26 @@ describe('BigQueryService', () => {
     });
   });
 
+  describe('getBrandsNearby', () => {
+    it('leaves out places with no brand, in SQL and in the mapped rows', async () => {
+      const service = new BigQueryService();
+      service.getPlaceColumns = jest.fn().mockResolvedValue(new Set(['categories']));
+      service.runQuery = jest.fn().mockResolvedValue({
+        rows: [
+          { brand: null, count_places: 900 },
+          { brand: { names: { primary: null }, wikidata: null }, count_places: 40 },
+          { brand: { names: { primary: 'Example Coffee' }, wikidata: 'Q1' }, count_places: 12 },
+          { brand: { names: { primary: null }, wikidata: 'Q2' }, count_places: 3 },
+        ],
+        statistics: {},
+      });
+      const brands = await service.getBrandsNearby(undefined, 51.5138, -0.0984, 1000);
+      const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('(brand.names.primary IS NOT NULL OR brand.wikidata IS NOT NULL)');
+      expect(brands.map((b) => b.wikidata)).toEqual(['Q1', 'Q2']);
+    });
+  });
+
   describe('runQuery', () => {
     it('prices bytes billed at US$6.25 per TiB (not the pre-2023 US$5 per decimal TB)', async () => {
       const service = new TestableBigQueryService();

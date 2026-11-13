@@ -119,6 +119,11 @@ const BUILDING_TABLE = process.env.BUILDING_TABLE || `${SOURCE_DATASET}.building
 // September 2026 `categories` column removal without a redeploy.
 const PLACE_COLUMNS_TTL_MS = 6 * 60 * 60 * 1000;
 
+/** A brand row is only useful if it has a name or a Wikidata id. */
+export function isNamedBrand(brand: { names?: { primary?: string | null } | null; wikidata?: string | null } | null | undefined): boolean {
+  return !!(brand?.names?.primary || brand?.wikidata);
+}
+
 @Injectable()
 export class BigQueryService {
   private bigQueryClient: BigQuery;
@@ -261,9 +266,10 @@ export class BigQueryService {
     const params: any = {};
     const hasCategoriesColumn = (await this.getPlaceColumns()).has('categories');
     const whereClauses = this.buildWhereClauses({ country, latitude, longitude, radius, categories, require_wikidata, hasCategoriesColumn, params, countrySql: source.countrySql });
-    if (whereClauses.length > 0) {
-      query += ` WHERE ${whereClauses.join(' AND ')}`;
-    }
+    // Places with no brand would otherwise come back as one unnamed "brand"
+    // holding most of the area's places, at the top of the list.
+    whereClauses.push('(brand.names.primary IS NOT NULL OR brand.wikidata IS NOT NULL)');
+    query += ` WHERE ${whereClauses.join(' AND ')}`;
 
     /*
         if (country) {
@@ -290,13 +296,15 @@ export class BigQueryService {
 
     const { rows } = await this.runQuery(query, params);
 
-    return rows.map((row: any) => ({
-      names: row.brand?.names,
-      wikidata: row.brand?.wikidata,
-      counts: {
-        places: row.count_places
-      }
-    }));
+    return rows
+      .map((row: any) => ({
+        names: row.brand?.names,
+        wikidata: row.brand?.wikidata,
+        counts: {
+          places: row.count_places
+        }
+      }))
+      .filter(isNamedBrand);
   }
 
   async getPlaceCountsByCountry(): Promise<{ country: string; counts: { places: number, brands: number } }[]> {
