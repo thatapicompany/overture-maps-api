@@ -6,12 +6,14 @@ import { AddressDto, toAddressDto } from './dto/responses/address-response.dto';
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiStandardErrors, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
 
 @ApiTags('Addresses')
 @ApiSecurity('API_KEY')
+@ApiStandardErrors()
 @Controller('addresses')
 @UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class AddressesController {
@@ -23,8 +25,12 @@ export class AddressesController {
     ) { }
 
     @Get()
-    @ApiOperation({ summary: 'Get Addresses using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return Addresses.', type: AddressDto, isArray: true })
+    @ApiOperation({
+    operationId: "searchAddresses",
+    summary: "Search addresses",
+    description: "Find address points within `radius` metres of a `lat`/`lng`. A location is required. Use it for address lookup, validation or reverse geocoding.",
+  })
+    @ApiResponse({ status: 200, description: 'Return Addresses.', type: AddressDto, isArray: true, headers: PAGINATION_HEADERS })
     @CountHeader()
     async getAddresses(@Query() query: GetAddressesQuery): Promise<AddressDto[] | any> {
     requirePoint(query, '/addresses');

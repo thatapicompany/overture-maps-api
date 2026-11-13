@@ -5,6 +5,7 @@ import { DivisionDto, toDivisionDto } from './dto/responses/division-response.dt
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiStandardErrors, ErrorResponseDto, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
@@ -13,6 +14,7 @@ import { checkDemoDivisionsScope } from './demo-divisions-scope';
 
 @ApiTags('Divisions')
 @ApiSecurity('API_KEY')
+@ApiStandardErrors()
 @Controller('divisions')
 @UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class DivisionsController {
@@ -24,8 +26,12 @@ export class DivisionsController {
     ) { }
 
     @Get()
-    @ApiOperation({ summary: 'Get Division areas using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return Division areas.', type: DivisionDto, isArray: true })
+    @ApiOperation({
+    operationId: "searchDivisions",
+    summary: "Search administrative areas",
+    description: "Find countries, regions, localities and neighbourhoods by `name`, `country`, `subtype` or `admin_level`, or those containing or near a `lat`/`lng`. Use it to geocode a place name to a point or boundary before searching `/places`. Name searches omit boundary geometry by default (set `include_geometry=true`, or fetch one area with `GET /divisions/{id}`), because polygons can be megabytes each.",
+  })
+    @ApiResponse({ status: 200, description: 'Return Division areas.', type: DivisionDto, isArray: true, headers: PAGINATION_HEADERS })
     @CountHeader()
     async getDivisions(@Query() query: GetDivisionsQuery, @AuthedUser() user: User): Promise<DivisionDto[] | any> {
 
@@ -42,10 +48,14 @@ export class DivisionsController {
     }
 
     @Get(':id')
-    @ApiOperation({ summary: 'Get a single Division area by ID, including its full polygon geometry' })
+    @ApiOperation({
+    operationId: "getDivision",
+    summary: "Get an administrative area by ID",
+    description: "Fetch one division area by its Overture ID, including its full boundary polygon. Use an ID returned by `GET /divisions`.",
+  })
     @ApiParam({ name: 'id', description: 'Overture division area ID', example: '0850b45bffffffff01c3320da9d5f43d' })
     @ApiResponse({ status: 200, description: 'Return the Division area.', type: DivisionDto })
-    @ApiResponse({ status: 404, description: 'Division area not found.' })
+    @ApiResponse({ status: 404, description: 'Division area not found.', type: ErrorResponseDto })
     async getDivisionById(@Param('id') id: string): Promise<DivisionDto> {
 
         const division = await this.divisionsService.getDivisionById(id);

@@ -3,7 +3,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
-import { DocumentBuilder, SwaggerModule, SwaggerCustomOptions, SwaggerDocumentOptions } from '@nestjs/swagger';
+import { SwaggerModule, SwaggerCustomOptions } from '@nestjs/swagger';
+import { buildOpenApiDocument } from './openapi/openapi.document';
+import { RouteNotFoundFilter } from './openapi/route-not-found.filter';
 const helmet = require('helmet');
 
 async function bootstrap() {
@@ -32,41 +34,19 @@ async function bootstrap() {
 
   app.enableCors(corsOptions);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new RouteNotFoundFilter());
 
 
-  // Configure Swagger
-  const config = new DocumentBuilder()
-    .setTitle('Overture Maps API Documentation')
-    .setDescription('OpenAPI docs for the Overture Maps API')
-    .setVersion('1.0')
-    .addServer('http://localhost:8080/', 'Local environment')
-    .addServer('https://api.overturemapsapi.com', 'Cloud API Service')
-    .setContact("Aden Forshaw", "https://thatapicompany.com/overture-maps-api", "aden@thatapicompany.com")
-    .addApiKey(
-      { type: 'apiKey', name: 'x-api-key', in: 'header' },
-      'API_KEY', // Reference name for the security scheme
-    )
-    .addTag('places', 'Operations related to Places')
-    .build();
-
-  // Create the Swagger document
-  const document = SwaggerModule.createDocument(app, config);
-
+  // OpenAPI spec (src/openapi/openapi.document.ts) served as JSON at
+  // /api-docs.json and as Swagger UI at /api-docs.
+  const document = buildOpenApiDocument(app);
   const customOptions: SwaggerCustomOptions = {
     customfavIcon: 'https://overturemaps.org/wp-content/uploads/sites/16/2022/12/cropped-Favicon-150x150.png',
     customCss: '.swagger-ui .topbar { display: none }', // Hide the top bar of Swagger UI
-    jsonDocumentUrl: '/api-docs.json', swaggerUrl: '/api-docs-ui',
+    jsonDocumentUrl: '/api-docs.json',
     customSiteTitle: 'Overture Maps API Documentation',
   };
-
-
-  const docOptions: SwaggerDocumentOptions = {
-    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
-  };
-
-  // Serve the Swagger document at /api-docs
   SwaggerModule.setup('api-docs', app, document, customOptions);
-
 
   await app.listen(8080);
 }
