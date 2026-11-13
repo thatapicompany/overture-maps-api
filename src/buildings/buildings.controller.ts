@@ -9,7 +9,8 @@ import { GetBuildingsQuery } from './dto/requests/get-buildings-query.dto';
 import { BuildingDto, toBuildingDto } from './dto/responses/building-response.dto';
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
-import { ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiStandardErrors, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { UseGuards } from '@nestjs/common';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
@@ -17,6 +18,7 @@ import { CountHeader } from '../decorators/count-header.decorator';
 
 @ApiTags('Buildings')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
+@ApiStandardErrors()
 @Controller('buildings')
 @UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class BuildingsController {
@@ -28,6 +30,12 @@ export class BuildingsController {
   ) { }
 
   @Get()
+  @ApiOperation({
+    operationId: "searchBuildings",
+    summary: "Search building footprints",
+    description: "Find buildings within `radius` metres of a `lat`/`lng`, with footprint geometry and attributes such as height and number of floors where known. A location is required. Use `format=geojson` to draw them on a map.",
+  })
+  @ApiResponse({ status: 200, description: 'Buildings near the point.', type: BuildingDto, isArray: true, headers: PAGINATION_HEADERS })
   @CountHeader()
   async getBuildings(@Query() query: GetBuildingsQuery): Promise<BuildingDto[] | any> {
     requirePoint(query, '/buildings');

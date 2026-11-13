@@ -6,12 +6,14 @@ import { TransportationDto, toTransportationDto } from './dto/responses/transpor
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiStandardErrors, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
 
 @ApiTags('Transportation')
 @ApiSecurity('API_KEY')
+@ApiStandardErrors()
 @Controller('transportation')
 @UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class TransportationController {
@@ -23,8 +25,12 @@ export class TransportationController {
     ) { }
 
     @Get()
-    @ApiOperation({ summary: 'Get Transportation segments using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return Transportation segments.', type: TransportationDto, isArray: true })
+    @ApiOperation({
+    operationId: "searchTransportationSegments",
+    summary: "Search transportation segments",
+    description: "Find road, rail and path segments within `radius` metres of a `lat`/`lng`. A location is required.",
+  })
+    @ApiResponse({ status: 200, description: 'Return Transportation segments.', type: TransportationDto, isArray: true, headers: PAGINATION_HEADERS })
     @CountHeader()
     async getTransportationSegments(@Query() query: GetTransportationQuery): Promise<TransportationDto[] | any> {
     requirePoint(query, '/transportation');

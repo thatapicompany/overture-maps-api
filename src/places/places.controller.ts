@@ -9,6 +9,7 @@ import { GetBrandsDto } from './dto/requests/get-brands.dto';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { GetCategoriesDto } from './dto/requests/get-categories.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody , ApiQuery, ApiSecurity} from '@nestjs/swagger';
+import { ApiStandardErrors, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { BrandDto } from './dto/models/brand.dto';
 import { CountryResponseDto, toCountryResponseDto } from './dto/responses/country-response.dto';
 import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/category-response.dto';
@@ -30,6 +31,7 @@ import { ACCOUNT_URL } from '../common/links';
 
 @ApiTags('Places')
 @ApiSecurity('API_KEY') // Applies the API key security scheme defined in Swagger
+@ApiStandardErrors()
 @Controller('places')
 @UseGuards(IsAuthenticatedGuard)
 export class PlacesController {
@@ -46,9 +48,13 @@ export class PlacesController {
   private enrichmentAdapter: EnrichmentAdapter = loadEnrichmentAdapter();
 
   @Get()
-  @ApiOperation({ summary: 'Get Places using Query params as filters' })
+  @ApiOperation({
+    operationId: "searchPlaces",
+    summary: "Search places (POIs)",
+    description: "Find points of interest near a point, or across a country on paid plans. Best query: `lat` + `lng` + `radius` (metres) with optional `categories`, `taxonomy`, `brand_name` or `name_prefix`. Country-level searches (`country` with no lat/lng) need a paid plan and a narrowing filter. Get valid category values from `GET /places/categories`. Page with `limit` and `page` and read the total from the `Pagination-Count` header. `enrichment_fields=brand` adds Wikidata brand details. The demo key is limited to small lat/lng searches.",
+  })
   @ApiQuery({type:GetPlacesDto})
-  @ApiResponse({ status: 200, description: 'Return Places.' , type: PlaceResponseDto, isArray: true})
+  @ApiResponse({ status: 200, description: 'Return Places.' , type: PlaceResponseDto, isArray: true, headers: PAGINATION_HEADERS })
   @CountHeader() 
   @ValidateLatLngUser()
   async getPlaces(@Query() query: GetPlacesDto, @AuthedUser() user: User) {
@@ -138,9 +144,13 @@ export class PlacesController {
   }
 
   @Get('buildings')
-  @ApiOperation({ summary: 'Get Places with their Building shapes using Query params as filters' })
+  @ApiOperation({
+    operationId: "searchPlacesWithBuildings",
+    summary: "Search places with their building footprints",
+    description: "Same filters as `GET /places`, and each place also carries the footprint of the building it sits in. Use it when you need the shape or size of the premises, for example for site analysis or rooftop mapping. Slower than `/places`, so keep the radius small.",
+  })
   @ApiQuery({type:GetPlacesWithBuildingsDto})
-  @ApiResponse({ status: 200, description: 'Return Places with Buildings.' , type: PlaceResponseDto, isArray: true})
+  @ApiResponse({ status: 200, description: 'Return Places with Buildings.' , type: PlaceResponseDto, isArray: true, headers: PAGINATION_HEADERS })
   @CountHeader() 
   @ValidateLatLngUser()
   async getPlacesWithBuildings(@Query() query: GetPlacesWithBuildingsDto, @AuthedUser() user: User) {
@@ -165,8 +175,12 @@ export class PlacesController {
   
     
     @Get('brands')
-    @ApiOperation({ summary: 'Get all Brands from Places using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return all Brands, along with a count of all Places for each.' , type: BrandDto, isArray: true})
+    @ApiOperation({
+    operationId: "listPlaceBrands",
+    summary: "List brands",
+    description: "List brands (chains) with how many places each has, for a country or a lat/lng area. Use it to find the exact `brand_name` or `brand_wikidata` value to pass to `GET /places`, for example to map every location of a retail chain.",
+  })
+    @ApiResponse({ status: 200, description: 'Return all Brands, along with a count of all Places for each.' , type: BrandDto, isArray: true, headers: PAGINATION_HEADERS })
     @ApiQuery({type:GetBrandsDto})
     @CountHeader() 
     @ValidateLatLngUser()
@@ -177,8 +191,12 @@ export class PlacesController {
     }
 
     @Get('countries')
-    @ApiOperation({ summary: 'Get all Countries from Places using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return all Countries, as well as a count of all the Places and Brands in each.', type:CountryResponseDto, isArray: true})
+    @ApiOperation({
+    operationId: "listPlaceCountries",
+    summary: "List countries with places",
+    description: "List the countries that have places, with place and brand counts for each. Use it to check coverage before a country-level search.",
+  })
+    @ApiResponse({ status: 200, description: 'Return all Countries, as well as a count of all the Places and Brands in each.', type:CountryResponseDto, isArray: true, headers: PAGINATION_HEADERS })
     @CountHeader() 
     @ValidateLatLngUser()
     async getCountries() {
@@ -188,8 +206,12 @@ export class PlacesController {
     }
 
     @Get('categories')
-    @ApiOperation({ summary: 'Get all Categories from Places using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return all Categories, along with a count of all Brands and Places for each' , type: CategoryResponseDto, isArray: true})
+    @ApiOperation({
+    operationId: "listPlaceCategories",
+    summary: "List place categories",
+    description: "List the place categories present in a country or a lat/lng area, with place and brand counts. Use it to find valid values for the `categories` filter on `GET /places` (for example `cafe`, `pharmacy`, `restaurant`).",
+  })
+    @ApiResponse({ status: 200, description: 'Return all Categories, along with a count of all Brands and Places for each' , type: CategoryResponseDto, isArray: true, headers: PAGINATION_HEADERS })
     @ApiQuery({type:GetCategoriesDto})
     @CountHeader() 
     @ValidateLatLngUser()

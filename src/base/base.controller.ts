@@ -6,12 +6,14 @@ import { BaseDto, toBaseDto } from './dto/responses/base-response.dto';
 import { wrapAsGeoJSON } from '../utils/geojson';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 import { ApiSecurity, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiStandardErrors, PAGINATION_HEADERS } from '../openapi/openapi.decorators';
 import { CountHeader } from '../decorators/count-header.decorator';
 import { IsAuthenticatedGuard } from '../guards/is-authenticated.guard';
 import { DemoLocationGuard } from '../guards/demo-location.guard';
 
 @ApiTags('Base')
 @ApiSecurity('API_KEY')
+@ApiStandardErrors()
 @Controller('base')
 @UseGuards(IsAuthenticatedGuard, DemoLocationGuard)
 export class BaseController {
@@ -23,8 +25,12 @@ export class BaseController {
     ) { }
 
     @Get()
-    @ApiOperation({ summary: 'Get Base features using Query params as filters' })
-    @ApiResponse({ status: 200, description: 'Return Base features.', type: BaseDto, isArray: true })
+    @ApiOperation({
+    operationId: "searchBaseFeatures",
+    summary: "Search base map features",
+    description: "Find base map features (land use, land cover, water and similar) within `radius` metres of a `lat`/`lng`. A location is required.",
+  })
+    @ApiResponse({ status: 200, description: 'Return Base features.', type: BaseDto, isArray: true, headers: PAGINATION_HEADERS })
     @CountHeader()
     async getBaseFeatures(@Query() query: GetBaseQuery): Promise<BaseDto[] | any> {
     requirePoint(query, '/base');
