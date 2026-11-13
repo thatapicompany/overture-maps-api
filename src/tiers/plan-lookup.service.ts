@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { portalFirestore, portalFirestoreConfigured } from './portal-firestore';
+import { planSourceFromEnv } from './plan-source';
 
-// Live plan resolution for paid-only features, read from the account
-// portal's Firestore (project PLAN_FIRESTORE_PROJECT_ID, collection
-// `organizations`, document id = the API's accountId). The portal writes
+// Live plan resolution for paid-only features, read per account from a plan
+// source (tiers/plan-source.ts, PLAN_SOURCE: Firestore, an HTTP service, or
+// none). With the hosted portal's Firestore, the document id is the API's
+// accountId in collection `organizations`. The portal writes
 // `planId` (the Stripe price id) and `subscriptionStatus` when a subscription
 // changes, so an upgrade is visible here as soon as that write lands, plus at
 // most one cache TTL (60s by default).
@@ -172,7 +173,7 @@ export class PlanLookupService {
     const timeoutMs = envInt('PLAN_LOOKUP_TIMEOUT_MS', 2_500);
     let timer: NodeJS.Timeout | undefined;
     try {
-      const reader = this.reader ?? (this.reader = this.firestoreReader());
+      const reader = this.reader ?? (this.reader = this.sourceReader());
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
         timer.unref?.();
@@ -197,16 +198,11 @@ export class PlanLookupService {
     }
   }
 
-  private firestoreReader(): OrgReader {
-    if (!portalFirestoreConfigured()) {
-      this.logger.error('PLAN_FIRESTORE_PROJECT_ID is not set: every plan resolves unknown and paid-only features are not restricted.');
-      return async () => null;
+  private sourceReader(): OrgReader {
+    const source = planSourceFromEnv();
+    if (source.name === 'none') {
+      this.logger.warn('No plan source configured (PLAN_SOURCE): every plan resolves unknown and paid-only features are not restricted.');
     }
-    const db = portalFirestore();
-    const collection = process.env.PLAN_FIRESTORE_COLLECTION || 'organizations';
-    return async (accountId: string) => {
-      const snap = await db.collection(collection).doc(accountId).get();
-      return snap.exists ? (snap.data() as OrgPlanRecord) : null;
-    };
+    return (accountId: string) => source.read(accountId);
   }
 }
