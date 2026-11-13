@@ -3,7 +3,6 @@ import { Request, Response } from 'express';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { resolveQuotaPolicy } from './plan-limits';
-import { QuotaNoticeService } from './quota-notices';
 import { QuotaEventPublisher } from './quota-events';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
 import { PRICING_URL } from '../common/links';
@@ -24,9 +23,9 @@ import { recordUsageError } from '../usage/usage.context';
 // QUOTA_MODE: `enforce` (default) blocks; `log` counts, sets headers and logs
 // what it would have blocked; `off` does nothing.
 //
-// Passing the allowance and reaching the limit each trigger one email to the
-// account's team per month (QUOTA_NOTICE_MODE, quota/quota-notices.ts), and a
-// Pub/Sub event when QUOTA_EVENTS_TOPIC is set (quota/quota-events.ts).
+// Passing the allowance and reaching the limit publish a Pub/Sub event when
+// QUOTA_EVENTS_TOPIC is set (quota/quota-events.ts), for anything downstream
+// that wants to react, such as emailing the account.
 //
 // Fails open everywhere: unknown plan, counter unavailable, or any error in
 // this guard lets the request through.
@@ -54,7 +53,6 @@ export class MonthlyQuotaGuard implements CanActivate {
   constructor(
     private readonly plans: PlanLookupService,
     private readonly counter: UsageCounterStore,
-    @Optional() private readonly notices?: QuotaNoticeService,
     @Optional() private readonly events?: QuotaEventPublisher,
   ) {}
 
@@ -98,13 +96,12 @@ export class MonthlyQuotaGuard implements CanActivate {
           `Over the ${fmt(allowance)} requests/month included in the ${planName} plan; requests are refused from ${fmt(hardLimit)}.`,
         );
       }
-      // Email the team once when they pass the allowance and once when
-      // requests start being refused (quota/quota-notices.ts). Not for manual
-      // overrides: whoever set one is already talking to the account.
+      // Tell downstream consumers the account is over its allowance or at its
+      // limit (quota/quota-events.ts). Not for manual overrides: whoever set
+      // one is already talking to the account.
       const override = 'override' in plan ? plan.override : undefined;
       const overridden = !!override && override.until.getTime() > now.getTime();
       if (used >= allowance && !overridden) {
-        await this.notices?.notify({ accountId: user.accountId, plan: planName, used, allowance, hardLimit, now });
         // Downstream consumers (QUOTA_EVENTS_TOPIC, quota/quota-events.ts).
         await this.events?.publish({ accountId: user.accountId, plan: planName, used, allowance, hardLimit, now });
       }
