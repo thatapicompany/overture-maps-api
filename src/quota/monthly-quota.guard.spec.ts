@@ -121,34 +121,34 @@ describe('MonthlyQuotaGuard', () => {
     await expect(o.guard.canActivate(o.ctx)).resolves.toBe(true);
     expect(o.plans.getPlan).not.toHaveBeenCalled();
   });
-  describe('quota notices', () => {
-    const notices = () => ({ notify: jest.fn(async () => 'sent') });
+  describe('quota events', () => {
+    const notices = () => ({ publish: jest.fn(async () => 'published') });
 
-    it('asks for a notice once usage reaches the allowance, not before', async () => {
+    it('publishes once usage reaches the allowance, not before', async () => {
       const below = notices();
       const h1 = harness({ used: 99, notices: below });
       await h1.guard.canActivate(h1.ctx);
-      expect(below.notify).not.toHaveBeenCalled();
+      expect(below.publish).not.toHaveBeenCalled();
 
       const over = notices();
       const h2 = harness({ used: 150, notices: over });
       await h2.guard.canActivate(h2.ctx);
-      expect(over.notify).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acct', plan: 'Free', used: 150, allowance: 100, hardLimit: 200 }));
+      expect(over.publish).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acct', plan: 'Free', used: 150, allowance: 100, hardLimit: 200 }));
     });
 
-    it('asks for a notice on the request that is refused', async () => {
+    it('publishes on the request that is refused', async () => {
       const n = notices();
       const h = harness({ used: 200, notices: n });
       await expect(h.guard.canActivate(h.ctx)).rejects.toBeDefined();
-      expect(n.notify).toHaveBeenCalledWith(expect.objectContaining({ used: 200 }));
+      expect(n.publish).toHaveBeenCalledWith(expect.objectContaining({ used: 200 }));
     });
 
-    it('sends no notices to accounts on a manual override', async () => {
+    it('publishes nothing for accounts on a manual override', async () => {
       const n = notices();
       const plan = { status: 'paid', override: { plan: 'Premium', until: new Date(Date.now() + 86_400_000), reason: 't' } };
       const h = harness({ plan, used: 1_500, notices: n });
       await h.guard.canActivate(h.ctx);
-      expect(n.notify).not.toHaveBeenCalled();
+      expect(n.publish).not.toHaveBeenCalled();
     });
   });
 });
