@@ -24,6 +24,15 @@ jobs:
     - name: npm test
       run: |
         npm test 
+
+    - name: OpenAPI spec is current
+      run: |
+        npm run -s openapi:export
+        if ! git diff --quiet -- api-docs.json; then
+          echo "::error file=api-docs.json::api-docs.json is out of date. Run 'npm run openapi:export' and commit the result."
+          git --no-pager diff --stat -- api-docs.json
+          exit 1
+        fi
         
     - name: create credentials file
       run: |

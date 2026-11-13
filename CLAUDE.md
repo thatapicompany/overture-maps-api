@@ -44,3 +44,37 @@ Internal business information covers:
 Public facts are fine: published plan limits, the data schema, BigQuery bytes
 scanned by a query shape, and the names of the public GCP resources the code
 already references.
+
+## Keep the OpenAPI spec current
+
+The OpenAPI spec is the contract that SDK generators, AI tools and the docs
+site (overture-maps-dev-portal) read. Whenever a change touches an endpoint,
+a query parameter, a request or response DTO, or an `@Api*` decorator:
+
+1. Give any new operation an explicit `operationId` (camelCase, unique) and a
+   `description` that says when to use it, in `@ApiOperation`.
+2. Run `npm run openapi:export` and commit the updated `api-docs.json` in the
+   same PR. CI fails if it is stale.
+3. Run `npx jest src/openapi` to check the spec's quality rules.
+
+You do not need to edit the docs site: after a release reaches production, a
+workflow in overture-maps-dev-portal pulls the live spec from
+`/api-docs.json`, regenerates each endpoint page's parameter reference and
+Python example, and commits the result.
+
+## Keep the OpenAPI spec current
+
+The OpenAPI spec is the contract that SDK generators, AI tools and the docs
+site (overture-maps-dev-portal) read. Whenever a change touches an endpoint,
+a query parameter, a request or response DTO, or an `@Api*` decorator:
+
+1. Give any new operation an explicit `operationId` (camelCase, unique) and a
+   `description` that says when to use it, in `@ApiOperation`.
+2. Run `npm run openapi:export` and commit the updated `api-docs.json` in the
+   same PR. CI fails if it is stale.
+3. Run `npx jest src/openapi` to check the spec's quality rules.
+
+You do not need to edit the docs site: after a release reaches production, a
+workflow in overture-maps-dev-portal pulls the live spec from
+`/api-docs.json`, regenerates each endpoint page's parameter reference and
+Python example, and commits the result.
