@@ -23,6 +23,8 @@ function row(id: string): UsageRow {
     env: 'test',
     api_version: '0.1.2',
     error: null,
+    user_agent: null,
+    origin: null,
     jobs: [],
   };
 }

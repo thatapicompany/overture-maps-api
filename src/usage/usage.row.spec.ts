@@ -84,4 +84,29 @@ describe('buildUsageRow', () => {
     expect(row.status_code).toBe(401);
     expect(row.cache_hit).toBe(false); // not a success
   });
+
+  it('records the client user agent and origin', () => {
+    const row = buildUsageRow(
+      mockReq({ headers: { 'user-agent': 'example-client/1.2.3', origin: 'https://app.example.com' } }),
+      mockRes(),
+      store([]),
+    );
+    expect(row.user_agent).toBe('example-client/1.2.3');
+    expect(row.origin).toBe('https://app.example.com');
+  });
+
+  it('stores null when the client sends no user agent or origin', () => {
+    const row = buildUsageRow(mockReq(), mockRes(), store([]));
+    expect(row.user_agent).toBeNull();
+    expect(row.origin).toBeNull();
+  });
+
+  it('caps an oversized user agent', () => {
+    const row = buildUsageRow(
+      mockReq({ headers: { 'user-agent': 'x'.repeat(5000) } }),
+      mockRes(),
+      store([]),
+    );
+    expect(row.user_agent).toHaveLength(512);
+  });
 });

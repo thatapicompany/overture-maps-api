@@ -26,6 +26,8 @@ const TABLE_SCHEMA = {
     { name: 'env', type: 'STRING' },
     { name: 'api_version', type: 'STRING' },
     { name: 'error', type: 'STRING' },
+    { name: 'user_agent', type: 'STRING' },
+    { name: 'origin', type: 'STRING' },
     {
       name: 'jobs',
       type: 'RECORD',
