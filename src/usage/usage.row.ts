@@ -30,9 +30,28 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
+// Clients can pass their key as a query parameter, so drop those names before
+// storing the query string. Only the hash belongs in the usage table.
+function redactedQuery(req: Request): string {
+  const query = { ...(req.query ?? {}) } as Record<string, unknown>;
+  for (const name of API_KEY_NAMES) delete query[name];
+  return JSON.stringify(query);
+}
+
 function hashApiKey(key?: string): string | null {
   if (!key) return null;
   return createHash('sha256').update(key).digest('hex');
+}
+
+// Client-supplied headers are free text: cap them so a hostile client can't
+// bloat the usage table. 512 chars fits every real User-Agent we've seen.
+const MAX_HEADER_LENGTH = 512;
+
+function headerValue(req: Request, name: string): string | null {
+  const raw = req.headers?.[name];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string' || !value) return null;
+  return value.slice(0, MAX_HEADER_LENGTH);
 }
 
 function toInt(value: unknown): number | null {
@@ -61,6 +80,8 @@ export interface UsageRow {
   env: string | null;
   api_version: string | null;
   error: string | null;
+  user_agent: string | null;
+  origin: string | null;
   jobs: {
     job_id: string | null;
     bytes_processed: number;
@@ -95,7 +116,7 @@ export function buildUsageRow(req: Request, res: Response, store: UsageStore): U
     method: req.method,
     route: (req as any).route?.path ?? null,
     path,
-    query_params: JSON.stringify(req.query ?? {}),
+    query_params: redactedQuery(req),
     status_code: res.statusCode,
     // No BigQuery jobs on a successful data route means the response was cached.
     cache_hit: jobs.length === 0 && res.statusCode < 400 && isDataRoute,
@@ -107,6 +128,11 @@ export function buildUsageRow(req: Request, res: Response, store: UsageStore): U
     env: process.env.ENV ?? null,
     api_version: process.env.npm_package_version ?? null,
     error: store.error ?? null,
+    // Which client made the call (our MCP server, an SDK, curl, a browser...).
+    user_agent: headerValue(req, 'user-agent'),
+    // Set by browsers on cross-origin calls, so it separates front-end use
+    // from server-side use. Absent for most server-to-server requests.
+    origin: headerValue(req, 'origin'),
     jobs: jobs.map((j) => ({
       job_id: j.jobId,
       bytes_processed: j.bytesProcessed,

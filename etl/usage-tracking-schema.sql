@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS `usage.api_requests`
   env                STRING,
   api_version        STRING,
   error              STRING,
+  user_agent         STRING,             -- User-Agent header, capped at 512 chars
+  origin             STRING,             -- Origin header (browser cross-origin calls)
   jobs ARRAY<STRUCT<                     -- per-BigQuery-job breakdown
     job_id          STRING,
     bytes_processed INT64,
@@ -49,6 +51,14 @@ OPTIONS (
   description = 'Immutable per-request API usage and BigQuery cost. Append-only.',
   require_partition_filter = TRUE
 );
+
+-- Migration for tables created before user_agent/origin existed. Run this
+-- BEFORE deploying an API build that writes these fields: streaming inserts
+-- with unknown fields are rejected, and the API SA cannot alter the table.
+--
+--   ALTER TABLE `usage.api_requests`
+--     ADD COLUMN IF NOT EXISTS user_agent STRING,
+--     ADD COLUMN IF NOT EXISTS origin STRING;
 
 -- ----------------------------------------------------------------------------
 -- Immutability via IAM (run once; replace PROJECT / SA placeholders)
@@ -111,6 +121,17 @@ WHERE DATE(request_ts) >= DATE_TRUNC(CURRENT_DATE(), MONTH)
 GROUP BY account_id
 ORDER BY bq_cost_usd DESC
 LIMIT 50;
+
+-- Requests by client (MCP server, SDKs, curl, browsers) over the last 30 days
+SELECT
+  REGEXP_EXTRACT(user_agent, r'^[^/ ]+')  AS client,
+  COUNT(*)                                AS requests,
+  COUNT(DISTINCT account_id)              AS accounts,
+  COUNTIF(origin IS NOT NULL)             AS browser_requests
+FROM `usage.api_requests`
+WHERE request_ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+GROUP BY client
+ORDER BY requests DESC;
 
 -- Reconcile the usage table against BigQuery's authoritative billed bytes
 -- (jobs are labelled with request_id in src/bigquery/bigquery.service.ts).
