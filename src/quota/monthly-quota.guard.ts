@@ -9,7 +9,7 @@ import { PRICING_URL } from '../common/links';
 import { recordUsageError } from '../usage/usage.context';
 
 // Monthly request cap per account, enforced inside the API with no call to
-// TheAuthAPI (etl/bigquery-cost-controls.md, section 9).
+// TheAuthAPI (etl/cost-controls.md).
 //
 // Limits come from the Stripe plan (quota/plan-limits.ts): requests between
 // the advertised allowance and the soft limit work but carry X-Quota-Warning;
