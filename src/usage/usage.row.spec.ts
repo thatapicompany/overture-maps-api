@@ -109,4 +109,15 @@ describe('buildUsageRow', () => {
     );
     expect(row.user_agent).toHaveLength(512);
   });
+
+  it('keeps a query-string api key out of query_params but still hashes it', () => {
+    const row = buildUsageRow(
+      mockReq({ query: { lat: '40.7', api_key: 'super-secret-key' } }),
+      mockRes(),
+      store([]),
+    );
+    expect(JSON.parse(row.query_params)).toEqual({ lat: '40.7' });
+    expect(row.api_key_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(row)).not.toContain('super-secret-key');
+  });
 });

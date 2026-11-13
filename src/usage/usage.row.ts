@@ -30,6 +30,14 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
+// Clients can pass their key as a query parameter, so drop those names before
+// storing the query string. Only the hash belongs in the usage table.
+function redactedQuery(req: Request): string {
+  const query = { ...(req.query ?? {}) } as Record<string, unknown>;
+  for (const name of API_KEY_NAMES) delete query[name];
+  return JSON.stringify(query);
+}
+
 function hashApiKey(key?: string): string | null {
   if (!key) return null;
   return createHash('sha256').update(key).digest('hex');
@@ -108,7 +116,7 @@ export function buildUsageRow(req: Request, res: Response, store: UsageStore): U
     method: req.method,
     route: (req as any).route?.path ?? null,
     path,
-    query_params: JSON.stringify(req.query ?? {}),
+    query_params: redactedQuery(req),
     status_code: res.statusCode,
     // No BigQuery jobs on a successful data route means the response was cached.
     cache_hit: jobs.length === 0 && res.statusCode < 400 && isDataRoute,
