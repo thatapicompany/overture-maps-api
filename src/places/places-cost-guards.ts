@@ -63,3 +63,30 @@ export async function checkCountryLevelAllowed(query: CountryLevelQuery, user: U
     logger.warn(`Country-level query allowed for account ${user.accountId}: plan unknown (fail open).`);
   }
 }
+
+export const COUNTRY_LEVEL_NEEDS_FILTER_MESSAGE =
+  'A country-level query must include a narrowing filter (categories, taxonomy, brand_name, brand_wikidata, name or name_prefix), or be queried by lat/lng/radius. Unfiltered whole-country requests are not supported.';
+
+export interface CountryLevelFilters extends CountryLevelQuery {
+  categories?: string[];
+  taxonomy?: string[];
+  brand_name?: string;
+  brand_wikidata?: string;
+  name?: string;
+  name_prefix?: string;
+}
+
+/**
+ * Throws 400 when a country-level query has no narrowing filter, on any plan,
+ * and records `country_level_needs_filter` on the usage row so these show up
+ * in usage.api_requests like the paid-only 403s do.
+ */
+export function checkCountryLevelFiltered(query: CountryLevelFilters): void {
+  if (!isCountryLevel(query)) return;
+  const filtered =
+    !!query.categories?.length || !!query.taxonomy?.length ||
+    !!query.brand_name || !!query.brand_wikidata || !!query.name || !!query.name_prefix;
+  if (filtered) return;
+  recordUsageError('country_level_needs_filter');
+  throw new HttpException(COUNTRY_LEVEL_NEEDS_FILTER_MESSAGE, HttpStatus.BAD_REQUEST);
+}

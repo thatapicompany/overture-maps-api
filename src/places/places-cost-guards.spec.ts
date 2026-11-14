@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { checkCountryLevelAllowed, isCountryLevel, COUNTRY_LEVEL_PAID_ONLY_MESSAGE, PlanSource } from './places-cost-guards';
+import { checkCountryLevelAllowed, checkCountryLevelFiltered, isCountryLevel, COUNTRY_LEVEL_PAID_ONLY_MESSAGE, COUNTRY_LEVEL_NEEDS_FILTER_MESSAGE, PlanSource } from './places-cost-guards';
 import { PlanStatus } from '../tiers/plan-lookup.service';
 import { usageStorage, UsageStore } from '../usage/usage.context';
 
@@ -68,5 +68,48 @@ describe('places cost guards: usage row', () => {
       await expect(checkCountryLevelAllowed({ country: 'FR' } as any, { accountId: 'acct-free-9' } as any, plans)).rejects.toBeInstanceOf(HttpException);
     });
     expect(store.error).toBe('country_level_paid_only');
+  });
+});
+
+describe('places cost guards: country-level needs a narrowing filter', () => {
+  it('rejects a bare country query with a 400 that lists every accepted filter', () => {
+    try {
+      checkCountryLevelFiltered({ country: 'AE' });
+      fail('expected a 400');
+    } catch (e) {
+      expect(e).toBeInstanceOf(HttpException);
+      expect((e as HttpException).getStatus()).toBe(400);
+      for (const f of ['categories', 'taxonomy', 'brand_name', 'brand_wikidata', 'name', 'name_prefix']) {
+        expect(COUNTRY_LEVEL_NEEDS_FILTER_MESSAGE).toContain(f);
+      }
+    }
+  });
+
+  it.each([
+    ['categories', { categories: ['restaurant'] }],
+    ['taxonomy', { taxonomy: ['restaurant'] }],
+    ['brand_name', { brand_name: 'Starbucks' }],
+    ['brand_wikidata', { brand_wikidata: 'Q37158' }],
+    ['name', { name: 'Dubai Mall' }],
+    ['name_prefix', { name_prefix: 'Dub' }],
+  ])('allows a country query filtered by %s', (_label, filters) => {
+    expect(() => checkCountryLevelFiltered({ country: 'AE', ...filters })).not.toThrow();
+  });
+
+  it('ignores lat/lng queries, with or without a country', () => {
+    expect(() => checkCountryLevelFiltered({ lat: 25.2, lng: 55.27 })).not.toThrow();
+    expect(() => checkCountryLevelFiltered({ country: 'AE', lat: 25.2, lng: 55.27 })).not.toThrow();
+  });
+
+  it('treats empty filter arrays as no filter', () => {
+    expect(() => checkCountryLevelFiltered({ country: 'AE', categories: [], taxonomy: [] })).toThrow(HttpException);
+  });
+
+  it('records country_level_needs_filter on the usage row', () => {
+    const store: UsageStore = { requestId: 'req-3', startTime: Date.now(), jobs: [] };
+    usageStorage.run(store, () => {
+      expect(() => checkCountryLevelFiltered({ country: 'AE' })).toThrow(HttpException);
+    });
+    expect(store.error).toBe('country_level_needs_filter');
   });
 });
