@@ -315,7 +315,7 @@
             }
           },
           {
-            "description": "ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided.",
+            "description": "ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided. A country-level query (country without lat/lng) needs a paid plan and at least one narrowing filter: categories, taxonomy, brand_name, brand_wikidata, name or name_prefix.",
             "required": false,
             "name": "country",
             "in": "query",
@@ -629,7 +629,7 @@
             }
           },
           {
-            "description": "ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided.",
+            "description": "ISO 3166 country code consisting of 2 characters. Required if lat/lng are not provided. A country-level query (country without lat/lng) needs a paid plan and at least one narrowing filter: categories, taxonomy, brand_name, brand_wikidata, name or name_prefix.",
             "required": false,
             "name": "country",
             "in": "query",

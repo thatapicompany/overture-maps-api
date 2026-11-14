@@ -15,7 +15,7 @@ import { CountryResponseDto, toCountryResponseDto } from './dto/responses/countr
 import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/category-response.dto';
 import { AuthedUser, User } from '../decorators/authed-user.decorator';
 import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
-import { checkCountryLevelAllowed, hasLatLng as hasLatLngQuery } from './places-cost-guards';
+import { checkCountryLevelAllowed, checkCountryLevelFiltered, hasLatLng as hasLatLngQuery } from './places-cost-guards';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { PlacesService } from './places.service';
 import { findNearestPolygon, isPointInPolygon, isPointInPolygonWithoutTurf, wrapAsGeoJSON } from '../utils/geojson';
@@ -84,16 +84,7 @@ export class PlacesController {
     // mirror a whole-country slice is the most expensive shape the API serves,
     // and it is how one key walks a country out of the API a page at a time.
     await checkCountryLevelAllowed(query, user, this.planLookup);
-    if (
-      query.country && !hasLatLng &&
-      !query.categories?.length && !query.taxonomy?.length &&
-      !query.brand_name && !query.brand_wikidata && !query.name && !query.name_prefix
-    ) {
-      throw new HttpException(
-        'A country-level query must include a narrowing filter (categories, taxonomy, brand_name, brand_wikidata, name or name_prefix), or be queried by lat/lng/radius. Unfiltered whole-country requests are not supported.',
-        400,
-      );
-    }
+    checkCountryLevelFiltered(query);
 
       // If no cache, query BigQuery with wikidata and country support
     const { results, totalCount } = await this.placesService.getPlaces(query);
