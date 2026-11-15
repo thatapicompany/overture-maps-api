@@ -3,7 +3,7 @@ name: Live Endpoints E2E Tests
 on:
   workflow_dispatch: # Allows manual trigger from GitHub UI
   schedule:
-    - cron: '0 0 * * *' # Example: run daily at midnight (optional)
+    - cron: '0 0 * * *' # daily at 00:00 UTC
   # Uncomment the following to run on push to main
   # push:
   #   branches: [ "main" ]
@@ -25,15 +25,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-
-      - name: Set up Environment Variables
+      # The suite calls the deployed API over HTTPS with an API key and needs
+      # nothing else. Without the key Jest skips every test and reports
+      # success, so a missing secret is made a failure here.
+      - name: Check the test key is configured
+        env:
+          TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
         run: |
-          echo "TEST_API_KEY=${{ secrets.TEST_API_KEY }}" >> .env.test
-          echo "BIGQUERY_PROJECT_ID=${{ secrets.BIGQUERY_PROJECT_ID }}" >> .env.test
+          if [ -z "$TEST_API_KEY" ]; then
+            echo "::error::The TEST_API_KEY repository secret is not set, so there is nothing to test with."
+            exit 1
+          fi
 
       - name: Run Live E2E Tests
+        env:
+          TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
         run: npm run test:live
