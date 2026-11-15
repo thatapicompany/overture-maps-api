@@ -152,7 +152,7 @@ export class GetPlacesDto extends GetByLocationDto {
   has_contact?: string[];
 
   @ApiPropertyOptional({
-    description: 'Response format, defaulting to JSON. Options are "json", "csv", or "geojson".',
+    description: 'Response format, defaulting to JSON. Options are "json", "geojson" (a FeatureCollection) or "csv" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).',
     example: 'json',
     default: 'json',
     enum: ['json', 'csv', 'geojson'],
