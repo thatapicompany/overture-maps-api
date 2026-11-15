@@ -3,12 +3,14 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Response, Request } from 'express';
 import { wrapAsGeoJSON } from '../utils/geojson';
+import { toCsv } from '../utils/csv';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 
 /**
  * Result envelope services/controllers return for paginated endpoints. The
  * interceptor unwraps it, so the response body clients receive stays exactly
- * what it always was (an array, or a GeoJSON FeatureCollection) — pagination
+ * what it always was (an array, a GeoJSON FeatureCollection, or CSV text for
+ * format=csv) — pagination
  * metadata travels in headers only:
  *
  *   Pagination-Count — total results matching the query (across all pages)
@@ -46,6 +48,11 @@ export class PaginationInterceptor implements NestInterceptor {
           if (limit !== undefined) response.set('Pagination-Limit', String(limit));
           response.set('X-Total-Count', String(results.length));
 
+          if (request.query.format === Format.CSV) {
+            // Same rows and headers as the JSON response, as a spreadsheet.
+            response.set('Content-Type', 'text/csv; charset=utf-8');
+            return toCsv(results);
+          }
           return request.query.format === Format.GEOJSON ? wrapAsGeoJSON(results) : results;
         }
 

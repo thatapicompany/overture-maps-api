@@ -83,7 +83,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -285,7 +285,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -599,7 +599,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -912,7 +912,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -1232,7 +1232,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -1439,7 +1439,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -1644,7 +1644,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -1849,7 +1849,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -2054,7 +2054,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
