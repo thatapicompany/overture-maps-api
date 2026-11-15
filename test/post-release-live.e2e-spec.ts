@@ -25,6 +25,16 @@ describeLive('Live Production Endpoints (e2e)', () => {
         expect(apiKey).toBeDefined();
     });
 
+    it('/places (GET) live, as CSV', async () => {
+        const response = await request(baseUrl)
+            .get(`/places?${queryParams}&format=csv`)
+            .set('x-api-key', apiKey);
+
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toContain('text/csv');
+        expect(response.text.replace(/^\uFEFF/, '').split('\r\n')[0]).toMatch(/^id,/);
+    });
+
     it('/addresses (GET) live', async () => {
         const response = await request(baseUrl)
             .get(`/addresses?${queryParams}`)
