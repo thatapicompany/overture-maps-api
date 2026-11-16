@@ -2,7 +2,7 @@
 // their own pages.
 
 // Sign up and sign in.
-export const ACCOUNT_URL = process.env.ACCOUNT_URL || 'https://account.overturemapsapi.com';
+export const ACCOUNT_URL = process.env.ACCOUNT_URL || 'https://app.overturemapsapi.com';
 
 // Plans and prices, for refusals an upgrade would fix (paid-only queries,
 // the monthly request limit).
