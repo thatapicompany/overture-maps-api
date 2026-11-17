@@ -11,6 +11,12 @@ environment variable; nothing is hard-coded to the hosted service.
 - **Country-level `/places` is paid only.** A `country` with no lat/lng returns
   403 `country_level_paid_only` on Free, and 400 for the demo key. These read a
   country-clustered mirror (`overture.place_by_country`).
+- **Taxonomy, categories and brand filters on country-level queries** are
+  narrowed to the mirror's clustered columns (`etl/build-places-filter-tables.sql`,
+  `PLACE_FILTER_INDEX_TABLE`, `PLACE_BRAND_TABLE`). A small index says which
+  basic categories a taxonomy value occurs in, so the query reads those
+  category slices only; brand queries read a brand-clustered table of branded
+  places. Without them these filters read the whole country slice.
 - **Point-only endpoints** (`/buildings`, `/addresses`, `/base`,
   `/transportation`, `/places/buildings`) return 400 for country-only calls.
 - **Caching.** Identical requests are served from cache (`GCS_BUCKET_NAME`).
