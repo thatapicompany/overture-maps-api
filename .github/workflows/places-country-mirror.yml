@@ -36,3 +36,13 @@ jobs:
             --location=US \
             --use_legacy_sql=false \
             < etl/build-places-country-mirror.sql
+
+      # Built from the mirror above, so always rebuilt with it: the filter
+      # index and the brand-clustered table (etl/build-places-filter-tables.sql).
+      - name: Rebuild filter index and brand table
+        run: |
+          bq query \
+            --project_id="${{ secrets.BIGQUERY_PROJECT_ID }}" \
+            --location=US \
+            --use_legacy_sql=false \
+            < etl/build-places-filter-tables.sql
