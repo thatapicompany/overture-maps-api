@@ -16,6 +16,7 @@ import { CategoryResponseDto, toCategoryResponseDto } from './dto/responses/cate
 import { AuthedUser, User } from '../decorators/authed-user.decorator';
 import { ValidateLatLngUser } from '../decorators/validate-lat-lng-user.decorator';
 import { checkCountryLevelAllowed, hasLatLng as hasLatLngQuery } from './places-cost-guards';
+import { chargeCountryBudget, checkCountryBudget } from './country-budget';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { PlacesService } from './places.service';
 import { findNearestPolygon, isPointInPolygon, isPointInPolygonWithoutTurf, wrapAsGeoJSON } from '../utils/geojson';
@@ -95,8 +96,18 @@ export class PlacesController {
       );
     }
 
+    // (4) an account that has spent its hour's budget on country-level
+    // queries waits; what this request bills is added to that hour.
+    checkCountryBudget(query, user);
+
       // If no cache, query BigQuery with wikidata and country support
-    const { results, totalCount } = await this.placesService.getPlaces(query);
+    let found: Awaited<ReturnType<PlacesService['getPlaces']>>;
+    try {
+      found = await this.placesService.getPlaces(query);
+    } finally {
+      chargeCountryBudget(query, user);
+    }
+    const { results, totalCount } = found;
     const dtoResults = results.map((place: any) =>toPlaceDto(place,query));
 
     let finalResults = dtoResults;
