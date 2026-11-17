@@ -25,6 +25,15 @@ environment variable; nothing is hard-coded to the hosted service.
   carry `X-Quota-Warning`; at the limit, 429 `monthly_quota_exceeded` until
   00:00 UTC on the 1st. Only responses below 400 count. Plans resolve through
   the plan lookup (`src/tiers/`); anything uncertain is allowed.
+- **Per hour, for large country-level queries,** per account
+  (`src/places/country-budget.ts`, `COUNTRY_LEVEL_HOURLY_GIB`, default 300,
+  0 to switch off; `COUNTRY_LEVEL_HOURLY_EXEMPT` for accounts it should not
+  apply to). A country-level query filtered by taxonomy or brand is not pruned
+  by the mirror's clustering and can bill a whole country slice. The bytes each
+  account's country-level queries bill are added up over a rolling hour; past
+  the budget, further country-level queries get 429
+  `country_level_hourly_limit` with `retry_after_seconds`. Radius queries and
+  cached responses never count. Held in memory per instance.
 - **Plan overrides.** An org record can carry `planOverride: { plan, until,
   reason }`, which applies a named plan's limits until `until`.
 

@@ -194,7 +194,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -507,7 +507,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -821,7 +821,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1036,7 +1036,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1141,7 +1141,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1345,7 +1345,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1550,7 +1550,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1755,7 +1755,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1960,7 +1960,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2218,7 +2218,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2315,7 +2315,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_hourly_limit` when an account has run many large country-level queries within an hour (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2426,7 +2426,7 @@
           },
           "error": {
             "type": "string",
-            "description": "Machine-readable reason, e.g. `monthly_quota_exceeded` or `rate_limited` on a 429.",
+            "description": "Machine-readable reason, e.g. `monthly_quota_exceeded`, `rate_limited` or `country_level_hourly_limit` on a 429.",
             "example": "monthly_quota_exceeded"
           }
         },
