@@ -8,6 +8,11 @@ environment variable; nothing is hard-coded to the hosted service.
 - **Clustered mirrors.** Place, building and division queries read copies of the
   Overture tables clustered for the filters the API uses (`etl/build-*-mirror.sql`),
   so a radius or id lookup reads a small slice rather than the whole table.
+- **Building queries name their grid cells.** The building table is too large
+  for geometry clustering alone to narrow a small search. The grid mirror
+  (`etl/build-buildings-grid-mirror.sql`, `BUILDING_GRID_TABLE`) partitions it
+  by a 3 degree cell, and `/buildings` and `/places/buildings` read only the
+  cells their search area touches (`src/bigquery/building-grid.ts`).
 - **Country-level `/places` is paid only.** A `country` with no lat/lng returns
   403 `country_level_paid_only` on Free, and 400 for the demo key. These read a
   country-clustered mirror (`overture.place_by_country`).

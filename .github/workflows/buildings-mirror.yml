@@ -1,12 +1,11 @@
-name: Rebuild Buildings Mirror (clustered)
+name: Rebuild Buildings Mirror (grid-partitioned)
 
-# Rebuilds the geometry-clustered mirror of the Overture building table
-# (etl/build-buildings-mirror.sql) so /places/buildings and /buildings
-# queries prune spatially instead of scanning the raw public table each
-# time. Runs monthly after Overture's release. Idempotent (CREATE OR
-# REPLACE). Point the API at it with
-# BUILDING_TABLE=overture-maps-api.overture.building once the first build
-# succeeds.
+# Rebuilds the grid-partitioned mirror of the Overture building table
+# (etl/build-buildings-grid-mirror.sql) so /buildings and /places/buildings
+# read only the grid cells a search touches instead of a gigabyte or more of
+# the table. Runs monthly after Overture's release. The finished table
+# replaces the live one in one step. Point the API at it with
+# BUILDING_GRID_TABLE=overture-maps-api.overture.building_by_cell.
 #
 # The service account in GOOGLE_APPLICATION_CREDENTIALS needs BigQuery
 # dataset create + table write in overture-maps-api and read on
@@ -32,10 +31,15 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Rebuild clustered building mirror
+      # The grid-partitioned mirror (etl/build-buildings-grid-mirror.sql) is
+      # what the API reads when BUILDING_GRID_TABLE is set. It is built
+      # straight from the public table, so the geometry-only mirror
+      # (etl/build-buildings-mirror.sql) is no longer rebuilt here; run that
+      # file by hand if you use BUILDING_TABLE without the grid.
+      - name: Rebuild grid-partitioned building mirror
         run: |
           bq query \
             --project_id="${{ secrets.BIGQUERY_PROJECT_ID }}" \
             --location=US \
             --use_legacy_sql=false \
-            < etl/build-buildings-mirror.sql
+            < etl/build-buildings-grid-mirror.sql

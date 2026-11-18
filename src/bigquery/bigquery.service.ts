@@ -15,6 +15,7 @@ import { parseTransportationRow } from './row-parsers/bq-transportation-row.pars
 import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
 import { currentRequestId, recordBqJob, recordUsageError } from '../usage/usage.context';
+import { buildingCellsForCircle } from './building-grid';
 
 // Optional per-job cap on bytes billed (BQ_MAX_BYTES_BILLED, in bytes). OFF
 // unless set. BigQuery checks maximumBytesBilled against its upfront estimate,
@@ -138,6 +139,17 @@ const divisionAreaTable = (): string => process.env.DIVISION_AREA_TABLE || PUBLI
 // was fixed (see etl/build-buildings-mirror.sql). Set to an in-project mirror
 // clustered by geometry once built.
 const BUILDING_TABLE = process.env.BUILDING_TABLE || `${SOURCE_DATASET}.building`;
+
+// The same building data partitioned by a coarse grid cell
+// (etl/build-buildings-grid-mirror.sql, src/bigquery/building-grid.ts). When
+// set, radius queries read it and name the cells their search area touches,
+// which is several times cheaper than the geometry-clustered mirror alone in
+// a table this large. Optional: unset, BUILDING_TABLE is read as before. Read
+// per call so tests and runtime config changes take effect without a reload.
+const buildingGridTable = (): string | undefined => process.env.BUILDING_GRID_TABLE || undefined;
+// A building that contains a place can reach beyond the search circle. This
+// much is added to the radius when choosing cells for that join.
+const CONTAINING_BUILDING_MARGIN_METRES = 5000;
 
 // How long to trust a cached place-table column list. Overture releases monthly
 // and Google re-mirrors shortly after, so a few hours is plenty to pick up the
@@ -473,6 +485,7 @@ export class BigQueryService {
 
     // Determine if we match nearest building or only containing buildings
     if (match_nearest_building) {
+      const nearest = this.buildingSource(latitude, longitude, radius, params);
       queryParts.push(`
       -- Step 2: Select buildings within the search area and calculate the distance
       WITH nearby_buildings AS (
@@ -481,9 +494,9 @@ export class BigQueryService {
           geometry AS building_geometry,
           ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS building_distance
         FROM
-          \`${BUILDING_TABLE}\`
+          \`${nearest.table}\`
         WHERE
-          ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
+          ${nearest.cellSql}ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
           AND ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)
       ),
     
@@ -518,6 +531,7 @@ export class BigQueryService {
         distance_rank = 1
       `);
     } else {
+      const containing = this.buildingSource(latitude, longitude, radius + CONTAINING_BUILDING_MARGIN_METRES, params, 'b.cell');
       queryParts.push(`
       -- Step 2: Select places and buildings within the search area where the building contains the place geometry
       SELECT
@@ -529,11 +543,11 @@ export class BigQueryService {
       FROM
         \`${placeTable()}\` AS p
       JOIN
-        \`${BUILDING_TABLE}\` AS b
+        \`${containing.table}\` AS b
       ON
         ST_WITHIN(p.geometry, b.geometry)
       WHERE
-        ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
+        ${containing.cellSql}ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
         `
         + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
         `
@@ -756,6 +770,7 @@ export class BigQueryService {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
+    const source = this.buildingSource(latitude, longitude, radius, params);
 
     queryParts.push(
       `-- Overture Maps API: Get Buildings Nearby
@@ -766,8 +781,8 @@ SELECT
   *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
-  \`${BUILDING_TABLE}\` AS s
-WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+  \`${source.table}\` AS s
+WHERE ${source.cellSql}ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
@@ -1202,6 +1217,22 @@ LIMIT 1;`;
   }
   // Country predicate against the raw Overture schema (first address's country).
   private static readonly COUNTRY_FROM_ADDRESSES_SQL = `addresses.list[OFFSET(0)].element.country = @country`;
+
+  /**
+   * Which building table a radius query reads, and the predicate that names
+   * its grid cells. With no grid table the plain mirror is read. A search
+   * area too wide for a cell list reads the grid table with no cell
+   * predicate, which is still correct, so the grid table can stand alone.
+   * `params` gains `building_cells` when the predicate is used.
+   */
+  private buildingSource(latitude: number, longitude: number, radius: number, params: any, column = 'cell'): { table: string; cellSql: string } {
+    const grid = buildingGridTable();
+    if (!grid) return { table: BUILDING_TABLE, cellSql: '' };
+    const cells = buildingCellsForCircle(latitude, longitude, radius);
+    if (!cells) return { table: grid, cellSql: '' };
+    params.building_cells = cells;
+    return { table: grid, cellSql: `${column} IN UNNEST(@building_cells) AND ` };
+  }
 
   private filterIndexCache = new Map<string, { narrow: (string | null)[]; at: number }>();
 

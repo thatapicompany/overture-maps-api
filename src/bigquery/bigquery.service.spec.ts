@@ -253,6 +253,62 @@ describe('BigQueryService', () => {
     }
   }
 
+  describe('building queries name their grid cells (BUILDING_GRID_TABLE)', () => {
+    const prev = process.env.BUILDING_GRID_TABLE;
+    afterEach(() => {
+      if (prev === undefined) delete process.env.BUILDING_GRID_TABLE; else process.env.BUILDING_GRID_TABLE = prev;
+    });
+    const stub = () => {
+      const service = new BigQueryService();
+      service.getPlaceColumns = jest.fn().mockResolvedValue(new Set([]));
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [], statistics: {} });
+      return service;
+    };
+    const call = (service: BigQueryService) => (service.runQuery as jest.Mock).mock.calls[0] as [string, any];
+
+    it('reads the grid table and the cells the circle touches', async () => {
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const service = stub();
+      await service.getBuildingsNearby(40.7484, -73.9857, 200, 10);
+      const [sql, params] = call(service);
+      expect(sql).toContain('`proj.overture.building_by_cell` AS s');
+      expect(sql).toContain('WHERE cell IN UNNEST(@building_cells) AND ST_WITHIN(s.geometry');
+      expect(params.building_cells).toEqual([43 * 120 + 35]);
+    });
+
+    it('does the same for the nearest-building join, and reaches further for buildings that contain a place', async () => {
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const nearest = stub();
+      await nearest.getPlacesWithNearestBuilding(40.5, -74.999, 50, undefined, undefined, undefined, undefined, undefined, 10, true);
+      const [nearestSql, nearestParams] = call(nearest);
+      expect(nearestSql).toContain('`proj.overture.building_by_cell`');
+      expect(nearestSql).toContain('cell IN UNNEST(@building_cells) AND ST_WITHIN(geometry');
+      expect(nearestParams.building_cells).toEqual([43 * 120 + 34, 43 * 120 + 35]);
+
+      const containing = stub();
+      // 4 km from the cell edge: outside a 50 m circle, inside the wider reach.
+      await containing.getPlacesWithNearestBuilding(40.5, -74.953, 50, undefined, undefined, undefined, undefined, undefined, 10, false);
+      const [containingSql, containingParams] = call(containing);
+      expect(containingSql).toContain('`proj.overture.building_by_cell` AS b');
+      expect(containingSql).toContain('b.cell IN UNNEST(@building_cells) AND ST_WITHIN(p.geometry');
+      expect(containingParams.building_cells).toEqual([43 * 120 + 34, 43 * 120 + 35]);
+    });
+
+    it('reads the plain mirror when the grid table is not set, and the grid table without a cell list when the area is too wide', async () => {
+      delete process.env.BUILDING_GRID_TABLE;
+      const plain = stub();
+      await plain.getBuildingsNearby(40.7484, -73.9857, 200, 10);
+      expect(call(plain)[0]).not.toContain('building_cells');
+      expect(call(plain)[1].building_cells).toBeUndefined();
+
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const wide = stub();
+      await wide.getBuildingsNearby(89.9, 10, 20000, 10);
+      expect(call(wide)[0]).not.toContain('building_cells');
+      expect(call(wide)[0]).toContain('`proj.overture.building_by_cell` AS s');
+    });
+  });
+
   describe('getDivisionById reads the id-clustered mirror (DIVISION_AREA_TABLE)', () => {
     // Public division_area is clustered by geometry, so a by-id lookup scanned
     // ~9 GiB. The mirror is clustered by id. Behaviour must be identical for
