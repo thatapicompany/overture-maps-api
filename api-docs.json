@@ -83,7 +83,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -194,7 +194,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -285,7 +285,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -507,7 +507,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -599,7 +599,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -821,7 +821,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -912,7 +912,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -1036,7 +1036,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1141,7 +1141,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1232,7 +1232,7 @@
             }
           },
           {
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "required": false,
             "name": "format",
             "in": "query",
@@ -1345,7 +1345,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1439,7 +1439,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -1550,7 +1550,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1644,7 +1644,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -1755,7 +1755,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -1849,7 +1849,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -1960,7 +1960,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2054,7 +2054,7 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "Response format, defaulting to JSON. Options are \"json\", \"csv\", or \"geojson\".",
+            "description": "Response format, defaulting to JSON. Options are \"json\", \"geojson\" (a FeatureCollection) or \"csv\" (text/csv, one row per result: id, name, category, latitude, longitude, address fields, website, phone and brand where present, then every other property; shapes other than points in a final geometry column as GeoJSON).",
             "schema": {
               "default": "json",
               "example": "json",
@@ -2218,7 +2218,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2315,7 +2315,7 @@
             }
           },
           "429": {
-            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan's monthly limit. Wait for `Retry-After` seconds before retrying; do not retry immediately.",
+            "description": "Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan's monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). Wait for `Retry-After` seconds before retrying; do not retry immediately.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
@@ -2347,7 +2347,7 @@
   },
   "info": {
     "title": "Overture Maps API",
-    "description": "REST API for [Overture Maps Foundation](https://overturemaps.org) open data: places (POIs), buildings, addresses, administrative divisions, base and transportation features. No BigQuery, Athena or GeoParquet needed.\n\n## Authentication\nSend your key in the `x-api-key` header. Get a free key at https://account.overturemapsapi.com. The public key `DEMO-API-KEY` works for small lat/lng searches near a few demo cities.\n\n## Choosing a query\n- Search by `lat` + `lng` + `radius` (metres, up to 25,000) wherever you can. It is the fastest and cheapest query on every plan.\n- Country-level place searches (`country` with no `lat`/`lng`) need a paid plan and a narrowing filter such as `categories`, `brand_name` or `name`.\n- Use `GET /places/categories` to find valid category values before filtering `/places` by `categories`.\n- Results are paginated with `limit` and `page` (0-indexed). The `Pagination-Count` response header holds the total number of matches.\n- `format=geojson` returns a GeoJSON FeatureCollection; the default `json` returns an array.\n\n## Limits and errors\nEach plan has a monthly request limit (see https://www.overturemapsapi.com/pricing). Responses carry `X-Quota-Limit`, `X-Quota-Used`, `X-Quota-Remaining` and `X-Quota-Reset` headers. Errors return `{ statusCode, message, error? }`; the `message` explains how to fix the request. On `429`, wait for the `Retry-After` header before retrying.\n\n## More\nDocs and guides: https://www.overturemapsapi.com/docs/intro · LLM-friendly index: https://www.overturemapsapi.com/llms.txt · MCP server for Claude, ChatGPT and other AI tools: https://www.npmjs.com/package/@thatapicompany/overture-maps-mcp",
+    "description": "REST API for [Overture Maps Foundation](https://overturemaps.org) open data: places (POIs), buildings, addresses, administrative divisions, base and transportation features. No BigQuery, Athena or GeoParquet needed.\n\n## Authentication\nSend your key in the `x-api-key` header. Get a free key at https://app.overturemapsapi.com. The public key `DEMO-API-KEY` works for small lat/lng searches near a few demo cities.\n\n## Choosing a query\n- Search by `lat` + `lng` + `radius` (metres, up to 25,000) wherever you can. It is the fastest and cheapest query on every plan.\n- Country-level place searches (`country` with no `lat`/`lng`) need a paid plan and a narrowing filter such as `categories`, `brand_name` or `name`.\n- Use `GET /places/categories` to find valid category values before filtering `/places` by `categories`.\n- Results are paginated with `limit` and `page` (0-indexed). The `Pagination-Count` response header holds the total number of matches.\n- `format=geojson` returns a GeoJSON FeatureCollection; the default `json` returns an array.\n\n## Limits and errors\nEach plan has a monthly request limit (see https://www.overturemapsapi.com/pricing). Responses carry `X-Quota-Limit`, `X-Quota-Used`, `X-Quota-Remaining` and `X-Quota-Reset` headers. Errors return `{ statusCode, message, error? }`; the `message` explains how to fix the request. On `429`, wait for the `Retry-After` header before retrying.\n\n## More\nDocs and guides: https://www.overturemapsapi.com/docs/intro · LLM-friendly index: https://www.overturemapsapi.com/llms.txt · MCP server for Claude, ChatGPT and other AI tools: https://www.npmjs.com/package/@thatapicompany/overture-maps-mcp",
     "version": "1.0",
     "contact": {
       "name": "ThatAPICompany",
@@ -2397,7 +2397,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "x-api-key",
-        "description": "Your API key from https://account.overturemapsapi.com. Use DEMO-API-KEY to try small lat/lng searches."
+        "description": "Your API key from https://app.overturemapsapi.com. Use DEMO-API-KEY to try small lat/lng searches."
       }
     },
     "schemas": {
@@ -2426,7 +2426,7 @@
           },
           "error": {
             "type": "string",
-            "description": "Machine-readable reason, e.g. `monthly_quota_exceeded` or `rate_limited` on a 429.",
+            "description": "Machine-readable reason, e.g. `monthly_quota_exceeded`, `rate_limited` or `country_level_daily_limit` on a 429.",
             "example": "monthly_quota_exceeded"
           }
         },

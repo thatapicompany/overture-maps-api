@@ -8,9 +8,20 @@ environment variable; nothing is hard-coded to the hosted service.
 - **Clustered mirrors.** Place, building and division queries read copies of the
   Overture tables clustered for the filters the API uses (`etl/build-*-mirror.sql`),
   so a radius or id lookup reads a small slice rather than the whole table.
+- **Building queries name their grid cells.** The building table is too large
+  for geometry clustering alone to narrow a small search. The grid mirror
+  (`etl/build-buildings-grid-mirror.sql`, `BUILDING_GRID_TABLE`) partitions it
+  by a 3 degree cell, and `/buildings` and `/places/buildings` read only the
+  cells their search area touches (`src/bigquery/building-grid.ts`).
 - **Country-level `/places` is paid only.** A `country` with no lat/lng returns
   403 `country_level_paid_only` on Free, and 400 for the demo key. These read a
   country-clustered mirror (`overture.place_by_country`).
+- **Taxonomy, categories and brand filters on country-level queries** are
+  narrowed to the mirror's clustered columns (`etl/build-places-filter-tables.sql`,
+  `PLACE_FILTER_INDEX_TABLE`, `PLACE_BRAND_TABLE`). A small index says which
+  basic categories a taxonomy value occurs in, so the query reads those
+  category slices only; brand queries read a brand-clustered table of branded
+  places. Without them these filters read the whole country slice.
 - **Point-only endpoints** (`/buildings`, `/addresses`, `/base`,
   `/transportation`, `/places/buildings`) return 400 for country-only calls.
 - **Caching.** Identical requests are served from cache (`GCS_BUCKET_NAME`).
@@ -25,6 +36,16 @@ environment variable; nothing is hard-coded to the hosted service.
   carry `X-Quota-Warning`; at the limit, 429 `monthly_quota_exceeded` until
   00:00 UTC on the 1st. Only responses below 400 count. Plans resolve through
   the plan lookup (`src/tiers/`); anything uncertain is allowed.
+- **Per day, for large country-level queries,** per account
+  (`src/places/country-budget.ts`, `COUNTRY_LEVEL_DAILY_GIB`, default 3072,
+  0 to switch off; `COUNTRY_LEVEL_BUDGET_EXEMPT` for accounts it should not
+  apply to). The bytes each account's country-level queries bill are added up
+  over a rolling 24 hours; past the budget, further country-level queries get
+  429 `country_level_daily_limit` with `retry_after_seconds`. Set it well
+  below the project's daily BigQuery quota, so no one account can use the
+  quota up, and well above what a real job needs, so a burst is never slowed.
+  Radius queries and cached responses never count. Held in memory per
+  instance.
 - **Plan overrides.** An org record can carry `planOverride: { plan, until,
   reason }`, which applies a named plan's limits until `until`.
 

@@ -24,7 +24,7 @@ export class ErrorResponseDto {
   message: string | string[];
 
   @ApiPropertyOptional({
-    description: 'Machine-readable reason, e.g. `monthly_quota_exceeded` or `rate_limited` on a 429.',
+    description: 'Machine-readable reason, e.g. `monthly_quota_exceeded`, `rate_limited` or `country_level_daily_limit` on a 429.',
     example: 'monthly_quota_exceeded',
   })
   error?: string;
@@ -65,7 +65,7 @@ export function ApiStandardErrors() {
     }),
     ApiTooManyRequestsResponse({
       description:
-        'Rate limited. `error` is `rate_limited` for the per-minute limit or `monthly_quota_exceeded` for the plan\'s monthly limit. ' +
+        'Rate limited. `error` is `rate_limited` for the per-minute limit, `monthly_quota_exceeded` for the plan\'s monthly limit, or `country_level_daily_limit` when an account has run an exceptional volume of large country-level queries within a day (queries by lat, lng and radius are not affected). ' +
         'Wait for `Retry-After` seconds before retrying; do not retry immediately.',
       type: ErrorResponseDto,
       headers: {

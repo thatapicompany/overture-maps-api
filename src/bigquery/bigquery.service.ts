@@ -15,6 +15,7 @@ import { parseTransportationRow } from './row-parsers/bq-transportation-row.pars
 import { DivisionArea } from '../divisions/interfaces/division.interface';
 import { parseDivisionRow } from './row-parsers/bq-division-row.parser';
 import { currentRequestId, recordBqJob, recordUsageError } from '../usage/usage.context';
+import { buildingCellsForCircle } from './building-grid';
 
 // Optional per-job cap on bytes billed (BQ_MAX_BYTES_BILLED, in bytes). OFF
 // unless set. BigQuery checks maximumBytesBilled against its upfront estimate,
@@ -97,6 +98,31 @@ const placeTable = (): string => process.env.PLACE_TABLE || `${SOURCE_DATASET}.p
 // call so tests and runtime config changes take effect without a reload.
 const placeCountryTable = (): string | undefined => process.env.PLACE_COUNTRY_TABLE || undefined;
 
+// Two small helpers for country-level queries (etl/build-places-filter-tables.sql).
+// The country mirror is clustered by country, basic_category and name, so a
+// filter on anything else (taxonomy, brand) reads the whole country slice, and
+// in the largest countries that is over 10 GiB a request.
+//
+// PLACE_FILTER_INDEX_TABLE says, per country, which basic categories a
+// taxonomy value occurs in and which brand names a Wikidata id goes by. With
+// it a taxonomy or categories filter is narrowed to those basic categories,
+// which the mirror's clustering can prune.
+//
+// PLACE_BRAND_TABLE holds only the places that have a brand, clustered by
+// country and brand name, so a brand query reads that brand's rows.
+//
+// Both optional: unset, queries run exactly as before.
+const placeFilterIndexTable = (): string | undefined => process.env.PLACE_FILTER_INDEX_TABLE || undefined;
+const placeBrandTable = (): string | undefined => process.env.PLACE_BRAND_TABLE || undefined;
+const FILTER_INDEX_TTL_MS = 6 * 60 * 60 * 1000;
+const FILTER_INDEX_MAX_ENTRIES = 20000;
+
+/** A set of values a clustered column may take; `includeNull` when rows with no value also qualify. */
+export interface Narrowing {
+  values: string[];
+  includeNull: boolean;
+}
+
 // The public division_area table is clustered by geometry, so a lookup by `id`
 // (GET /divisions/:id) scanned all ~9.7GB of it: ~9 GiB billed per call,
 // 1.6 TiB in the 30 days to 11 Oct 2026. DIVISION_AREA_TABLE points at an
@@ -113,6 +139,17 @@ const divisionAreaTable = (): string => process.env.DIVISION_AREA_TABLE || PUBLI
 // was fixed (see etl/build-buildings-mirror.sql). Set to an in-project mirror
 // clustered by geometry once built.
 const BUILDING_TABLE = process.env.BUILDING_TABLE || `${SOURCE_DATASET}.building`;
+
+// The same building data partitioned by a coarse grid cell
+// (etl/build-buildings-grid-mirror.sql, src/bigquery/building-grid.ts). When
+// set, radius queries read it and name the cells their search area touches,
+// which is several times cheaper than the geometry-clustered mirror alone in
+// a table this large. Optional: unset, BUILDING_TABLE is read as before. Read
+// per call so tests and runtime config changes take effect without a reload.
+const buildingGridTable = (): string | undefined => process.env.BUILDING_GRID_TABLE || undefined;
+// A building that contains a place can reach beyond the search circle. This
+// much is added to the radius when choosing cells for that join.
+const CONTAINING_BUILDING_MARGIN_METRES = 5000;
 
 // How long to trust a cached place-table column list. Overture releases monthly
 // and Google re-mirrors shortly after, so a few hours is plenty to pick up the
@@ -448,6 +485,7 @@ export class BigQueryService {
 
     // Determine if we match nearest building or only containing buildings
     if (match_nearest_building) {
+      const nearest = this.buildingSource(latitude, longitude, radius, params);
       queryParts.push(`
       -- Step 2: Select buildings within the search area and calculate the distance
       WITH nearby_buildings AS (
@@ -456,9 +494,9 @@ export class BigQueryService {
           geometry AS building_geometry,
           ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS building_distance
         FROM
-          \`${BUILDING_TABLE}\`
+          \`${nearest.table}\`
         WHERE
-          ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
+          ${nearest.cellSql}ST_WITHIN(geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
           AND ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)
       ),
     
@@ -493,6 +531,7 @@ export class BigQueryService {
         distance_rank = 1
       `);
     } else {
+      const containing = this.buildingSource(latitude, longitude, radius + CONTAINING_BUILDING_MARGIN_METRES, params, 'b.cell');
       queryParts.push(`
       -- Step 2: Select places and buildings within the search area where the building contains the place geometry
       SELECT
@@ -504,11 +543,11 @@ export class BigQueryService {
       FROM
         \`${placeTable()}\` AS p
       JOIN
-        \`${BUILDING_TABLE}\` AS b
+        \`${containing.table}\` AS b
       ON
         ST_WITHIN(p.geometry, b.geometry)
       WHERE
-        ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
+        ${containing.cellSql}ST_WITHIN(p.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius))
         `
         + (whereClauses.length > 0 ? `AND ${whereClauses.join(' AND ')}` : '') +
         `
@@ -567,6 +606,47 @@ export class BigQueryService {
     // the FROM and the country/name predicates agree on which columns exist.
     const placeSrc = this.placeSource(hasCoords(latitude, longitude));
 
+    // Country-level queries only: work out what the clustered columns can be
+    // narrowed to before building the SQL. See placeFilterIndexTable above.
+    const narrowClauses: string[] = [];
+    if (placeSrc.isCountryMirror && country) {
+      const brandTable = placeBrandTable();
+      if (brandTable && (brand_name || brand_wikidata)) {
+        placeSrc.table = brandTable;
+        if (brand_name) {
+          narrowClauses.push(`brand_name = @brand_name`);
+        } else {
+          const names = await this.lookupFilterIndex(country, 'brand_wikidata', [brand_wikidata!]);
+          if (names) {
+            const narrowing = BigQueryService.narrowing(names.values());
+            if (narrowing.values.length === 0 && !narrowing.includeNull) return { results: [], totalCount: 0 };
+            narrowClauses.push(BigQueryService.narrowingSql('brand_name', 'narrow_brand_names', narrowing));
+            if (narrowing.values.length) params.narrow_brand_names = narrowing.values;
+          }
+        }
+      }
+      if (taxonomy && taxonomy.length > 0) {
+        const basics = await this.lookupFilterIndex(country, 'taxonomy', taxonomy);
+        if (basics) {
+          const narrowing = BigQueryService.narrowing(basics.values());
+          if (narrowing.values.length === 0 && !narrowing.includeNull) return { results: [], totalCount: 0 };
+          narrowClauses.push(BigQueryService.narrowingSql('basic_category', 'narrow_taxonomy_basics', narrowing));
+          if (narrowing.values.length) params.narrow_taxonomy_basics = narrowing.values;
+        }
+      }
+      // The categories filter also matches basic_category itself, and the
+      // legacy categories column while a table still has one; with that
+      // column present the basic category says nothing certain, so no narrowing.
+      if (categories && categories.length > 0 && !hasCategoriesColumn) {
+        const basics = await this.lookupFilterIndex(country, 'taxonomy', categories);
+        if (basics) {
+          const narrowing = BigQueryService.narrowing(basics.values(), categories);
+          narrowClauses.push(BigQueryService.narrowingSql('basic_category', 'narrow_category_basics', narrowing));
+          if (narrowing.values.length) params.narrow_category_basics = narrowing.values;
+        }
+      }
+    }
+
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *, COUNT(*) OVER() AS total_count`);
@@ -613,6 +693,8 @@ export class BigQueryService {
       whereClauses.push(placeSrc.countrySql);
       params.country = country;
     }
+    // Straight after the country predicate: these are on clustered columns.
+    whereClauses.push(...narrowClauses);
 
     if (categories && categories.length > 0) {
       whereClauses.push(this.categoryFilterSql(hasCategoriesColumn));
@@ -688,6 +770,7 @@ export class BigQueryService {
 
     let queryParts: string[] = [];
     const params: any = { latitude, longitude, radius };
+    const source = this.buildingSource(latitude, longitude, radius, params);
 
     queryParts.push(
       `-- Overture Maps API: Get Buildings Nearby
@@ -698,8 +781,8 @@ SELECT
   *, COUNT(*) OVER() AS total_count
  ,ST_Distance(geometry, ST_GeogPoint(@longitude, @latitude)) AS ext_distance
 FROM
-  \`${BUILDING_TABLE}\` AS s
-WHERE ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
+  \`${source.table}\` AS s
+WHERE ${source.cellSql}ST_WITHIN(s.geometry, ST_Buffer(ST_GeogPoint(@longitude, @latitude), @radius)) and ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)`);
 
     // Order by distance if latitude and longitude are provided
     // Always deterministic: the id tiebreaker guarantees stable, disjoint
@@ -1134,6 +1217,80 @@ LIMIT 1;`;
   }
   // Country predicate against the raw Overture schema (first address's country).
   private static readonly COUNTRY_FROM_ADDRESSES_SQL = `addresses.list[OFFSET(0)].element.country = @country`;
+
+  /**
+   * Which building table a radius query reads, and the predicate that names
+   * its grid cells. With no grid table the plain mirror is read. A search
+   * area too wide for a cell list reads the grid table with no cell
+   * predicate, which is still correct, so the grid table can stand alone.
+   * `params` gains `building_cells` when the predicate is used.
+   */
+  private buildingSource(latitude: number, longitude: number, radius: number, params: any, column = 'cell'): { table: string; cellSql: string } {
+    const grid = buildingGridTable();
+    if (!grid) return { table: BUILDING_TABLE, cellSql: '' };
+    const cells = buildingCellsForCircle(latitude, longitude, radius);
+    if (!cells) return { table: grid, cellSql: '' };
+    params.building_cells = cells;
+    return { table: grid, cellSql: `${column} IN UNNEST(@building_cells) AND ` };
+  }
+
+  private filterIndexCache = new Map<string, { narrow: (string | null)[]; at: number }>();
+
+  /**
+   * What the filter index holds for some values in one country: for
+   * `taxonomy`, the basic categories each value occurs in; for
+   * `brand_wikidata`, the brand names it goes by. A value the index does not
+   * have maps to an empty list: no place in that country carries it.
+   * Returns null when there is no index or it cannot be read, and the caller
+   * then runs the query without narrowing.
+   */
+  async lookupFilterIndex(country: string, kind: 'taxonomy' | 'brand_wikidata', values: string[]): Promise<Map<string, (string | null)[]> | null> {
+    const table = placeFilterIndexTable();
+    if (!table || !country || values.length === 0) return null;
+    const now = Date.now();
+    const found = new Map<string, (string | null)[]>();
+    const missing: string[] = [];
+    for (const value of new Set(values)) {
+      const hit = this.filterIndexCache.get(`${country}|${kind}|${value}`);
+      if (hit && now - hit.at < FILTER_INDEX_TTL_MS) found.set(value, hit.narrow);
+      else missing.push(value);
+    }
+    if (missing.length === 0) return found;
+    try {
+      const { rows } = await this.runQuery(
+        `-- Overture Maps API: Get filter index\n` +
+          `SELECT value, narrow FROM \`${table}\` WHERE country = @country AND kind = @kind AND value IN UNNEST(@values) GROUP BY value, narrow;`,
+        { country, kind, values: missing },
+      );
+      for (const value of missing) found.set(value, []);
+      for (const row of rows) found.get(row.value)?.push(row.narrow ?? null);
+      if (this.filterIndexCache.size > FILTER_INDEX_MAX_ENTRIES) this.filterIndexCache.clear();
+      for (const value of missing) this.filterIndexCache.set(`${country}|${kind}|${value}`, { narrow: found.get(value)!, at: now });
+      return found;
+    } catch (error) {
+      this.logger.warn(`Filter index lookup failed, running without narrowing: ${error.message}`);
+      return null;
+    }
+  }
+
+  private static narrowing(lists: Iterable<(string | null)[]>, extra: string[] = []): Narrowing {
+    const values = new Set<string>(extra);
+    let includeNull = false;
+    for (const list of lists) {
+      for (const item of list) {
+        if (item === null) includeNull = true;
+        else values.add(item);
+      }
+    }
+    return { values: [...values], includeNull };
+  }
+
+  /** SQL that keeps rows whose `column` is one of the narrowing's values. */
+  private static narrowingSql(column: string, param: string, narrowing: Narrowing): string {
+    // An empty array parameter has no type BigQuery can infer, so it is never sent.
+    if (narrowing.values.length === 0) return `${column} IS NULL`;
+    return narrowing.includeNull ? `(${column} IN UNNEST(@${param}) OR ${column} IS NULL)` : `${column} IN UNNEST(@${param})`;
+  }
 
   /**
    * Which place table a query should read, with the country and name

@@ -253,6 +253,62 @@ describe('BigQueryService', () => {
     }
   }
 
+  describe('building queries name their grid cells (BUILDING_GRID_TABLE)', () => {
+    const prev = process.env.BUILDING_GRID_TABLE;
+    afterEach(() => {
+      if (prev === undefined) delete process.env.BUILDING_GRID_TABLE; else process.env.BUILDING_GRID_TABLE = prev;
+    });
+    const stub = () => {
+      const service = new BigQueryService();
+      service.getPlaceColumns = jest.fn().mockResolvedValue(new Set([]));
+      service.runQuery = jest.fn().mockResolvedValue({ rows: [], statistics: {} });
+      return service;
+    };
+    const call = (service: BigQueryService) => (service.runQuery as jest.Mock).mock.calls[0] as [string, any];
+
+    it('reads the grid table and the cells the circle touches', async () => {
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const service = stub();
+      await service.getBuildingsNearby(40.7484, -73.9857, 200, 10);
+      const [sql, params] = call(service);
+      expect(sql).toContain('`proj.overture.building_by_cell` AS s');
+      expect(sql).toContain('WHERE cell IN UNNEST(@building_cells) AND ST_WITHIN(s.geometry');
+      expect(params.building_cells).toEqual([43 * 120 + 35]);
+    });
+
+    it('does the same for the nearest-building join, and reaches further for buildings that contain a place', async () => {
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const nearest = stub();
+      await nearest.getPlacesWithNearestBuilding(40.5, -74.999, 50, undefined, undefined, undefined, undefined, undefined, 10, true);
+      const [nearestSql, nearestParams] = call(nearest);
+      expect(nearestSql).toContain('`proj.overture.building_by_cell`');
+      expect(nearestSql).toContain('cell IN UNNEST(@building_cells) AND ST_WITHIN(geometry');
+      expect(nearestParams.building_cells).toEqual([43 * 120 + 34, 43 * 120 + 35]);
+
+      const containing = stub();
+      // 4 km from the cell edge: outside a 50 m circle, inside the wider reach.
+      await containing.getPlacesWithNearestBuilding(40.5, -74.953, 50, undefined, undefined, undefined, undefined, undefined, 10, false);
+      const [containingSql, containingParams] = call(containing);
+      expect(containingSql).toContain('`proj.overture.building_by_cell` AS b');
+      expect(containingSql).toContain('b.cell IN UNNEST(@building_cells) AND ST_WITHIN(p.geometry');
+      expect(containingParams.building_cells).toEqual([43 * 120 + 34, 43 * 120 + 35]);
+    });
+
+    it('reads the plain mirror when the grid table is not set, and the grid table without a cell list when the area is too wide', async () => {
+      delete process.env.BUILDING_GRID_TABLE;
+      const plain = stub();
+      await plain.getBuildingsNearby(40.7484, -73.9857, 200, 10);
+      expect(call(plain)[0]).not.toContain('building_cells');
+      expect(call(plain)[1].building_cells).toBeUndefined();
+
+      process.env.BUILDING_GRID_TABLE = 'proj.overture.building_by_cell';
+      const wide = stub();
+      await wide.getBuildingsNearby(89.9, 10, 20000, 10);
+      expect(call(wide)[0]).not.toContain('building_cells');
+      expect(call(wide)[0]).toContain('`proj.overture.building_by_cell` AS s');
+    });
+  });
+
   describe('getDivisionById reads the id-clustered mirror (DIVISION_AREA_TABLE)', () => {
     // Public division_area is clustered by geometry, so a by-id lookup scanned
     // ~9 GiB. The mirror is clustered by id. Behaviour must be identical for
@@ -494,6 +550,132 @@ describe('BigQueryService', () => {
       const sql = (service.runQuery as jest.Mock).mock.calls[0][0] as string;
       expect(sql).toContain('FROM `proj.overture.place`');
       expect(sql).toContain('addresses.list[OFFSET(0)].element.country = @country');
+    });
+
+    describe('narrowing to clustered columns (PLACE_FILTER_INDEX_TABLE, PLACE_BRAND_TABLE)', () => {
+      const prevIndex = process.env.PLACE_FILTER_INDEX_TABLE;
+      const prevBrand = process.env.PLACE_BRAND_TABLE;
+      beforeEach(() => {
+        process.env.PLACE_FILTER_INDEX_TABLE = 'proj.overture.place_filter_index';
+        process.env.PLACE_BRAND_TABLE = 'proj.overture.place_by_brand';
+      });
+      afterEach(() => {
+        if (prevIndex === undefined) delete process.env.PLACE_FILTER_INDEX_TABLE; else process.env.PLACE_FILTER_INDEX_TABLE = prevIndex;
+        if (prevBrand === undefined) delete process.env.PLACE_BRAND_TABLE; else process.env.PLACE_BRAND_TABLE = prevBrand;
+      });
+      // Answers index lookups from `index`, and everything else with one row.
+      const indexed = (index: Record<string, (string | null)[]>, hasCategories = false) => {
+        const service = new BigQueryService();
+        service.getPlaceColumns = jest.fn().mockResolvedValue(new Set(hasCategories ? ['categories'] : []));
+        service.runQuery = jest.fn().mockImplementation(async (sql: string, params: any) => {
+          if (sql.includes('Get filter index')) {
+            const rows = (params.values as string[]).flatMap((value) => (index[`${params.kind}:${value}`] ?? []).map((narrow) => ({ value, narrow })));
+            return { rows, statistics: {} };
+          }
+          return { rows: [validRow], statistics: {} };
+        });
+        return service;
+      };
+      const placesCall = (service: BigQueryService) =>
+        (service.runQuery as jest.Mock).mock.calls.find((c) => (c[0] as string).includes('Get places nearby'));
+      const country = (service: BigQueryService, o: { brand_wikidata?: string; brand_name?: string; categories?: string[]; taxonomy?: string[]; lat?: number; lng?: number }) =>
+        service.getPlacesNearby(o.lat as any, o.lng as any, 1000, o.brand_wikidata, o.brand_name, 'US', o.categories, 0.5, 20, undefined, undefined, o.taxonomy, 0);
+
+      it('narrows a taxonomy filter to the basic categories the values occur in, keeping the filter itself', async () => {
+        const service = indexed({ 'taxonomy:squash_court': ['sport_court'], 'taxonomy:kiteboarding': ['sport_or_fitness_facility', 'sport_court'] });
+        await country(service, { taxonomy: ['squash_court', 'kiteboarding'] });
+        const [sql, params] = placesCall(service)!;
+        expect(sql).toContain('FROM `proj.overture.place_by_country`');
+        expect(sql).toContain('country = @country AND basic_category IN UNNEST(@narrow_taxonomy_basics) AND');
+        expect(sql).toContain('taxonomy.primary IN UNNEST(@taxonomy)');
+        expect(params.narrow_taxonomy_basics.sort()).toEqual(['sport_court', 'sport_or_fitness_facility']);
+      });
+
+      it('answers with nothing, and no places query, when no place in the country has the taxonomy value', async () => {
+        const service = indexed({});
+        expect(await country(service, { taxonomy: ['no_such_thing'] })).toEqual({ results: [], totalCount: 0 });
+        expect(placesCall(service)).toBeUndefined();
+      });
+
+      it('keeps rows with no basic category when the index says the value occurs there too', async () => {
+        const service = indexed({ 'taxonomy:odd': ['shop', null], 'taxonomy:odder': [null] });
+        await country(service, { taxonomy: ['odd'] });
+        expect(placesCall(service)![0]).toContain('(basic_category IN UNNEST(@narrow_taxonomy_basics) OR basic_category IS NULL)');
+        const second = indexed({ 'taxonomy:odder': [null] });
+        await country(second, { taxonomy: ['odder'] });
+        const [sql, params] = placesCall(second)!;
+        expect(sql).toContain('country = @country AND basic_category IS NULL AND');
+        expect(params.narrow_taxonomy_basics).toBeUndefined();
+      });
+
+      it('narrows a categories filter to the values themselves plus where they occur as taxonomy', async () => {
+        const service = indexed({ 'taxonomy:sushi_restaurant': ['restaurant'] });
+        await country(service, { categories: ['sushi_restaurant', 'museum'] });
+        const [sql, params] = placesCall(service)!;
+        expect(sql).toContain('basic_category IN UNNEST(@narrow_category_basics)');
+        expect(params.narrow_category_basics.sort()).toEqual(['museum', 'restaurant', 'sushi_restaurant']);
+      });
+
+      it('does not narrow categories while the table still has the legacy categories column', async () => {
+        const service = indexed({ 'taxonomy:museum': ['museum'] }, true);
+        await country(service, { categories: ['museum'] });
+        expect(placesCall(service)![0]).not.toContain('narrow_category_basics');
+      });
+
+      it('reads a brand name from the brand table, by its clustered column', async () => {
+        const service = indexed({});
+        await country(service, { brand_name: 'Example Coffee' });
+        const [sql] = placesCall(service)!;
+        expect(sql).toContain('FROM `proj.overture.place_by_brand`');
+        expect(sql).toContain('country = @country AND brand_name = @brand_name');
+        expect(sql).toContain('brand.names.primary = @brand_name');
+      });
+
+      it('turns a Wikidata id into its brand names, and answers with nothing when the country has none', async () => {
+        const service = indexed({ 'brand_wikidata:Q1': ['Example Coffee', 'Example Coffee Reserve'] });
+        await country(service, { brand_wikidata: 'Q1' });
+        const [sql, params] = placesCall(service)!;
+        expect(sql).toContain('FROM `proj.overture.place_by_brand`');
+        expect(sql).toContain('brand_name IN UNNEST(@narrow_brand_names)');
+        expect(sql).toContain('brand.wikidata = @brand_wikidata');
+        expect(params.narrow_brand_names).toEqual(['Example Coffee', 'Example Coffee Reserve']);
+        const none = indexed({});
+        expect(await country(none, { brand_wikidata: 'Q2' })).toEqual({ results: [], totalCount: 0 });
+      });
+
+      it('looks a value up once and remembers it', async () => {
+        const service = indexed({ 'taxonomy:museum': ['museum'] });
+        await country(service, { taxonomy: ['museum'] });
+        await country(service, { taxonomy: ['museum'] });
+        expect((service.runQuery as jest.Mock).mock.calls.filter((c) => (c[0] as string).includes('Get filter index'))).toHaveLength(1);
+      });
+
+      it('runs the query as before when the index cannot be read, or is not configured', async () => {
+        const service = indexed({});
+        (service.runQuery as jest.Mock).mockImplementation(async (sql: string) => {
+          if (sql.includes('Get filter index')) throw new Error('index unavailable');
+          return { rows: [validRow], statistics: {} };
+        });
+        await country(service, { taxonomy: ['museum'] });
+        expect(placesCall(service)![0]).not.toContain('narrow_');
+        delete process.env.PLACE_FILTER_INDEX_TABLE;
+        delete process.env.PLACE_BRAND_TABLE;
+        const plain = indexed({});
+        await country(plain, { taxonomy: ['museum'], brand_name: 'Example Coffee' });
+        const [sql] = placesCall(plain)!;
+        expect(sql).toContain('FROM `proj.overture.place_by_country`');
+        expect(sql).not.toContain('narrow_');
+        expect((plain.runQuery as jest.Mock).mock.calls).toHaveLength(1);
+      });
+
+      it('leaves radius queries alone', async () => {
+        const service = indexed({ 'taxonomy:museum': ['museum'] });
+        await country(service, { taxonomy: ['museum'], brand_name: 'Example Coffee', lat: 1, lng: 2 });
+        const [sql] = placesCall(service)!;
+        expect(sql).toContain('FROM `proj.overture.place`');
+        expect(sql).not.toContain('narrow_');
+        expect(sql).not.toContain('brand_name = @brand_name');
+      });
     });
 
     it('routes the brands and categories aggregates the same way', async () => {
