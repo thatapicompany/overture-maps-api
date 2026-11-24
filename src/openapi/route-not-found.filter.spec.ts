@@ -56,6 +56,24 @@ describe('RouteNotFoundFilter and crawler routes', () => {
     expect(res.headers.location).toBe('https://www.overturemapsapi.com/llms.txt');
   });
 
+  it.each(['/openapi.json', '/swagger.json', '/api-docs-json', '/api-json', '/.well-known/openapi.json'])(
+    'sends %s to the spec',
+    async (path) => {
+      const res = await request(app.getHttpServer()).get(path).expect(302);
+      expect(res.headers.location).toBe('/api-docs.json');
+    },
+  );
+
+  it.each(['/docs', '/documentation'])('sends %s to the docs site', async (path) => {
+    const res = await request(app.getHttpServer()).get(path).expect(302);
+    expect(res.headers.location).toBe('https://www.overturemapsapi.com/docs/intro');
+  });
+
+  it('redirects llms-full.txt to the docs site', async () => {
+    const res = await request(app.getHttpServer()).get('/llms-full.txt').expect(302);
+    expect(res.headers.location).toBe('https://www.overturemapsapi.com/llms-full.txt');
+  });
+
   it('links the spec, the Swagger UI and llms.txt from the root', async () => {
     const res = await request(app.getHttpServer()).get('/').expect(200);
     expect(res.body).toMatchObject({

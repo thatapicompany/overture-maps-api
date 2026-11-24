@@ -42,4 +42,21 @@ export class AppController {
   @ApiExcludeEndpoint()
   @Redirect(`${DOCS_URL}/llms.txt`, 302)
   getLlmsTxt(): void {}
+
+  // Paths AI tools and SDK generators try before reading any docs. Each one
+  // lands on the real thing instead of a 404.
+  @Get(['openapi.json', 'swagger.json', 'api-docs-json', 'api-json', '.well-known/openapi.json'])
+  @ApiExcludeEndpoint()
+  @Redirect('/api-docs.json', 302)
+  getOpenApiAlias(): void {}
+
+  @Get(['docs', 'documentation'])
+  @ApiExcludeEndpoint()
+  @Redirect(`${DOCS_URL}/docs/intro`, 302)
+  getDocsAlias(): void {}
+
+  @Get('llms-full.txt')
+  @ApiExcludeEndpoint()
+  @Redirect(`${DOCS_URL}/llms-full.txt`, 302)
+  getLlmsFullTxt(): void {}
 }
