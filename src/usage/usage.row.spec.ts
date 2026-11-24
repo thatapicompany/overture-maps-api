@@ -110,13 +110,48 @@ describe('buildUsageRow', () => {
     expect(row.user_agent).toHaveLength(512);
   });
 
+  describe('coordinates in query_params', () => {
+    const stored = (query: Record<string, unknown>) =>
+      JSON.parse(buildUsageRow(mockReq({ query }), mockRes(), store([])).query_params);
+    afterEach(() => {
+      delete process.env.USAGE_COORDINATE_DECIMALS;
+    });
+
+    it('are rounded to two decimal places, and other filters are kept as sent', () => {
+      expect(stored({ lat: '40.7486731', lng: '-73.9854953', radius: '150', categories: 'cafe' })).toEqual({
+        lat: '40.75',
+        lng: '-73.99',
+        radius: '150',
+        categories: 'cafe',
+      });
+    });
+
+    it('are rounded inside a bbox', () => {
+      expect(stored({ bbox: '-0.12345,51.50001,-0.10001,51.51999' })).toEqual({ bbox: '-0.12,51.50,-0.10,51.52' });
+    });
+
+    it('are kept as sent when they are not numbers, so a bad request can still be diagnosed', () => {
+      expect(stored({ lat: 'abc', lng: '', bbox: 'x,1.23456' })).toEqual({ lat: 'abc', lng: '', bbox: 'x,1.23' });
+      expect(stored({ lat: ['40.7486731', '41'] })).toEqual({ lat: ['40.7486731', '41'] });
+    });
+
+    it('follow USAGE_COORDINATE_DECIMALS, and `full` stores them exactly', () => {
+      process.env.USAGE_COORDINATE_DECIMALS = '0';
+      expect(stored({ lat: '40.7486731' })).toEqual({ lat: '41' });
+      process.env.USAGE_COORDINATE_DECIMALS = 'full';
+      expect(stored({ lat: '40.7486731' })).toEqual({ lat: '40.7486731' });
+      process.env.USAGE_COORDINATE_DECIMALS = 'nonsense';
+      expect(stored({ lat: '40.7486731' })).toEqual({ lat: '40.75' });
+    });
+  });
+
   it('keeps a query-string api key out of query_params but still hashes it', () => {
     const row = buildUsageRow(
       mockReq({ query: { lat: '40.7', api_key: 'super-secret-key' } }),
       mockRes(),
       store([]),
     );
-    expect(JSON.parse(row.query_params)).toEqual({ lat: '40.7' });
+    expect(JSON.parse(row.query_params)).toEqual({ lat: '40.70' });
     expect(row.api_key_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(row)).not.toContain('super-secret-key');
   });
