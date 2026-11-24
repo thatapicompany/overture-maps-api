@@ -30,11 +30,44 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
+// Coordinates are stored coarsely: enough to see which area a request was
+// about, not the exact point, which can be a person's position when an app
+// calls the API from a phone or a browser. Two decimal places is about 1 km.
+// USAGE_COORDINATE_DECIMALS changes the precision; `full` stores them as sent.
+const COORDINATE_NAMES = ['lat', 'lng', 'lon', 'latitude', 'longitude'];
+const BBOX_NAMES = ['bbox'];
+
+function coordinateDecimals(): number | null {
+  const raw = (process.env.USAGE_COORDINATE_DECIMALS ?? '2').trim().toLowerCase();
+  if (raw === 'full') return null;
+  const n = parseInt(raw, 10);
+  return Number.isInteger(n) && n >= 0 && n <= 6 ? n : 2;
+}
+
+/** A coordinate rounded for storage. Anything that is not a number is kept as sent. */
+export function coarseCoordinate(value: unknown, decimals: number): unknown {
+  if (typeof value !== 'string' && typeof value !== 'number') return value;
+  const text = String(value).trim();
+  if (text === '' || !Number.isFinite(Number(text))) return value;
+  return Number(text).toFixed(decimals);
+}
+
 // Clients can pass their key as a query parameter, so drop those names before
 // storing the query string. Only the hash belongs in the usage table.
 function redactedQuery(req: Request): string {
   const query = { ...(req.query ?? {}) } as Record<string, unknown>;
   for (const name of API_KEY_NAMES) delete query[name];
+  const decimals = coordinateDecimals();
+  if (decimals !== null) {
+    for (const name of COORDINATE_NAMES) {
+      if (name in query) query[name] = coarseCoordinate(query[name], decimals);
+    }
+    for (const name of BBOX_NAMES) {
+      if (typeof query[name] === 'string') {
+        query[name] = (query[name] as string).split(',').map((part) => coarseCoordinate(part, decimals)).join(',');
+      }
+    }
+  }
   return JSON.stringify(query);
 }
 
