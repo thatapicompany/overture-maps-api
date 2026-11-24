@@ -39,6 +39,8 @@ describe('OpenAPI document', () => {
     );
     expect(paths).not.toContain('/robots.txt');
     expect(paths).not.toContain('/llms.txt');
+    expect(paths).not.toContain('/openapi.json');
+    expect(paths).not.toContain('/docs');
   });
 
   it('gives every operation a unique camelCase operationId', () => {
