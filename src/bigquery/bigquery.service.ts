@@ -114,6 +114,37 @@ const placeCountryTable = (): string | undefined => process.env.PLACE_COUNTRY_TA
 // Both optional: unset, queries run exactly as before.
 const placeFilterIndexTable = (): string | undefined => process.env.PLACE_FILTER_INDEX_TABLE || undefined;
 const placeBrandTable = (): string | undefined => process.env.PLACE_BRAND_TABLE || undefined;
+
+// PLACE_NAME_TOKEN_TABLE holds the country mirror once per distinct word of each
+// place's lower-cased name (etl/build-place-name-tokens.sql), clustered by
+// country and that word. name_prefix matches a name that starts with the prefix
+// or has a word that does, which the mirror's name clustering cannot prune, so
+// a country-level name_prefix query read the whole country slice. With this
+// table it reads only the rows whose word falls in the prefix's range.
+// Optional: unset, queries run exactly as before.
+const placeNameTokenTable = (): string | undefined => process.env.PLACE_NAME_TOKEN_TABLE || undefined;
+
+/** The prefix as the name_prefix predicate compares it: trimmed, single-spaced, lower case. */
+export const normaliseNamePrefix = (prefix: string): string => prefix.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * The name-token rows a normalised name_prefix can match. A match starts at the
+ * beginning of the name or just after a space, which is where a token starts.
+ * With a space in the prefix its first word is a whole token, so that token must
+ * equal it. A single word only has to start a token: tokens from `lo` up to, not
+ * including, `hi`. `hi` is `lo` with its last code point raised by one, the first
+ * string past every string that starts with `lo`; it is left out when there is
+ * no such code point.
+ */
+export function namePrefixTokenRange(prefix: string): { token: string } | { lo: string; hi?: string } {
+  const space = prefix.indexOf(' ');
+  if (space > 0) return { token: prefix.slice(0, space) };
+  const points = Array.from(prefix);
+  let next = (points.pop() ?? '').codePointAt(0)! + 1;
+  if (next >= 0xd800 && next <= 0xdfff) next = 0xe000;
+  if (next > 0x10ffff) return { lo: prefix };
+  return { lo: prefix, hi: points.join('') + String.fromCodePoint(next) };
+}
 const FILTER_INDEX_TTL_MS = 6 * 60 * 60 * 1000;
 const FILTER_INDEX_MAX_ENTRIES = 20000;
 
@@ -609,10 +640,12 @@ export class BigQueryService {
     // Country-level queries only: work out what the clustered columns can be
     // narrowed to before building the SQL. See placeFilterIndexTable above.
     const narrowClauses: string[] = [];
+    let readsBrandTable = false;
     if (placeSrc.isCountryMirror && country) {
       const brandTable = placeBrandTable();
       if (brandTable && (brand_name || brand_wikidata)) {
         placeSrc.table = brandTable;
+        readsBrandTable = true;
         if (brand_name) {
           narrowClauses.push(`brand_name = @brand_name`);
         } else {
@@ -647,6 +680,30 @@ export class BigQueryService {
       }
     }
 
+    const namePrefix = name_prefix ? normaliseNamePrefix(name_prefix) : undefined;
+
+    // Country-level name_prefix reads the name-token copy of the mirror, pruned
+    // to the words in the prefix's range (see placeNameTokenTable above). A place
+    // appears once per word there, so one row per id is kept before counting and
+    // paging. The full name_prefix predicate below still decides what matches,
+    // so the results are the same as reading the mirror. A brand query keeps the
+    // brand table, which is smaller still.
+    let fromSql = `\`${placeSrc.table}\``;
+    const tokenTable = placeNameTokenTable();
+    if (placeSrc.isCountryMirror && country && namePrefix && tokenTable && !readsBrandTable) {
+      const range = namePrefixTokenRange(namePrefix);
+      let tokenSql: string;
+      if ('token' in range) {
+        tokenSql = `name_token = @name_token`;
+        params.name_token = range.token;
+      } else {
+        tokenSql = `name_token >= @name_token_lo${range.hi ? ' AND name_token < @name_token_hi' : ''} AND STARTS_WITH(name_token, @name_token_lo)`;
+        params.name_token_lo = range.lo;
+        if (range.hi) params.name_token_hi = range.hi;
+      }
+      fromSql = `(SELECT * EXCEPT(name_token) FROM \`${tokenTable}\` WHERE country = @country AND ${tokenSql} QUALIFY ROW_NUMBER() OVER (PARTITION BY id) = 1)`;
+    }
+
     // Base query and distance calculation if latitude and longitude are provided
     queryParts.push(`-- Overture Maps API: Get places nearby \n`);
     queryParts.push(`SELECT *, COUNT(*) OVER() AS total_count`);
@@ -657,7 +714,7 @@ export class BigQueryService {
       params.longitude = longitude;
     }
 
-    queryParts.push(`FROM \`${placeSrc.table}\``);
+    queryParts.push(`FROM ${fromSql}`);
 
     // Conditional filters
     let whereClauses: string[] = [];
@@ -684,9 +741,9 @@ export class BigQueryService {
       params.name = name;
     }
 
-    if (name_prefix) {
+    if (namePrefix) {
       whereClauses.push(placeSrc.namePrefixSql);
-      params.name_prefix = name_prefix.trim().replace(/\s+/g, ' ').toLowerCase();
+      params.name_prefix = namePrefix;
     }
 
     if (country) {
