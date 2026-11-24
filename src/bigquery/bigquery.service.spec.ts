@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BigQueryService } from './bigquery.service';
+import { BigQueryService, namePrefixTokenRange } from './bigquery.service';
 import { Logger } from '@nestjs/common';
 
 describe('BigQueryService', () => {
@@ -710,6 +710,67 @@ describe('BigQueryService', () => {
       expect(sql).toContain('STARTS_WITH(name_lower, @name_prefix)');
       expect(sql).not.toContain('LOWER(names.primary)');
     });
+
+    describe('name_prefix reads the name-token table (PLACE_NAME_TOKEN_TABLE)', () => {
+      const prevTokens = process.env.PLACE_NAME_TOKEN_TABLE;
+      const prevBrand = process.env.PLACE_BRAND_TABLE;
+      beforeEach(() => {
+        process.env.PLACE_NAME_TOKEN_TABLE = 'proj.overture.place_name_tokens';
+        process.env.PLACE_BRAND_TABLE = 'proj.overture.place_by_brand';
+      });
+      afterEach(() => {
+        if (prevTokens === undefined) delete process.env.PLACE_NAME_TOKEN_TABLE; else process.env.PLACE_NAME_TOKEN_TABLE = prevTokens;
+        if (prevBrand === undefined) delete process.env.PLACE_BRAND_TABLE; else process.env.PLACE_BRAND_TABLE = prevBrand;
+      });
+      const run = async (o: { prefix: string; lat?: number; lng?: number; brand_name?: string; taxonomy?: string[] }) => {
+        const service = stub();
+        service.getPlaceColumns = jest.fn().mockResolvedValue(new Set([]));
+        await service.getPlacesNearby(o.lat as any, o.lng as any, 1000, undefined, o.brand_name, 'US', undefined, 0.6, 20, undefined, undefined, o.taxonomy, 0, undefined, undefined, o.prefix);
+        const call = (service.runQuery as jest.Mock).mock.calls.find((c) => (c[0] as string).includes('Get places nearby'));
+        return { sql: call![0] as string, params: call![1] as Record<string, unknown> };
+      };
+
+      it('reads one word range of the token table, one row per place, and keeps the full prefix predicate', async () => {
+        const { sql, params } = await run({ prefix: '  Exam ' });
+        expect(sql).toContain('FROM (SELECT * EXCEPT(name_token) FROM `proj.overture.place_name_tokens` WHERE country = @country AND name_token >= @name_token_lo AND name_token < @name_token_hi AND STARTS_WITH(name_token, @name_token_lo) QUALIFY ROW_NUMBER() OVER (PARTITION BY id) = 1)');
+        expect(sql).not.toContain('FROM `proj.overture.place_by_country`');
+        expect(sql).toContain('STARTS_WITH(name_lower, @name_prefix)');
+        expect(sql).toContain("STRPOS(name_lower, CONCAT(' ', @name_prefix)) > 0");
+        expect(sql).toContain('COUNT(*) OVER() AS total_count');
+        expect(sql).toContain('ORDER BY id');
+        expect(params).toMatchObject({ name_prefix: 'exam', name_token_lo: 'exam', name_token_hi: 'exan', country: 'US' });
+      });
+
+      it('matches the first word exactly when the prefix has more than one', async () => {
+        const { sql, params } = await run({ prefix: 'Blue  Bo' });
+        expect(sql).toContain('WHERE country = @country AND name_token = @name_token QUALIFY');
+        expect(params).toMatchObject({ name_token: 'blue', name_prefix: 'blue bo' });
+        expect(params.name_token_lo).toBeUndefined();
+      });
+
+      it('still narrows a taxonomy filter alongside the token range', async () => {
+        const { sql } = await run({ prefix: 'exam', taxonomy: ['museum'] });
+        expect(sql).toContain('place_name_tokens');
+        expect(sql).toContain('taxonomy.primary IN UNNEST(@taxonomy)');
+      });
+
+      it('leaves brand queries on the brand table and radius queries on the geometry table', async () => {
+        const brand = await run({ prefix: 'exam', brand_name: 'Example Coffee' });
+        expect(brand.sql).toContain('FROM `proj.overture.place_by_brand`');
+        expect(brand.sql).not.toContain('place_name_tokens');
+        const radius = await run({ prefix: 'exam', lat: 1, lng: 2 });
+        expect(radius.sql).toContain('FROM `proj.overture.place`');
+        expect(radius.sql).not.toContain('place_name_tokens');
+      });
+
+      it('runs exactly as before when the table is not configured', async () => {
+        delete process.env.PLACE_NAME_TOKEN_TABLE;
+        const { sql, params } = await run({ prefix: 'exam' });
+        expect(sql).toContain('FROM `proj.overture.place_by_country`');
+        expect(sql).not.toContain('name_token');
+        expect(params.name_token_lo).toBeUndefined();
+      });
+    });
   });
 
   describe('getBrandsNearby', () => {
@@ -846,5 +907,26 @@ describe('BigQueryService bytes billed backstop', () => {
     const failing = { id: 'job-3', getQueryResults: jest.fn().mockRejectedValue(new Error('boom')), getMetadata: jest.fn() };
     const { service } = serviceWith(failing);
     await expect(service.runQuery('SELECT 1')).rejects.toThrow('boom');
+  });
+});
+
+describe('namePrefixTokenRange', () => {
+  it('gives the range of tokens that start with a single word', () => {
+    expect(namePrefixTokenRange('exam')).toEqual({ lo: 'exam', hi: 'exan' });
+    expect(namePrefixTokenRange('caf\u00e9')).toEqual({ lo: 'caf\u00e9', hi: 'caf\u00ea' });
+  });
+
+  it('treats a name with no spaces, as in Chinese or Japanese, as one token', () => {
+    expect(namePrefixTokenRange('\u5973\u88c5')).toEqual({ lo: '\u5973\u88c5', hi: '\u5973\u88c6' });
+  });
+
+  it('steps over whole code points, not UTF-16 halves', () => {
+    expect(namePrefixTokenRange('a\u{1F600}')).toEqual({ lo: 'a\u{1F600}', hi: 'a\u{1F601}' });
+    expect(namePrefixTokenRange('a\ud7ff')).toEqual({ lo: 'a\ud7ff', hi: 'a\ue000' });
+    expect(namePrefixTokenRange('a\u{10FFFF}')).toEqual({ lo: 'a\u{10FFFF}' });
+  });
+
+  it('needs the first word whole when there is more than one', () => {
+    expect(namePrefixTokenRange('blue bo')).toEqual({ token: 'blue' });
   });
 });

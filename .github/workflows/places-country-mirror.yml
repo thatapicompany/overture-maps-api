@@ -46,3 +46,13 @@ jobs:
             --location=US \
             --use_legacy_sql=false \
             < etl/build-places-filter-tables.sql
+
+      # Also built from the mirror: one row per word of each place's name, for
+      # country-level name_prefix queries (etl/build-place-name-tokens.sql).
+      - name: Rebuild name-token table
+        run: |
+          bq query \
+            --project_id="${{ secrets.BIGQUERY_PROJECT_ID }}" \
+            --location=US \
+            --use_legacy_sql=false \
+            < etl/build-place-name-tokens.sql

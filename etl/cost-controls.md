@@ -22,6 +22,10 @@ environment variable; nothing is hard-coded to the hosted service.
   basic categories a taxonomy value occurs in, so the query reads those
   category slices only; brand queries read a brand-clustered table of branded
   places. Without them these filters read the whole country slice.
+- **`name_prefix` on country-level queries** reads a copy of the mirror with one
+  row per word of each place's name, clustered by country and that word
+  (`etl/build-place-name-tokens.sql`, `PLACE_NAME_TOKEN_TABLE`), so it reads the
+  words in the prefix's range instead of the whole country slice.
 - **Point-only endpoints** (`/buildings`, `/addresses`, `/base`,
   `/transportation`, `/places/buildings`) return 400 for country-only calls.
 - **Caching.** Identical requests are served from cache (`GCS_BUCKET_NAME`).
