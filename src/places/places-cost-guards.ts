@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanStatus } from '../tiers/plan-lookup.service';
-import { PRICING_URL } from '../common/links';
+import { PRICING_URL, tagged } from '../common/links';
 import { recordUsageError } from '../usage/usage.context';
 
 const logger = new Logger('PlacesCostGuards');
@@ -15,7 +15,7 @@ const logger = new Logger('PlacesCostGuards');
 // etl/cost-controls.md.
 export const COUNTRY_LEVEL_PAID_ONLY_MESSAGE =
   'Country-level queries (a country filter without lat/lng) are available on paid plans. ' +
-  `Free plans query by lat, lng and radius (up to 25 km). See plans at ${PRICING_URL}`;
+  `Free plans query by lat, lng and radius (up to 25 km). See plans at ${tagged(PRICING_URL, 'paid_only')}`;
 
 export interface CountryLevelQuery {
   lat?: number;

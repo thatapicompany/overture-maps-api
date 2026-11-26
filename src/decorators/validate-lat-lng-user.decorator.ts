@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { ACCOUNT_URL } from '../common/links';
+import { ACCOUNT_URL, tagged } from '../common/links';
 
 // Helper to calculate distance between two lat/lng points in meters
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -53,7 +53,7 @@ export function ValidateLatLngUser(): MethodDecorator {
         );
         if (!withinRadius) {
           throw new BadRequestException(
-            `Demo accounts can only access locations within 10,000 meters of demo cities. Demo cities: ${demoCities.map(city => JSON.stringify(city)).join(", ")}. Sign up for a free account at ${ACCOUNT_URL}`
+            `Demo accounts can only access locations within 10,000 meters of demo cities. Demo cities: ${demoCities.map(city => JSON.stringify(city)).join(", ")}. Sign up for a free account at ${tagged(ACCOUNT_URL, 'demo_limit')}`
           );
         }
       }

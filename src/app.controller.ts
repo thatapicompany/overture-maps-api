@@ -3,6 +3,7 @@ import { AppService } from './app.service';
 
 import { ApiExcludeEndpoint, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DOCS_URL, PUBLIC_API_URL } from './openapi/openapi.document';
+import { tagged } from './common/links';
 
 // Crawlers may read the root and the docs; data endpoints need a key anyway.
 export const ROBOTS_TXT = ['User-agent: *', 'Allow: /$', 'Allow: /api-docs', 'Disallow: /', ''].join('\n');
@@ -52,7 +53,7 @@ export class AppController {
 
   @Get(['docs', 'documentation'])
   @ApiExcludeEndpoint()
-  @Redirect(`${DOCS_URL}/docs/intro`, 302)
+  @Redirect(tagged(`${DOCS_URL}/docs/intro`, 'docs_redirect'), 302)
   getDocsAlias(): void {}
 
   @Get('llms-full.txt')

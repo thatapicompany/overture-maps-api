@@ -8,7 +8,7 @@ import {
   ThrottlerOptions,
   ThrottlerStorage,
 } from '@nestjs/throttler';
-import { PRICING_URL } from '../common/links';
+import { PRICING_URL, tagged } from '../common/links';
 import { User } from '../decorators/authed-user.decorator';
 import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { recordUsageError } from '../usage/usage.context';
@@ -36,7 +36,7 @@ export function rateLimitedMessage(limit: number, ttlMs: number, paid: boolean):
   const window = seconds === 60 ? 'a minute' : `per ${seconds} seconds`;
   return (
     `Too many requests: this ${paid ? 'plan' : 'key'} allows ${limit} requests ${window} to each endpoint. ` +
-    `Wait for the Retry-After seconds and try again${paid ? '' : `, or upgrade for a higher limit: ${PRICING_URL}`}`
+    `Wait for the Retry-After seconds and try again${paid ? '' : `, or upgrade for a higher limit: ${tagged(PRICING_URL, 'rate_limit')}`}`
   );
 }
 

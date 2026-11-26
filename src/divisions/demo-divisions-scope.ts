@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { ACCOUNT_URL } from '../common/links';
+import { ACCOUNT_URL, tagged } from '../common/links';
 import { User } from '../decorators/authed-user.decorator';
 
 // The demo key is for trying the API out, so on /divisions it gets the cheap
@@ -9,7 +9,7 @@ import { User } from '../decorators/authed-user.decorator';
 // searches without a point read several GiB each, so they need a real key.
 export const DEMO_DIVISIONS_MESSAGE =
   'The demo key supports division searches by name (without geometry) or by lat/lng near a demo city. ' +
-  `Get a free API key for country-wide, bounding-box and geometry searches: ${ACCOUNT_URL}`;
+  `Get a free API key for country-wide, bounding-box and geometry searches: ${tagged(ACCOUNT_URL, 'demo_limit')}`;
 
 export interface DivisionsScopeQuery {
   lat?: number;

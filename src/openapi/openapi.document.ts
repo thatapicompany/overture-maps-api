@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { ACCOUNT_URL, PRICING_URL } from '../common/links';
+import { ACCOUNT_URL, PRICING_URL, tagged } from '../common/links';
 import { Format } from '../common/dto/requests/get-by-location.dto';
 
 // Self-hosted deployments can point these at their own URLs.
@@ -14,7 +14,7 @@ const API_DESCRIPTION = `
 REST API for [Overture Maps Foundation](https://overturemaps.org) open data: places (POIs), buildings, addresses, administrative divisions, base and transportation features. No BigQuery, Athena or GeoParquet needed.
 
 ## Authentication
-Send your key in the \`x-api-key\` header. Get a free key at ${ACCOUNT_URL}. The public key \`DEMO-API-KEY\` works for small lat/lng searches near a few demo cities.
+Send your key in the \`x-api-key\` header. Get a free key at ${tagged(ACCOUNT_URL, 'openapi')}. The public key \`DEMO-API-KEY\` works for small lat/lng searches near a few demo cities.
 
 ## Choosing a query
 - Search by \`lat\` + \`lng\` + \`radius\` (metres, up to 25,000) wherever you can. It is the fastest and cheapest query on every plan.
@@ -24,7 +24,7 @@ Send your key in the \`x-api-key\` header. Get a free key at ${ACCOUNT_URL}. The
 - \`format=geojson\` returns a GeoJSON FeatureCollection; the default \`json\` returns an array.
 
 ## Limits and errors
-Each plan has a monthly request limit (see ${PRICING_URL}). Responses carry \`X-Quota-Limit\`, \`X-Quota-Used\`, \`X-Quota-Remaining\` and \`X-Quota-Reset\` headers. Errors return \`{ statusCode, message, error? }\`; the \`message\` explains how to fix the request. On \`429\`, wait for the \`Retry-After\` header before retrying.
+Each plan has a monthly request limit (see ${tagged(PRICING_URL, 'openapi')}). Responses carry \`X-Quota-Limit\`, \`X-Quota-Used\`, \`X-Quota-Remaining\` and \`X-Quota-Reset\` headers. Errors return \`{ statusCode, message, error? }\`; the \`message\` explains how to fix the request. On \`429\`, wait for the \`Retry-After\` header before retrying.
 
 ## More
 Docs and guides: ${DOCS_URL}/docs/intro · LLM-friendly index: ${DOCS_URL}/llms.txt · MCP server for Claude, ChatGPT and other AI tools: https://www.npmjs.com/package/@thatapicompany/overture-maps-mcp
@@ -53,7 +53,7 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
         type: 'apiKey',
         name: 'x-api-key',
         in: 'header',
-        description: `Your API key from ${ACCOUNT_URL}. Use DEMO-API-KEY to try small lat/lng searches.`,
+        description: `Your API key from ${tagged(ACCOUNT_URL, 'openapi')}. Use DEMO-API-KEY to try small lat/lng searches.`,
       },
       'API_KEY',
     )
