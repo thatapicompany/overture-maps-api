@@ -66,7 +66,7 @@ describe('RouteNotFoundFilter and crawler routes', () => {
 
   it.each(['/docs', '/documentation'])('sends %s to the docs site', async (path) => {
     const res = await request(app.getHttpServer()).get(path).expect(302);
-    expect(res.headers.location).toBe('https://www.overturemapsapi.com/docs/intro');
+    expect(res.headers.location).toBe('https://www.overturemapsapi.com/docs/intro?utm_source=overture_api&utm_medium=api_response&utm_campaign=docs_redirect');
   });
 
   it('redirects llms-full.txt to the docs site', async () => {

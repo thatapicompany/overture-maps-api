@@ -5,7 +5,7 @@ import { PlanLookupService } from '../tiers/plan-lookup.service';
 import { resolveQuotaPolicy } from './plan-limits';
 import { QuotaEventPublisher } from './quota-events';
 import { nextMonthStartUtc, UsageCounterStore } from './usage-counter.store';
-import { PRICING_URL } from '../common/links';
+import { PRICING_URL, tagged } from '../common/links';
 import { recordUsageError } from '../usage/usage.context';
 
 // Monthly request cap per account, enforced inside the API with no call to
@@ -42,7 +42,7 @@ export function quotaExceededMessage(plan: string, used: number, allowance: numb
   return (
     `Monthly request limit reached: this account has made ${fmt(used)} requests this month on the ${plan} plan ` +
     `(allowance ${fmt(allowance)}, limit ${fmt(hardLimit)}). It resets at 00:00 UTC on ${reset}. ` +
-    `Upgrade for a higher limit: ${PRICING_URL}`
+    `Upgrade for a higher limit: ${tagged(PRICING_URL, 'monthly_limit')}`
   );
 }
 

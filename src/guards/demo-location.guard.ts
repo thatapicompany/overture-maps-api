@@ -1,7 +1,7 @@
 import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Request } from 'express';
 import { User } from '../decorators/authed-user.decorator';
-import { ACCOUNT_URL } from '../common/links';
+import { ACCOUNT_URL, tagged } from '../common/links';
 
 // Helper to calculate distance between two lat/lng points in meters
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -57,7 +57,7 @@ export class DemoLocationGuard implements CanActivate {
 
     if (!withinRadius) {
       throw new BadRequestException(
-        `Demo accounts can only access locations within ${DEMO_RADIUS_METERS} meters of demo cities. Demo cities: ${DEMO_CITIES.map((city) => JSON.stringify(city)).join(', ')}. Sign up for a free account at ${ACCOUNT_URL}`,
+        `Demo accounts can only access locations within ${DEMO_RADIUS_METERS} meters of demo cities. Demo cities: ${DEMO_CITIES.map((city) => JSON.stringify(city)).join(', ')}. Sign up for a free account at ${tagged(ACCOUNT_URL, 'demo_limit')}`,
       );
     }
 

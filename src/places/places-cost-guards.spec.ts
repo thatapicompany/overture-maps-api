@@ -10,7 +10,7 @@ const plans = (status: PlanStatus) => {
 
 describe('places cost guards: country-level is paid only', () => {
   it('points Free users at the pricing page on the marketing site', () => {
-    expect(COUNTRY_LEVEL_PAID_ONLY_MESSAGE).toContain('https://www.overturemapsapi.com/pricing');
+    expect(COUNTRY_LEVEL_PAID_ONLY_MESSAGE).toContain('https://www.overturemapsapi.com/pricing?utm_source=overture_api&utm_medium=api_response&utm_campaign=paid_only');
   });
 
   const free = { accountId: 'free-acct', userId: 'u1' };
