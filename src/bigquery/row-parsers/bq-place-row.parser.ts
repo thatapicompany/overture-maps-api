@@ -1,5 +1,6 @@
 import { Place, PlaceWithBuilding, Taxonomy } from "../../places/interfaces/place.interface"
 import { parsePointToGeoJSON, parsePolygonToGeoJSON, parseWKTToGeoJSON } from "../../utils/geojson"
+import { extractExtraColumns } from "../../places/place-fields"
 
 // BigQuery returns Overture's Parquet-style repeated fields as { list: [{ element: x }] }.
 const unwrapList = (wrapped: any): any[] =>
@@ -87,6 +88,9 @@ export const parsePlaceRow = (row: any): Place => {
           country: address.element?.country,
         })) : [],
         ext_distance: parseFloat(row.ext_distance),
+        // Any additional ext_ columns on the place table; the place fields
+        // manifest decides which of them a response includes.
+        extra_columns: extractExtraColumns(row),
       }
     }
 

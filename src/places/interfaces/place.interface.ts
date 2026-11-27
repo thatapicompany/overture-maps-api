@@ -20,6 +20,7 @@ export interface Place {
     brand?: Brand;
     addresses: Address[];
     ext_distance?: number;
+    extra_columns?: Record<string, unknown>;
     theme?: string;
     type?: string;
   }

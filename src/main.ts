@@ -6,6 +6,7 @@ import * as bodyParser from 'body-parser';
 import { SwaggerModule, SwaggerCustomOptions } from '@nestjs/swagger';
 import { buildOpenApiDocument } from './openapi/openapi.document';
 import { RouteNotFoundFilter } from './openapi/route-not-found.filter';
+import { loadPlaceFieldManifest } from './places/place-fields';
 const helmet = require('helmet');
 
 async function bootstrap() {
@@ -39,6 +40,8 @@ async function bootstrap() {
 
   // OpenAPI spec (src/openapi/openapi.document.ts) served as JSON at
   // /api-docs.json and as Swagger UI at /api-docs.
+  // Optional extra place fields; loaded first so the document describes them.
+  await loadPlaceFieldManifest();
   const document = buildOpenApiDocument(app);
   const customOptions: SwaggerCustomOptions = {
     customfavIcon: 'https://overturemaps.org/wp-content/uploads/sites/16/2022/12/cropped-Favicon-150x150.png',

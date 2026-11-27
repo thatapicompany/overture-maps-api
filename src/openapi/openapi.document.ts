@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { ACCOUNT_URL, PRICING_URL } from '../common/links';
 import { Format } from '../common/dto/requests/get-by-location.dto';
+import { placeFieldSchemas } from '../places/place-fields';
 
 // Self-hosted deployments can point these at their own URLs.
 export const PUBLIC_API_URL = process.env.PUBLIC_API_URL || 'https://api.overturemapsapi.com';
@@ -69,7 +70,23 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const root = document.paths['/']?.get;
   if (root) root.security = [];
   normaliseParameters(document);
+  addPlaceFields(document);
   return document;
+}
+
+/**
+ * Describes the fields from the place fields manifest (src/places/place-fields.ts)
+ * on the place properties schema. A no-op when no manifest is configured.
+ */
+export function addPlaceFields(
+  document: OpenAPIObject,
+  schemas: Record<string, Record<string, unknown>> = placeFieldSchemas(),
+): void {
+  const target = (document.components?.schemas?.PlacePropertiesDto as any)?.properties;
+  if (!target) return;
+  for (const [name, schema] of Object.entries(schemas)) {
+    if (!(name in target)) target[name] = schema;
+  }
 }
 
 /**

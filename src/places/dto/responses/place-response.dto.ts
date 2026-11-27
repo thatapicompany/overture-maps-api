@@ -8,6 +8,7 @@ import { Geometry, MultiPolygon, Point, Polygon } from 'geojson';
 import { GetByLocationDto } from '../../../common/dto/requests/get-by-location.dto';
 
 import { applyIncludesToDto } from '../../../common/dto/responses/includes.dto';
+import { resolvePlaceFields } from '../../place-fields';
 
 export class RulesDto {
   @ApiProperty({ description: 'Variant of the rule.', example: 'Abbreviation' })
@@ -209,13 +210,16 @@ export class PlaceResponseDto {
 
 export const toPlaceDto = (place: Place, requestQuery:GetByLocationDto):PlaceResponseDto => {
 
-  const excludeFieldsFromProperties = ['properties','geometry','ext_distance','bbox'];
+  const excludeFieldsFromProperties = ['properties','geometry','ext_distance','bbox','extra_columns'];
 
   
   const rPlace =  new PlaceResponseDto(place)
 
   const properties = {...rPlace.properties};
   excludeFieldsFromProperties.forEach(field => delete properties[field]);
+
+  // Fields declared in the place fields manifest, when one is configured.
+  Object.assign(properties, resolvePlaceFields(place.extra_columns));
 
   rPlace.properties = properties;
 
