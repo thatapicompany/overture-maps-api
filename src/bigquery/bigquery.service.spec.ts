@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BigQueryService, namePrefixTokenRange } from './bigquery.service';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { BigQueryService, foldName, foldNameSql, namePrefixTokenRange, normaliseNamePrefix } from './bigquery.service';
 import { Logger } from '@nestjs/common';
 
 describe('BigQueryService', () => {
@@ -135,7 +137,7 @@ describe('BigQueryService', () => {
       expect(spy.mock.calls[0][0]).not.toContain('ARRAY_LENGTH');
     });
 
-    it('adds a case-insensitive name clause against names.primary and names.common when name is provided', async () => {
+    it('adds a case- and accent-insensitive name clause against names.primary and names.common when name is provided', async () => {
       const service = new BigQueryService();
       service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
       const spy = jest.spyOn(service, 'runQuery');
@@ -144,10 +146,10 @@ describe('BigQueryService', () => {
       const params = spy.mock.calls[0][1];
       // names.common is a MAP (STRUCT<key_value ARRAY<STRUCT<key,value>>>), not the
       // {list:[{element}]} shape used by other repeated fields — must unnest .key_value.
-      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(sql).toContain(`NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC) = @name`);
       expect(sql).toContain('UNNEST(names.common.key_value)');
-      expect(sql).toContain('LOWER(common_name.value) = LOWER(@name)');
-      expect(params.name).toBe('Central Park');
+      expect(sql).toContain(`NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(common_name.value), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC) = @name`);
+      expect(params.name).toBe('central park');
     });
 
     it('adds no name clause when name is omitted', async () => {
@@ -159,15 +161,15 @@ describe('BigQueryService', () => {
       expect(spy.mock.calls[0][1].name).toBeUndefined();
     });
 
-    it('adds a prefix clause for name_prefix: start of the name or of any word, lowercased, nearest first', async () => {
+    it('adds a prefix clause for name_prefix: start of the name or of any word, folded, nearest first', async () => {
       const service = new BigQueryService();
       service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
       const spy = jest.spyOn(service, 'runQuery');
       await service.getPlacesNearby(51.5074, -0.1278, 5000, undefined, undefined, undefined, undefined, undefined, 5, undefined, undefined, undefined, 0, undefined, undefined, '  The   Example ');
       const sql = spy.mock.calls[0][0];
       const params = spy.mock.calls[0][1];
-      expect(sql).toContain("STARTS_WITH(LOWER(names.primary), @name_prefix)");
-      expect(sql).toContain("STRPOS(LOWER(names.primary), CONCAT(' ', @name_prefix)) > 0");
+      expect(sql).toContain(`STARTS_WITH(NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC), @name_prefix)`);
+      expect(sql).toContain(`STRPOS(NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC), CONCAT(' ', @name_prefix)) > 0`);
       expect(sql).toContain('ORDER BY ext_distance, id');
       expect(params.name_prefix).toBe('the example');
       // The prefix is a parameter, never spliced into the SQL.
@@ -192,9 +194,9 @@ describe('BigQueryService', () => {
       const params = spy.mock.calls[0][1];
       expect(sql).toContain('ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)');
       expect(sql).toContain('brand.names.primary = @brand_name');
-      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(sql).toContain(`NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC) = @name`);
       expect(params.brand_name).toBe('Starbucks');
-      expect(params.name).toBe('Starbucks Reserve');
+      expect(params.name).toBe('starbucks reserve');
     });
   });
 
@@ -525,7 +527,7 @@ describe('BigQueryService', () => {
       expect(sql).toContain('FROM `proj.overture.place_by_country`');
       expect(sql).toContain('country = @country');
       expect(sql).not.toContain('addresses.list[OFFSET(0)].element.country');
-      expect(sql).toContain('name_lower = LOWER(@name)');
+      expect(sql).toContain('name_folded = @name');
       expect(sql).not.toContain('LOWER(names.primary)');
       expect(sql).toContain('UNNEST(names.common.key_value)');
       expect(sql).not.toContain('ST_DWithin');
@@ -538,9 +540,9 @@ describe('BigQueryService', () => {
       expect(sql).toContain('FROM `proj.overture.place`');
       expect(sql).toContain('ST_DWithin(geometry, ST_GeogPoint(@longitude, @latitude), @radius)');
       expect(sql).toContain('addresses.list[OFFSET(0)].element.country = @country');
-      expect(sql).toContain('LOWER(names.primary) = LOWER(@name)');
+      expect(sql).toContain(`NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC) = @name`);
       expect(sql).not.toContain('place_by_country');
-      expect(sql).not.toContain('name_lower');
+      expect(sql).not.toContain('name_folded');
     });
 
     it('falls back to PLACE_TABLE with raw-schema predicates when PLACE_COUNTRY_TABLE is unset', async () => {
@@ -701,13 +703,13 @@ describe('BigQueryService', () => {
       expect(sql).toContain('SELECT country AS country');
     });
 
-    it('uses the pre-lowered name_lower column for name_prefix on the country mirror', async () => {
+    it('uses the pre-folded name_folded column for name_prefix on the country mirror', async () => {
       const service = new BigQueryService();
       service.runQuery = jest.fn().mockResolvedValue({ rows: [validRow], statistics: {} });
       const spy = jest.spyOn(service, 'runQuery');
       await service.getPlacesNearby(undefined as any, undefined as any, 1000, undefined, undefined, 'GB', undefined, 0.6, 20, undefined, undefined, undefined, 0, undefined, undefined, 'exam');
       const sql = spy.mock.calls[0][0];
-      expect(sql).toContain('STARTS_WITH(name_lower, @name_prefix)');
+      expect(sql).toContain('STARTS_WITH(name_folded, @name_prefix)');
       expect(sql).not.toContain('LOWER(names.primary)');
     });
 
@@ -734,11 +736,18 @@ describe('BigQueryService', () => {
         const { sql, params } = await run({ prefix: '  Exam ' });
         expect(sql).toContain('FROM (SELECT * EXCEPT(name_token) FROM `proj.overture.place_name_tokens` WHERE country = @country AND name_token >= @name_token_lo AND name_token < @name_token_hi AND STARTS_WITH(name_token, @name_token_lo) QUALIFY ROW_NUMBER() OVER (PARTITION BY id) = 1)');
         expect(sql).not.toContain('FROM `proj.overture.place_by_country`');
-        expect(sql).toContain('STARTS_WITH(name_lower, @name_prefix)');
-        expect(sql).toContain("STRPOS(name_lower, CONCAT(' ', @name_prefix)) > 0");
+        expect(sql).toContain('STARTS_WITH(name_folded, @name_prefix)');
+        expect(sql).toContain("STRPOS(name_folded, CONCAT(' ', @name_prefix)) > 0");
         expect(sql).toContain('COUNT(*) OVER() AS total_count');
         expect(sql).toContain('ORDER BY id');
         expect(params).toMatchObject({ name_prefix: 'exam', name_token_lo: 'exam', name_token_hi: 'exan', country: 'US' });
+      });
+
+      it('reads the folded word range for an accented prefix', async () => {
+        const { params } = await run({ prefix: 'Café' });
+        expect(params).toMatchObject({ name_prefix: 'cafe', name_token_lo: 'cafe', name_token_hi: 'caff' });
+        const two = await run({ prefix: 'São  Pa' });
+        expect(two.params).toMatchObject({ name_token: 'sao', name_prefix: 'sao pa' });
       });
 
       it('matches the first word exactly when the prefix has more than one', async () => {
@@ -907,6 +916,49 @@ describe('BigQueryService bytes billed backstop', () => {
     const failing = { id: 'job-3', getQueryResults: jest.fn().mockRejectedValue(new Error('boom')), getMetadata: jest.fn() };
     const { service } = serviceWith(failing);
     await expect(service.runQuery('SELECT 1')).rejects.toThrow('boom');
+  });
+});
+
+describe('foldName', () => {
+  // Each pair is what BigQuery returns for foldNameSql() on the left-hand text
+  // (checked against BigQuery on 28 Nov 2026). Japanese voicing marks, Hangul and Indic vowel signs are left alone. The country mirror stores names
+  // folded by BigQuery and the API folds the query in TypeScript, so the two
+  // must agree.
+  it.each([
+    ['Café', 'cafe'],
+    ['São Paulo', 'sao paulo'],
+    ['Peña', 'pena'],
+    ['ÉCOLE', 'ecole'],
+    ['Zürich', 'zurich'],
+    ['Øresund', 'oresund'],
+    ['İstanbul', 'istanbul'],
+    ['Łódź', 'lodz'],
+    ['Đà Nẵng', 'da nang'],
+    ['Nhà hàng Phở', 'nha hang pho'],
+    ['Ça va', 'ca va'],
+    ['Straße', 'straße'],
+    ['Αθήνα', 'αθηνα'],
+    ['Москва Йошкар', 'москва иошкар'],
+    ['東京 カフェ', '東京 カフェ'],
+    ['ガスト', 'ガスト'],
+    ['카페 베네', '카페 베네'],
+    ['नमस्ते', 'नमस्ते'],
+    ['Blue Bottle', 'blue bottle'],
+  ])('folds %s to %s', (text, folded) => {
+    expect(foldName(text)).toBe(folded);
+  });
+
+  it('gives the same result for precomposed and decomposed input', () => {
+    expect(foldName('Cafe\u0301')).toBe(foldName('Caf\u00e9'));
+  });
+
+  it('folds the same way as the country mirror build', () => {
+    const build = readFileSync(join(__dirname, '../../etl/build-places-country-mirror.sql'), 'utf8');
+    expect(build).toContain(`${foldNameSql('names.primary')} AS name_folded`);
+  });
+
+  it('is what name_prefix compares: trimmed, single-spaced and folded', () => {
+    expect(normaliseNamePrefix('  São   Paulo ')).toBe('sao paulo');
   });
 });
 
