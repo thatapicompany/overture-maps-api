@@ -33,6 +33,27 @@ Enrichment is disabled by default. Set `ENABLE_ENRICHMENT=true` in hosted deploy
 
 Alternative adapters can be supplied via `ENRICHMENT_ADAPTER_PACKAGE`. This allows future data sources such as Postgres without changing the public API.
 
+### Extra place fields
+
+If your place table carries additional columns whose names start with `ext_`, the API can return them on each place and describe them in the OpenAPI document. List them in a JSON manifest and point `PLACE_FIELDS_MANIFEST` at it (a `gs://` URL or a local path):
+
+```json
+{
+  "version": "2026-01-01",
+  "fields": [
+    {
+      "name": "ext_example",
+      "description": "What the field holds.",
+      "attribution": "Who to credit",
+      "licence": "CC0-1.0",
+      "schema": { "type": "string" }
+    }
+  ]
+}
+```
+
+`column` defaults to `name`, and `"encoding": "json"` parses a string column that holds JSON. Columns the manifest does not list are never returned. The manifest is read once at start-up; with none configured the API serves its standard fields. To export a spec that includes the fields, run `PLACE_FIELDS_MANIFEST=./manifest.json npm run openapi:export -- out.json`. The committed `api-docs.json` is exported without a manifest.
+
 ## API Endpoints
 
 - [OpenAPI Spec Doc](https://api.overturemapsapi.com/api-docs.json)
