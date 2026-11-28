@@ -2,13 +2,13 @@
 -- country-level name_prefix query reads only the words it can match.
 --
 -- name_prefix matches a name that starts with the prefix, or has a word that
--- does (`STARTS_WITH(name_lower, p) OR STRPOS(name_lower, ' ' || p) > 0`).
+-- does (`STARTS_WITH(name_folded, p) OR STRPOS(name_folded, ' ' || p) > 0`).
 -- `overture.place_by_country` is clustered by country, basic_category and
 -- name_lower, which cannot prune "any word starts with", so every such query
 -- read the whole country slice: about 13 GiB for the US, whatever the page.
 --
--- Here each place appears once for every distinct word of its lower-cased
--- name (split on single spaces, the same boundary the predicate uses), in a
+-- Here each place appears once for every distinct word of its folded name
+-- (lower case, no accents; split on single spaces, the same boundary the predicate uses), in a
 -- `name_token` column, clustered by country and name_token. The API reads the
 -- rows whose token falls in the prefix's range, keeps one row per id, and
 -- then applies the unchanged name_prefix predicate, so results are identical
@@ -29,7 +29,7 @@ AS
 SELECT p.*, name_token
 FROM `overture-maps-api.overture.place_by_country` AS p,
   UNNEST(ARRAY(
-    SELECT DISTINCT t FROM UNNEST(SPLIT(p.name_lower, ' ')) AS t WHERE t != ''
+    SELECT DISTINCT t FROM UNNEST(SPLIT(p.name_folded, ' ')) AS t WHERE t != ''
   )) AS name_token
 WHERE p.country IS NOT NULL
-  AND p.name_lower IS NOT NULL;
+  AND p.name_folded IS NOT NULL;

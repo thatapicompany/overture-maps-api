@@ -116,7 +116,7 @@ const placeFilterIndexTable = (): string | undefined => process.env.PLACE_FILTER
 const placeBrandTable = (): string | undefined => process.env.PLACE_BRAND_TABLE || undefined;
 
 // PLACE_NAME_TOKEN_TABLE holds the country mirror once per distinct word of each
-// place's lower-cased name (etl/build-place-name-tokens.sql), clustered by
+// place's folded name (lower case, no accents: see foldName below) (etl/build-place-name-tokens.sql), clustered by
 // country and that word. name_prefix matches a name that starts with the prefix
 // or has a word that does, which the mirror's name clustering cannot prune, so
 // a country-level name_prefix query read the whole country slice. With this
@@ -124,8 +124,35 @@ const placeBrandTable = (): string | undefined => process.env.PLACE_BRAND_TABLE 
 // Optional: unset, queries run exactly as before.
 const placeNameTokenTable = (): string | undefined => process.env.PLACE_NAME_TOKEN_TABLE || undefined;
 
-/** The prefix as the name_prefix predicate compares it: trimmed, single-spaced, lower case. */
-export const normaliseNamePrefix = (prefix: string): string => prefix.trim().replace(/\s+/g, ' ').toLowerCase();
+// Name matching ignores case and accents: both the stored name and the query
+// are lower-cased, a few letters that carry no combining mark are mapped to
+// their base letter, then the text is decomposed (NFD), the accents in the
+// Combining Diacritical Marks block (U+0300 to U+036F) are dropped, and the
+// rest is composed again (NFC). "Café" and "cafe" both become "cafe", "São"
+// becomes "sao", "Peña" becomes "pena". Marks outside that block, such as
+// Japanese voicing marks and Indic vowel signs, change the word, so they stay. foldName() in TypeScript and foldNameSql() in BigQuery must
+// give the same result, since the country mirror stores the folded name
+// (etl/build-places-country-mirror.sql) and the API folds the query to match.
+const FOLD_FROM = 'øłđı';
+const FOLD_TO = 'oldi';
+
+/** A name as the name and name_prefix filters compare it: lower case, no accents. */
+export const foldName = (text: string): string =>
+  Array.from(text.toLowerCase(), (c) => {
+    const i = FOLD_FROM.indexOf(c);
+    return i >= 0 ? FOLD_TO[i] : c;
+  })
+    .join('')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC');
+
+/** BigQuery SQL that folds a string expression the same way as foldName(). */
+export const foldNameSql = (expr: string): string =>
+  `NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(${expr}), '${FOLD_FROM}', '${FOLD_TO}'), NFD), r'[\\x{0300}-\\x{036f}]', ''), NFC)`;
+
+/** The prefix as the name_prefix predicate compares it: trimmed, single-spaced, folded. */
+export const normaliseNamePrefix = (prefix: string): string => foldName(prefix.trim().replace(/\s+/g, ' '));
 
 /**
  * The name-token rows a normalised name_prefix can match. A match starts at the
@@ -738,7 +765,7 @@ export class BigQueryService {
       // always paired with the radius or country predicate. The SQL depends on
       // which table is being read (see placeSource()).
       whereClauses.push(placeSrc.nameSql);
-      params.name = name;
+      params.name = foldName(name);
     }
 
     if (namePrefix) {
@@ -1356,20 +1383,22 @@ LIMIT 1;`;
    * Radius queries (lat/lng present) read PLACE_TABLE, clustered by geometry.
    * Country-level queries (no lat/lng) read PLACE_COUNTRY_TABLE when it is
    * configured: the same rows plus a top-level `country` cluster column and a
-   * pre-lowered `name_lower`, so the predicates become plain equalities on
-   * clustered columns instead of struct digs and LOWER() over 45GB. When the
+   * pre-folded `name_folded` (lower case, no accents), so the predicates become
+   * plain comparisons on top-level columns, pruned by the clustered country,
+   * instead of struct digs and folding every name over 45GB. When the
    * mirror is not configured the raw-schema predicates are used unchanged.
    */
   private placeSource(hasLatLng: boolean): { table: string; isCountryMirror: boolean; countrySql: string; nameSql: string; namePrefixSql: string } {
-    const commonNameSql = `EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE LOWER(common_name.value) = LOWER(@name))`;
+    // @name arrives folded (foldName), so each side compares folded text.
+    const commonNameSql = `EXISTS (SELECT 1 FROM UNNEST(names.common.key_value) AS common_name WHERE ${foldNameSql('common_name.value')} = @name)`;
     const countryTable = placeCountryTable();
     if (!hasLatLng && countryTable) {
       return {
         table: countryTable,
         isCountryMirror: true,
         countrySql: `country = @country`,
-        nameSql: `(name_lower = LOWER(@name) OR ${commonNameSql})`,
-        namePrefixSql: BigQueryService.namePrefixSql('name_lower'),
+        nameSql: `(name_folded = @name OR ${commonNameSql})`,
+        namePrefixSql: BigQueryService.namePrefixSql('name_folded'),
       };
     }
     return {
@@ -1380,18 +1409,19 @@ LIMIT 1;`;
       // is a MAP<string,string> and comes through BigQuery as
       // STRUCT<key_value ARRAY<STRUCT<key,value>>>, so it is unnested via
       // .key_value rather than .list. UNNEST of a NULL array yields zero rows.
-      nameSql: `(LOWER(names.primary) = LOWER(@name) OR ${commonNameSql})`,
-      namePrefixSql: BigQueryService.namePrefixSql('LOWER(names.primary)'),
+      nameSql: `(${foldNameSql('names.primary')} = @name OR ${commonNameSql})`,
+      namePrefixSql: BigQueryService.namePrefixSql(foldNameSql('names.primary')),
     };
   }
 
   /**
    * Type-ahead match on the primary name: the name starts with the prefix, or
-   * one of its words does. @name_prefix is already lowercased. Plain string
-   * functions rather than a regex, so user input needs no escaping.
+   * one of its words does. @name_prefix is already folded (normaliseNamePrefix)
+   * and `foldedNameExpr` is the folded name. Plain string functions rather than
+   * a regex, so user input needs no escaping.
    */
-  private static namePrefixSql(lowerNameExpr: string): string {
-    return `(STARTS_WITH(${lowerNameExpr}, @name_prefix) OR STRPOS(${lowerNameExpr}, CONCAT(' ', @name_prefix)) > 0)`;
+  private static namePrefixSql(foldedNameExpr: string): string {
+    return `(STARTS_WITH(${foldedNameExpr}, @name_prefix) OR STRPOS(${foldedNameExpr}, CONCAT(' ', @name_prefix)) > 0)`;
   }
 
   private buildWhereClauses({

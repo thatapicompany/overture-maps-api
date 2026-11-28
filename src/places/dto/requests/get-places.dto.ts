@@ -74,7 +74,7 @@ export class GetPlacesDto extends GetByLocationDto {
 
   @ApiPropertyOptional({
     description:
-      'Filter by the place\'s own name — an additional filter on top of lat/lng/radius (or country) search, not a standalone text search. Case-insensitive exact match against names.primary or any localized value in names.common.',
+      'Filter by the place\'s own name: an additional filter on top of lat/lng/radius (or country) search, not a standalone text search. Exact match against names.primary or any localized value in names.common, ignoring case and accents ("cafe" matches "Café").',
     example: 'Central Park',
   })
   @IsOptional()
@@ -84,7 +84,7 @@ export class GetPlacesDto extends GetByLocationDto {
   @ApiPropertyOptional({
     description:
       'Partial-name search for type-ahead: matches places whose primary name starts with this text, or has a word that does ' +
-      '(so "blue bo" and "bottle" both match "Blue Bottle Coffee"). Case-insensitive, at least 2 characters. ' +
+      '(so "blue bo" and "bottle" both match "Blue Bottle Coffee"). Ignores case and accents ("sao" matches "São Paulo"), at least 2 characters. ' +
       'Combine with lat/lng/radius and a small limit: results come nearest first.',
     example: 'blue bo',
   })

@@ -12,11 +12,19 @@
 -- (see docs/cost-budget-rate-limiting.md). Clustering on a derived top-level
 -- `country` column means a country query reads one country's slice instead.
 --
--- Same schema as the source plus two derived columns the API filters on:
---   country     the first address's ISO country code (what the API has always
---               filtered on), hoisted to a top-level column so it can cluster
---   name_lower  LOWER(names.primary), so name matching is a plain equality
---               instead of LOWER() over every row
+-- Same schema as the source plus derived columns the API filters on:
+--   country      the first address's ISO country code (what the API has always
+--                filtered on), hoisted to a top-level column so it can cluster
+--   name_folded  names.primary in lower case with accents removed, so name and
+--                name_prefix matching ignore accents ("cafe" finds "Café") and
+--                are plain comparisons instead of folding every row. Must fold
+--                exactly as foldName() and foldNameSql() in
+--                src/bigquery/bigquery.service.ts.
+--   name_lower   LOWER(names.primary). No longer read by the API. It stays as
+--                the third clustering column because CREATE OR REPLACE cannot
+--                change a table's clustering, and dropping the table first
+--                would break country-level queries during every rebuild. The
+--                cost is small: country, then category, does the pruning.
 -- `SELECT *` keeps the parser (bq-place-row.parser.ts) unchanged; it ignores
 -- columns it does not read.
 --
@@ -35,6 +43,7 @@ CLUSTER BY country, basic_category, name_lower
 AS
 SELECT
   addresses.list[SAFE_OFFSET(0)].element.country AS country,
+  NORMALIZE(REGEXP_REPLACE(NORMALIZE(TRANSLATE(LOWER(names.primary), 'øłđı', 'oldi'), NFD), r'[\x{0300}-\x{036f}]', ''), NFC) AS name_folded,
   LOWER(names.primary) AS name_lower,
   *
 FROM `overture-maps-api.overture.place`;
@@ -42,4 +51,4 @@ FROM `overture-maps-api.overture.place`;
 -- Sanity check after building: a country query should bill one country's
 -- slice (low single-digit GiB for a small country), not 45 GiB.
 --   SELECT COUNT(*) FROM `overture-maps-api.overture.place_by_country`
---   WHERE country = 'GB' AND name_lower = 'the example cafe';
+--   WHERE country = 'GB' AND name_folded = 'the example cafe';
